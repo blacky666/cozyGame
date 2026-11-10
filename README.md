@@ -2,7 +2,8 @@
 
 Eine Online-Minispiel-Party für 2 bis 4 Freunde im Browser. Albern, schadenfroh, gemütlich.
 
-> **Status:** In Planung. Noch nicht spielbar.
+> **Status:** Fundament steht (Räume, Lobby, Abendablauf, Spielstand-Sicherung) – die Minispiele folgen.
+> Online: https://blacky666.github.io/cozyGame/
 
 ## Idee
 
@@ -24,3 +25,15 @@ Eine Online-Minispiel-Party für 2 bis 4 Freunde im Browser. Albern, schadenfroh
 - Peer-to-peer über WebRTC ([Trystero](https://github.com/dmotz/trystero)), der Browser des Gastgebers ist der Server
 - Gehostet auf GitHub Pages
 - 16-Bit-Pixel-Art
+
+## Entwickeln
+
+```bash
+npm install
+npm run dev      # http://localhost:5173/cozyGame/
+npm test
+npm run assets:check
+```
+
+- `?dev=1&bots=2` startet als Gastgeber mit Bot-Mitspielern.
+- `?dev=chars` zeigt die Figuren-Testseite.
