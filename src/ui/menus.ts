@@ -15,14 +15,13 @@ import { showProfile } from './profileScreen';
 import { showConnecting, showStart } from './startScreen';
 import { addDevBots } from '../dev/bots';
 import { devFlags } from '../dev/devFlags';
-import { attachClientEvening, onStartEvening } from './startEvening';
+import { attachClientEvening, onStartEvening, preloadRuntime } from './startEvening';
 
-const JOIN_TIMEOUT_MS = 15000;
 const NOT_FOUND = 'Kein Raum mit diesem Code gefunden.';
 const REJECT_TEXT: Record<RejectReason, string> = {
   full: 'Der Raum ist voll.',
   running: 'Der Abend läuft bereits.',
-  version: 'Bitte Seite neu laden – deine Version ist veraltet.',
+  version: 'Versionen passen nicht – bitte beide Seiten neu laden.',
   name: 'Dieser Name ist im Raum schon vergeben. Falls du gerade neu geladen hast: kurz warten und nochmal versuchen.',
 };
 
@@ -79,6 +78,7 @@ export function startMenus(root: HTMLElement): void {
       session.close(); // sends `bye`
       toStart();
     };
+    preloadRuntime();
     const update = showLobby(
       root,
       {
@@ -111,7 +111,7 @@ export function startMenus(root: HTMLElement): void {
       session.close();
       toStart(message);
     };
-    const timer = setTimeout(() => phase === 'connecting' && abort(NOT_FOUND), JOIN_TIMEOUT_MS);
+    const timer = setTimeout(() => phase === 'connecting' && abort(NOT_FOUND), CONFIG.net.joinTimeoutMs);
     showConnecting(root, () => abort());
 
     let update: ((r: PlayerInfo[]) => void) | null = null;

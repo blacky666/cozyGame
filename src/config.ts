@@ -16,6 +16,10 @@ interface GameConfig {
     interpDelayMs: number;
     reconnectGraceMs: number;
     appId: string;
+    /** Client gives up joining a room after this long. */
+    joinTimeoutMs: number;
+    /** STUN servers for WebRTC. */
+    stun: string[];
     /** Client prediction: ease toward the server position when the error exceeds this (px). */
     predictErrPx: number;
     /** Client prediction: fraction of the error corrected per frame. */
@@ -26,7 +30,7 @@ interface GameConfig {
     inputStaleMs: number;
   };
   view: { width: number; height: number; zoom: number };
-  players: { min: number; max: number };
+  players: { min: number; max: number; maxName: number };
   turn: { urls: string[]; username: string; credential: string };
   intro: { ruleMs: number; countdownMs: number };
   standings: { showMs: number };
@@ -50,13 +54,15 @@ export const CONFIG = deepFreeze<GameConfig>({
     interpDelayMs: 100,
     reconnectGraceMs: 60000,
     appId: 'cozygame-v1',
+    joinTimeoutMs: 15000,
+    stun: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'],
     predictErrPx: 4,
     predictEase: 0.3,
     inputHeartbeatMs: 200,
     inputStaleMs: 500,
   },
   view: { width: 426, height: 240, zoom: 3 },
-  players: { min: 2, max: 4 },
+  players: { min: 2, max: 4, maxName: 16 },
   // Empty until the Metered TURN account exists.
   turn: { urls: [], username: '', credential: '' },
   intro: { ruleMs: 5000, countdownMs: 3000 },

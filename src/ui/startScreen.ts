@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import { normalizeRoomCode } from '../net/roomCode';
 import { clear, h } from './dom';
 
@@ -14,7 +15,7 @@ export function showStart(root: HTMLElement, o: StartHandlers): void {
   clear(root);
   const error = h('p', { class: 'cg-error', text: o.message ?? '' });
   const name = h('input', {
-    class: 'cg-input', maxlength: 16, value: o.name, placeholder: 'Dein Name', 'aria-label': 'Name',
+    class: 'cg-input', maxlength: CONFIG.players.maxName, value: o.name, placeholder: 'Dein Name', 'aria-label': 'Name',
     oninput: () => o.onName(name.value.trim().slice(0, 16)),
   });
   const code = h('input', {

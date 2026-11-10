@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import { decodeSave, encodeSave, saveFileName } from '../save/saveFile';
 import { saveProfile } from '../save/storage';
 import type { Profile } from '../save/profile';
@@ -13,7 +14,7 @@ export function showProfile(root: HTMLElement, profile: Profile, onBack: (p: Pro
   const msg = h('p', { class: 'cg-error' });
   const stats = h('p', { class: 'cg-hint' });
   const name = h('input', {
-    class: 'cg-input', maxlength: 16, value: current.name, 'aria-label': 'Name',
+    class: 'cg-input', maxlength: CONFIG.players.maxName, value: current.name, 'aria-label': 'Name',
     oninput: () => {
       current = { ...current, name: name.value.trim().slice(0, 16) };
       saveProfile(current);
@@ -50,7 +51,7 @@ export function showProfile(root: HTMLElement, profile: Profile, onBack: (p: Pro
   const save = async () => {
     const url = URL.createObjectURL(new Blob([await encodeSave(current)], { type: 'text/plain' }));
     h('a', { href: url, download: saveFileName(current, new Date()) }).click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   root.append(

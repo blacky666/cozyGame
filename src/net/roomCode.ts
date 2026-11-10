@@ -22,7 +22,9 @@ export function normalizeRoomCode(input: string): string | null {
     .replace(/Ä/g, 'AE')
     .replace(/Ö/g, 'OE')
     .replace(/Ü/g, 'UE')
+    .replace(/[–—]/g, '-')
     .replace(/[\s_]+/g, '-')
-    .replace(/-{2,}/g, '-');
+    .replace(/-{2,}/g, '-')
+    .replace(/^([A-Z]{3,12})(\d{2})$/, '$1-$2');
   return /^[A-Z]{3,12}-\d{2}$/.test(s) ? s : null;
 }

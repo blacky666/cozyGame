@@ -15,7 +15,6 @@ import type { Transport } from './transport';
  */
 
 export const LOBBY = 'lobby';
-const MAX_NAME = 24;
 const REJECT_REASONS: readonly RejectReason[] = ['full', 'running', 'version', 'name'];
 
 type ProfileLike = Pick<Profile, 'name' | 'look'>;
@@ -80,18 +79,19 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
   const rosterChanged = () => {
     const list = roster.list();
     toAll('roster', list);
-    rosterCbs.forEach((cb) => cb(roster.list()));
+    [...rosterCbs].forEach((cb) => cb(roster.list()));
   };
   const emitInput = (id: string, s: InputState, seq: number) => {
     inputs.set(id, s);
     inputAt.set(id, now());
-    inputCbs.forEach((cb) => cb(id, s, seq));
+    [...inputCbs].forEach((cb) => cb(id, s, seq));
   };
 
   t.on('hello', (data, from) => {
     if (!isObj(data) || typeof data.name !== 'string' || typeof data.version !== 'string') return;
     const name = data.name.trim();
-    if (name.length === 0 || name.length > MAX_NAME || local.has(from)) return;
+    if (local.has(from)) return;
+    if (name.length === 0 || name.length > CONFIG.players.maxName) return send(t, 'reject', { reason: 'name' }, from);
     if (data.version !== APP_VERSION) return send(t, 'reject', { reason: 'version' }, from);
 
     const existing = roster.get(from);
@@ -223,7 +223,7 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
   const setRoster = (data: unknown) => {
     if (!Array.isArray(data)) return;
     roster = data as PlayerInfo[];
-    rosterCbs.forEach((cb) => cb(roster));
+    [...rosterCbs].forEach((cb) => cb(roster));
   };
 
   t.onPeerJoin((id) => {
@@ -244,7 +244,7 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
     const reason = data.reason as RejectReason;
     if (!REJECT_REASONS.includes(reason)) return;
     done = true;
-    rejectCbs.forEach((cb) => cb(reason));
+    [...rejectCbs].forEach((cb) => cb(reason));
   });
 
   t.on('roster', (data, from) => {
@@ -255,18 +255,18 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
     if (!fromHost(from) || !isObj(data) || typeof data.phase !== 'string') return;
     phase = data.phase;
     const msg = data as PhaseMsg;
-    phaseCbs.forEach((cb) => cb(msg));
+    [...phaseCbs].forEach((cb) => cb(msg));
   });
 
   t.on('snap', (data, from) => {
     if (!fromHost(from) || !isObj(data) || typeof data.tick !== 'number' || typeof data.phase !== 'string') return;
     const snap = data as Snap;
-    snapCbs.forEach((cb) => cb(snap));
+    [...snapCbs].forEach((cb) => cb(snap));
   });
 
   const hostLost = () => {
     done = true;
-    lostCbs.forEach((cb) => cb());
+    [...lostCbs].forEach((cb) => cb());
   };
   t.on('bye', (_data, from) => {
     if (!done && fromHost(from)) hostLost();

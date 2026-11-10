@@ -9,10 +9,7 @@ import { normalizeRoomCode } from './roomCode';
 export function joinTrysteroRoom(rawCode: string): Transport {
   const code = normalizeRoomCode(rawCode);
   if (code === null) throw new Error(`Invalid room code: ${rawCode}`);
-  const iceServers: RTCIceServer[] = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
-  ];
+  const iceServers: RTCIceServer[] = CONFIG.net.stun.map((urls) => ({ urls }));
   if (CONFIG.turn.urls.length > 0) {
     iceServers.push({
       urls: [...CONFIG.turn.urls],

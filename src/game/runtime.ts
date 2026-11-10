@@ -65,7 +65,14 @@ export function runHostEvening(session: HostSession, rounds: number, onLobby: ()
     },
     backToStart: () => {},
   });
-  host.start();
+  try {
+    host.start();
+  } catch (e) {
+    // e.g. too few connected players: do not leave a stage or host behind.
+    host.stop();
+    stage.destroy();
+    throw e;
+  }
 }
 
 /** Client: render phases from the host. Returns the stage (driven by startEvening.ts). */

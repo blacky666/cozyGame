@@ -58,6 +58,17 @@ function setup() {
 }
 
 describe('EveningHost', () => {
+  it('start with fewer than 2 connected players throws and leaves the session recoverable', () => {
+    const s = setup();
+    expect(() => s.evening.start()).toThrow();
+    expect(s.phases).toEqual([]);
+    expect(s.evening.phase.kind).toBe('lobby');
+    s.session.setPhase('starting'); // what startEvening does before loading
+    s.session.resetForLobby({ kind: 'lobby' });
+    expect(s.session.phase).toBe('lobby');
+    expect(s.stopped()).toBe(0);
+  });
+
   it('runs a full evening keyed by player slots and broadcasts every phase', async () => {
     const s = setup();
     const ct = s.hub.join();

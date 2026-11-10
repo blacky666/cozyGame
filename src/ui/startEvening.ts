@@ -22,26 +22,49 @@ export type EveningContext = {
   onLobby?(): void;
 };
 
+const STARTING = 'starting';
 const loadRuntime = () => import('../game/runtime');
 const setOverlay = (root: HTMLElement, visible: boolean) => void (root.style.display = visible ? '' : 'none');
+
+/** Shown in the lobby when the host's start failed. */
+export const START_ABORTED = 'Start abgebrochen – zu wenige Spieler.';
 
 /** Host pressed "Los geht's!". */
 export function onStartEvening(ctx: EveningContext): void {
   if (!ctx.isHost) return;
   const session = ctx.session as HostSession;
+  // Lock the room while the lazy chunk loads: new peers are told "running" instead of joining unready.
+  session.setPhase(STARTING);
   setOverlay(ctx.root, false);
+  const abort = (notice?: string) => {
+    session.resetForLobby({ kind: 'lobby' });
+    setOverlay(ctx.root, true);
+    if (notice) {
+      const hint = ctx.root.querySelector('.cg-hint');
+      if (hint) hint.textContent = notice;
+    }
+  };
   void loadRuntime().then(
-    ({ runHostEvening }) =>
-      runHostEvening(session, ctx.rounds, () => {
-        setOverlay(ctx.root, true);
-        ctx.onLobby?.();
-      }),
+    ({ runHostEvening }) => {
+      try {
+        runHostEvening(session, ctx.rounds, () => {
+          setOverlay(ctx.root, true);
+          ctx.onLobby?.();
+        });
+      } catch (e) {
+        console.error('could not start the evening', e);
+        abort(START_ABORTED);
+      }
+    },
     (e: unknown) => {
       console.error('could not load the game', e);
-      setOverlay(ctx.root, true);
+      abort();
     },
   );
 }
+
+/** Warm the lazy Phaser chunk (call when entering the lobby). */
+export const preloadRuntime = (): void => void loadRuntime().catch(() => {});
 
 const KINDS: ReadonlyArray<EveningPhase['kind']> = ['lobby', 'intro', 'playing', 'standings', 'podium', 'ended'];
 const asPhase = (x: unknown): EveningPhase | null =>

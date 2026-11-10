@@ -68,6 +68,33 @@ describe('session', () => {
     expect(host.roster.list()).toHaveLength(1);
   });
 
+  it('rejects a hello with an invalid name (empty or too long)', async () => {
+    for (const name of ['   ', 'x'.repeat(CONFIG.players.maxName + 1)]) {
+      const hub = createLocalHub();
+      const host = createHost(hub.join(), prof('Host'));
+      const client = createClient(hub.join(), { ...prof('Gast'), name });
+      const reasons: RejectReason[] = [];
+      client.onRejected((r) => reasons.push(r));
+      await flush();
+      expect(reasons).toEqual(['name']);
+      expect(host.roster.list()).toHaveLength(1);
+    }
+  });
+
+  it('keeps dispatching when a listener unsubscribes during dispatch', async () => {
+    const hub = createLocalHub();
+    createHost(hub.join(), prof('Host'));
+    const client = createClient(hub.join(), prof('Gast'));
+    const calls: string[] = [];
+    const off = client.onRoster(() => {
+      calls.push('a');
+      off();
+    });
+    client.onRoster(() => calls.push('b'));
+    await flush();
+    expect(calls.slice(0, 2)).toEqual(['a', 'b']); // without the copy, 'b' would be skipped
+  });
+
   it('identifies the host by welcome when other clients are present', async () => {
     const hub = createLocalHub();
     const ht = hub.join();

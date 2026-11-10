@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 export type Look = {
   outfit: string;
   hair: string;
@@ -59,7 +60,7 @@ export function migrate(raw: unknown): Profile {
   const s = isObj(raw.settings) ? raw.settings : {};
   return {
     v: 1,
-    name: str(raw.name, d.name),
+    name: str(raw.name, d.name).trim().slice(0, CONFIG.players.maxName) || d.name,
     xp: Math.max(0, num(raw.xp, d.xp)),
     unlocked: strArr(raw.unlocked, d.unlocked),
     look: {

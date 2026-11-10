@@ -8,6 +8,14 @@ describe('normalizeRoomCode', () => {
   it('maps umlauts and spaces', () => {
     expect(normalizeRoomCode('käse 42')).toBe('KAESE-42');
   });
+  it('accepts en/em dashes as separator', () => {
+    expect(normalizeRoomCode('kaese–42')).toBe('KAESE-42');
+    expect(normalizeRoomCode('kaese—42')).toBe('KAESE-42');
+  });
+  it('accepts a missing separator before the 2 digits', () => {
+    expect(normalizeRoomCode('kaese42')).toBe('KAESE-42');
+    expect(normalizeRoomCode('käse42')).toBe('KAESE-42');
+  });
   it('trims and uppercases', () => {
     expect(normalizeRoomCode(' kaese-42 ')).toBe('KAESE-42');
   });

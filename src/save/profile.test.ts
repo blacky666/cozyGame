@@ -20,6 +20,9 @@ describe('migrate', () => {
     const b = defaultProfile();
     expect({ ...a, createdAt: '' }).toEqual({ ...b, createdAt: '' });
   });
+  it('trims and limits the name to CONFIG.players.maxName', () => {
+    expect(migrate({ name: '  ' + 'x'.repeat(40) }).name).toBe('x'.repeat(16));
+  });
   it('keeps string name and resets invalid xp', () => {
     const p = migrate({ name: 'Mo', xp: 'x' });
     expect(p.name).toBe('Mo');
