@@ -3,26 +3,51 @@ import { defaultProfile, migrate, type Profile } from './profile';
 export const PROFILE_KEY = 'cozygame.profile';
 export const BROKEN_KEY = 'cozygame.profile.broken';
 
-export function loadProfile(storage: Storage = globalThis.localStorage): Profile {
-  let raw: string | null = null;
+let warned = false;
+function warnOnce(e: unknown): void {
+  if (warned) return;
+  warned = true;
+  console.warn('cozygame: profile storage unavailable', e);
+}
+
+export function loadProfile(storage?: Storage): Profile {
+  let store: Storage;
+  let raw: string | null;
   try {
-    raw = storage.getItem(PROFILE_KEY);
-  } catch {
+    store = storage ?? globalThis.localStorage;
+    raw = store.getItem(PROFILE_KEY);
+  } catch (e) {
+    warnOnce(e);
     return defaultProfile();
   }
   if (raw === null) return defaultProfile();
+  let parsed: unknown;
+  let valid = false;
   try {
-    return migrate(JSON.parse(raw));
+    parsed = JSON.parse(raw);
+    valid =
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      (parsed as { v?: unknown }).v === 1;
   } catch {
-    try {
-      storage.setItem(BROKEN_KEY, raw);
-    } catch {
-      /* storage unavailable or full */
-    }
-    return defaultProfile();
+    valid = false;
   }
+  if (!valid) {
+    // keep the original value so a broken or foreign profile is never lost silently
+    try {
+      store.setItem(BROKEN_KEY, raw);
+    } catch (e) {
+      warnOnce(e);
+    }
+  }
+  return valid ? migrate(parsed) : migrate(parsed === undefined ? null : parsed);
 }
 
-export function saveProfile(p: Profile, storage: Storage = globalThis.localStorage): void {
-  storage.setItem(PROFILE_KEY, JSON.stringify(p));
+export function saveProfile(p: Profile, storage?: Storage): void {
+  try {
+    (storage ?? globalThis.localStorage).setItem(PROFILE_KEY, JSON.stringify(p));
+  } catch (e) {
+    warnOnce(e);
+  }
 }

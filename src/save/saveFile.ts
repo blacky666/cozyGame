@@ -1,6 +1,6 @@
 import { migrate, type Profile } from './profile';
 
-export const SAVE_SECRET = 'cozyGame/v1/ZwieBelSuppe-7f3a91c2';
+const SAVE_SECRET = 'cozyGame/v1/ZwieBelSuppe-7f3a91c2';
 const MAGIC = 'COZYSAVE';
 const VERSION = '1';
 
@@ -48,7 +48,13 @@ export async function decodeSave(text: string): Promise<DecodeResult> {
   } catch {
     return { ok: false, reason: 'format' };
   }
-  if ((await checksum(json)) !== sum) return { ok: false, reason: 'checksum' };
+  let expected: string;
+  try {
+    expected = await checksum(json);
+  } catch {
+    return { ok: false, reason: 'format' };
+  }
+  if (expected !== sum) return { ok: false, reason: 'checksum' };
   try {
     return { ok: true, profile: migrate(JSON.parse(json)) };
   } catch {

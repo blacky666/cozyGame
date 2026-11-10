@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { defaultProfile, migrate } from './profile';
 import { loadProfile, saveProfile } from './storage';
 
@@ -47,5 +47,35 @@ describe('storage', () => {
   });
   it('returns defaults when nothing stored', () => {
     expect(loadProfile(stub()).v).toBe(1);
+  });
+
+  it('does not throw when storage methods throw', () => {
+    const bad = { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); } } as unknown as Storage;
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(loadProfile(bad).v).toBe(1);
+    expect(() => saveProfile(defaultProfile('A'), bad)).not.toThrow();
+  });
+  it('does not throw when localStorage getter throws', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('localStorage', undefined);
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('SecurityError'); } });
+    try {
+      expect(loadProfile().v).toBe(1);
+      expect(() => saveProfile(defaultProfile('A'))).not.toThrow();
+    } finally {
+      delete (globalThis as { localStorage?: unknown }).localStorage;
+      vi.unstubAllGlobals();
+    }
+  });
+  it.each(['null', '[]', '5', '{"v":2,"name":"Z"}', '{"name":"Z"}'])('backs up valid-JSON non-v1 value %s', (raw) => {
+    const s = stub({ 'cozygame.profile': raw });
+    expect(loadProfile(s).v).toBe(1);
+    expect(s.getItem('cozygame.profile.broken')).toBe(raw);
+  });
+  it('does not back up a valid v1 profile', () => {
+    const s = stub();
+    saveProfile(defaultProfile('Q'), s);
+    loadProfile(s);
+    expect(s.getItem('cozygame.profile.broken')).toBeNull();
   });
 });

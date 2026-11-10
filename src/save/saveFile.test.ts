@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { defaultProfile } from './profile';
 import { encodeSave, decodeSave, saveFileName } from './saveFile';
 
@@ -57,5 +57,14 @@ describe('saveFile', () => {
   });
   it('builds a sanitized file name', () => {
     expect(saveFileName(defaultProfile('Jörg M!'), new Date(2026, 10, 9))).toBe('cozyGame-J_rg_M_-2026-11-09.cozysave');
+  });
+  it('returns format when crypto.subtle is unavailable', async () => {
+    const t = await encodeSave(defaultProfile('Mo'));
+    vi.stubGlobal('crypto', {});
+    try {
+      expect(await decodeSave(t)).toEqual({ ok: false, reason: 'format' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
