@@ -49,3 +49,8 @@
 }
 .cg-dialog { min-width: 300px; max-width: 480px; text-align: center; }
 .cg-mobile { background: var(--panel); border: 4px solid var(--border); padding: 24px; font-size: 24px; text-align: center; }
+.cg-kick {
+  font: inherit; font-size: 14px; color: var(--hi); background: transparent; border: 2px solid var(--hi);
+  border-radius: 4px; padding: 2px 8px; margin-top: 2px; cursor: pointer;
+}
+.cg-kick:hover { background: var(--hi); color: var(--primary-text); }

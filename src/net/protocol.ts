@@ -27,7 +27,7 @@ export function neutralInput(): InputState {
   };
 }
 
-export type RejectReason = 'full' | 'running' | 'version' | 'name';
+export type RejectReason = 'full' | 'running' | 'version' | 'name' | 'kicked';
 
 // Type names must stay <= 12 bytes (Trystero action-name limit).
 export type Msg =

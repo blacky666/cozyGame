@@ -15,7 +15,7 @@ import type { Transport } from './transport';
  */
 
 export const LOBBY = 'lobby';
-const REJECT_REASONS: readonly RejectReason[] = ['full', 'running', 'version', 'name'];
+const REJECT_REASONS: readonly RejectReason[] = ['full', 'running', 'version', 'name', 'kicked'];
 
 type ProfileLike = Pick<Profile, 'name' | 'look'>;
 type Snap = MsgData<'snap'>;
@@ -52,6 +52,8 @@ export interface HostSession {
   setLocalReady(playerId: string, ready: boolean): void;
   /** Back to the lobby after an evening: drop disconnected players, reset ready (bots stay ready). */
   resetForLobby(data?: unknown): void;
+  /** Lobby only: remove a remote player; they cannot rejoin this room from the same connection. */
+  kick(playerId: string): boolean;
   /** Says `bye` to all clients (so they notice at once), then leaves the room. */
   close(): void;
 }
@@ -69,6 +71,8 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
   let tick = 0;
   let botCounter = 0;
   let localSeq = 0;
+  /** Peers the host removed: their hellos are refused for the rest of the room. */
+  const kicked = new Set<string>();
 
   roster.join(t.selfId, profile.name, profile.look, now(), { running: false });
 
@@ -91,6 +95,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     if (!isObj(data) || typeof data.name !== 'string' || typeof data.version !== 'string') return;
     const name = data.name.trim();
     if (local.has(from)) return;
+    if (kicked.has(from)) return send(t, 'reject', { reason: 'kicked' }, from);
     if (name.length === 0 || name.length > CONFIG.players.maxName) return send(t, 'reject', { reason: 'name' }, from);
     if (data.version !== APP_VERSION) return send(t, 'reject', { reason: 'version' }, from);
 
@@ -181,6 +186,18 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       toAll('phase', data === undefined ? { phase: LOBBY } : { phase: LOBBY, data });
       rosterChanged();
     },
+    kick(id) {
+      const p = roster.get(id);
+      if (phase !== LOBBY || !p || local.has(id)) return false;
+      kicked.add(id);
+      send(t, 'reject', { reason: 'kicked' }, id);
+      roster.remove(id);
+      inputs.delete(id);
+      lastSeq.delete(id);
+      inputAt.delete(id);
+      rosterChanged();
+      return true;
+    },
     close() {
       toAll('bye', {});
       t.leave();
@@ -239,10 +256,12 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
     setRoster(data.roster);
   });
 
-  t.on('reject', (data) => {
-    if (done || hostId !== null || !isObj(data)) return;
+  t.on('reject', (data, from) => {
+    if (done || !isObj(data)) return;
     const reason = data.reason as RejectReason;
     if (!REJECT_REASONS.includes(reason)) return;
+    // Before the welcome any peer may reject us; afterwards only our host can, and only by kicking.
+    if (hostId !== null && !(fromHost(from) && reason === 'kicked')) return;
     done = true;
     [...rejectCbs].forEach((cb) => cb(reason));
   });

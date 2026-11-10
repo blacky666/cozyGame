@@ -22,6 +22,7 @@ const REJECT_TEXT: Record<RejectReason, string> = {
   full: 'Der Raum ist voll.',
   running: 'Der Abend läuft bereits.',
   version: 'Versionen passen nicht – bitte beide Seiten neu laden.',
+  kicked: 'Der Gastgeber hat dich aus dem Raum entfernt.',
   name: 'Dieser Name ist im Raum schon vergeben. Falls du gerade neu geladen hast: kurz warten und nochmal versuchen.',
 };
 
@@ -87,6 +88,7 @@ export function startMenus(root: HTMLElement): void {
         onRounds: (n) => (rounds = n),
         onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, root }),
         onLeave: leave,
+        onKick: (id) => void session.kick(id),
       },
       session.roster.list(),
     );
@@ -116,7 +118,7 @@ export function startMenus(root: HTMLElement): void {
 
     let update: ((r: PlayerInfo[]) => void) | null = null;
     const evening = attachClientEvening(session, root, () => abort());
-    session.onRejected((reason) => phase === 'connecting' && abort(REJECT_TEXT[reason]));
+    session.onRejected((reason) => (phase === 'connecting' || reason === 'kicked') && abort(REJECT_TEXT[reason]));
     session.onHostLost(() => {
       if (phase === 'connecting') abort(NOT_FOUND);
       else if (evening.running()) evening.hostLost(); // ended screen; its button calls abort()

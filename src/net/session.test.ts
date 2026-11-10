@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../config';
+import { APP_VERSION, CONFIG } from '../config';
 import { defaultProfile } from '../save/profile';
 import { neutralInput, type InputState, type RejectReason } from './protocol';
 import { createClient, createHost, startHostTicker, type TickWorker } from './session';
@@ -11,6 +11,54 @@ const flush = async () => {
 const prof = (name: string) => defaultProfile(name);
 
 describe('session', () => {
+  it('lets the host kick a player from the lobby and refuses their next hello', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    const host = createHost(ht, prof('Host'));
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    const reasons: RejectReason[] = [];
+    client.onRejected((r) => reasons.push(r));
+    await flush();
+    expect(host.roster.list()).toHaveLength(2);
+    expect(host.kick(ht.selfId)).toBe(false); // never the host itself
+    expect(host.kick(ct.selfId)).toBe(true);
+    await flush();
+    expect(reasons).toEqual(['kicked']);
+    expect(host.roster.list().map((p) => p.id)).toEqual([ht.selfId]);
+    // Same connection says hello again (e.g. with another name): refused, not re-added.
+    const replies: unknown[] = [];
+    ct.on('reject', (d) => replies.push(d));
+    ct.send('hello', { name: 'Gast2', version: APP_VERSION, look: prof('Gast2').look }, ht.selfId);
+    await flush();
+    expect(replies).toEqual([{ reason: 'kicked' }]);
+    expect(host.roster.list()).toHaveLength(1);
+  });
+
+  it('ignores a kick sent by a peer that is not the host', async () => {
+    const hub = createLocalHub();
+    createHost(hub.join(), prof('Host'));
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    const reasons: RejectReason[] = [];
+    client.onRejected((r) => reasons.push(r));
+    await flush();
+    hub.join().send('reject', { reason: 'kicked' }, ct.selfId);
+    await flush();
+    expect(reasons).toEqual([]);
+    expect(client.hostId).not.toBeNull();
+  });
+
+  it('cannot kick once the evening is running', async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const ct = hub.join();
+    createClient(ct, prof('Gast'));
+    await flush();
+    host.setPhase('playing');
+    expect(host.kick(ct.selfId)).toBe(false);
+  });
+
   it('rejects a client with a wrong version', async () => {
     const hub = createLocalHub();
     createHost(hub.join(), prof('Host'));

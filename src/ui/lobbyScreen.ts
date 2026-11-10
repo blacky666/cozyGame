@@ -15,6 +15,8 @@ export type LobbyOptions = {
   onRounds(n: number): void;
   onStart(): void;
   onLeave(): void;
+  /** Host only: remove another player from the lobby. */
+  onKick?(playerId: string): void;
 };
 
 /** Renders the lobby; returns an updater to call on each roster change. */
@@ -86,6 +88,14 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
           h('span', { class: 'cg-name', text: s.name }),
           h('span', { class: 'cg-sub', text: 'Level 1' }),
           h('span', { class: 'cg-ready', text: !s.connected ? 'getrennt' : s.ready ? '✓ Bereit' : '' }),
+          o.isHost && o.onKick && !s.isSelf && !s.isBot
+            ? h('button', {
+                class: 'cg-kick', text: 'Entfernen', title: `${s.name} aus dem Raum entfernen`,
+                onclick: () => {
+                  if (confirm(`${s.name} wirklich aus dem Raum entfernen?`)) o.onKick?.(s.id);
+                },
+              })
+            : null,
         ),
       );
     });
