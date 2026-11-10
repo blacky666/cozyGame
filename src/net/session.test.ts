@@ -154,6 +154,38 @@ describe('session', () => {
     expect(host.roster.list().map((p) => p.name)).toEqual(['Host']);
   });
 
+  it('resetForLobby purges disconnected players, resets ready (bots stay ready) and announces the lobby', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    const host = createHost(ht, prof('Host'));
+    const bot = host.addLocalPlayer('Bot Mo', prof('x').look, { isBot: true })!;
+    host.setLocalReady(bot.id, true);
+    host.setLocalReady(ht.selfId, true);
+    const t1 = hub.join();
+    const c1 = createClient(t1, prof('Eins'));
+    const t2 = hub.join();
+    createClient(t2, prof('Zwei'));
+    await flush();
+    c1.setReady(true);
+    await flush();
+    host.setPhase('podium');
+    t2.leave();
+    await flush();
+    const phases: Array<[string, unknown]> = [];
+    c1.onPhase((p) => phases.push([p.phase, p.data]));
+    host.resetForLobby({ kind: 'lobby' });
+    await flush();
+    expect(host.phase).toBe('lobby');
+    expect(phases).toEqual([['lobby', { kind: 'lobby' }]]);
+    expect(host.roster.list().map((p) => [p.name, p.ready])).toEqual([
+      ['Host', false],
+      ['Bot Mo', true],
+      ['Eins', false],
+    ]);
+    expect(c1.roster.map((p) => p.name)).toEqual(['Host', 'Bot Mo', 'Eins']);
+    expect(c1.roster.every((p) => p.isBot || !p.ready)).toBe(true);
+  });
+
   it('supports local bot players with local input', () => {
     const hub = createLocalHub();
     const ht = hub.join();

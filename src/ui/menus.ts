@@ -13,7 +13,9 @@ import { setFavicon } from './favicon';
 import { showLobby } from './lobbyScreen';
 import { showProfile } from './profileScreen';
 import { showConnecting, showStart } from './startScreen';
-import { onStartEvening } from './startEvening';
+import { addDevBots } from '../dev/bots';
+import { devFlags } from '../dev/devFlags';
+import { attachClientEvening, onStartEvening } from './startEvening';
 
 const JOIN_TIMEOUT_MS = 15000;
 const NOT_FOUND = 'Kein Raum mit diesem Code gefunden.';
@@ -65,6 +67,7 @@ export function startMenus(root: HTMLElement): void {
     const code = generateRoomCode();
     const transport = joinTrysteroRoom(code);
     const session = createHost(transport, profile);
+    addDevBots(session, devFlags(location.search).bots);
     let rounds: number = CONFIG.rounds.default;
     let alive = true;
     const leave = () => {
@@ -78,10 +81,7 @@ export function startMenus(root: HTMLElement): void {
         code, selfId: session.selfId, isHost: true, rounds, assets,
         onReady: (r) => session.setLocalReady(session.selfId, r),
         onRounds: (n) => (rounds = n),
-        onStart: () => {
-          alive = false;
-          onStartEvening({ session, transport, profile, isHost: true, rounds });
-        },
+        onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, root }),
         onLeave: leave,
       },
       session.roster.list(),
@@ -111,9 +111,11 @@ export function startMenus(root: HTMLElement): void {
     showConnecting(root, () => abort());
 
     let update: ((r: PlayerInfo[]) => void) | null = null;
+    const evening = attachClientEvening(session, root, () => abort());
     session.onRejected((reason) => phase === 'connecting' && abort(REJECT_TEXT[reason]));
     session.onHostLost(() => {
       if (phase === 'connecting') abort(NOT_FOUND);
+      else if (evening.running()) evening.hostLost(); // ended screen; its button calls abort()
       else abort('Der Gastgeber hat den Raum verlassen.');
     });
     session.onRoster((r) => {

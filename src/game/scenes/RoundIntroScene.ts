@@ -1,0 +1,47 @@
+import Phaser from 'phaser';
+import { CONFIG } from '../../config';
+import { getMinigame } from '../../minigames/registry';
+import type { SceneData } from '../stageCtx';
+import { assetSprite, txt } from '../ui';
+
+export const DOUBLE_BANNER = 'Letzte Runde – doppelte Punkte!';
+
+/** Title, rule and controls for ruleMs, then the 3-2-1 countdown ("LOS!" opens the MinigameScene). */
+export class RoundIntroScene extends Phaser.Scene {
+  constructor() {
+    super('RoundIntroScene');
+  }
+
+  create({ phase, ctx }: SceneData<'intro'>): void {
+    const { width: w, height: h } = CONFIG.view;
+    const game = getMinigame(phase.game);
+    this.add.rectangle(0, 0, w, h, 0x2b2b3d).setOrigin(0);
+    this.add.rectangle(w / 2, h / 2 + 8, w - 60, 150, 0xefdcb0).setStrokeStyle(3, 0x8a5a3a);
+
+    if (phase.double) {
+      this.add.rectangle(w / 2, 22, w - 40, 22, 0xb8443a).setStrokeStyle(2, 0x3b2418);
+      const banner = txt(this, w / 2, 22, DOUBLE_BANNER, 12, '#fff4de');
+      this.tweens.add({ targets: banner, scale: 1.08, yoyo: true, repeat: -1, duration: 450 });
+    }
+
+    const info = [
+      txt(this, w / 2, 62, `Runde ${phase.round}`, 10, '#fff4de'),
+      txt(this, w / 2, 86, game?.title ?? phase.game, 20, '#ffd27a'),
+      txt(this, w / 2, 124, game?.rule ?? '', 11, '#ffffff').setWordWrapWidth(w - 90),
+      txt(this, w / 2, 160, game ? `Steuerung: ${game.controls}` : '', 9, '#ffffff'),
+    ];
+
+    const step = ctx.timing.countdownMs / 3;
+    let shown: Phaser.GameObjects.GameObject | null = null;
+    const show = (n: number) => {
+      shown?.destroy();
+      shown = assetSprite(this, `ui.countdown.${n}`, w / 2, h / 2 + 8) ?? txt(this, w / 2, h / 2 + 8, String(n), 40);
+    };
+    this.time.delayedCall(ctx.timing.ruleMs, () => {
+      info.forEach((t) => t.setAlpha(0.25));
+      show(3);
+      this.time.delayedCall(step, () => show(2));
+      this.time.delayedCall(step * 2, () => show(1));
+    });
+  }
+}

@@ -40,6 +40,8 @@ export interface HostSession {
   /** Input for the host's own player (selfId) or a local bot. */
   setLocalInput(playerId: string, state: InputState): void;
   setLocalReady(playerId: string, ready: boolean): void;
+  /** Back to the lobby after an evening: drop disconnected players, reset ready (bots stay ready). */
+  resetForLobby(data?: unknown): void;
   close(): void;
 }
 
@@ -144,6 +146,20 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     },
     setLocalReady(id, ready) {
       if (local.has(id) && roster.setReady(id, ready)) rosterChanged();
+    },
+    resetForLobby(data) {
+      for (const p of roster.list()) {
+        if (!p.connected) {
+          roster.remove(p.id);
+          inputs.delete(p.id);
+          lastSeq.delete(p.id);
+        } else {
+          roster.setReady(p.id, p.isBot);
+        }
+      }
+      phase = LOBBY;
+      toAll('phase', data === undefined ? { phase: LOBBY } : { phase: LOBBY, data });
+      rosterChanged();
     },
     close: () => t.leave(),
   };
