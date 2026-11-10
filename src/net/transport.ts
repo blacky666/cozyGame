@@ -24,9 +24,12 @@ export function createLocalHub(): { join(): Transport } {
   return {
     join(): Transport {
       const me: LocalPeer = { id: `local-${++counter}`, handlers: new Map(), joinCbs: [], leaveCbs: [] };
-      for (const p of peers.values()) p.joinCbs.forEach((cb) => cb(me.id));
-      peers.set(me.id, me);
       let left = false;
+      const existing = [...peers.keys()];
+      for (const p of peers.values()) p.joinCbs.forEach((cb) => cb(me.id));
+      // Symmetric: the new peer learns about existing peers (async, so callbacks can be registered first).
+      for (const id of existing) queueMicrotask(() => { if (!left) me.joinCbs.forEach((cb) => cb(id)); });
+      peers.set(me.id, me);
 
       const deliver = (target: LocalPeer, type: string, data: unknown) => {
         queueMicrotask(() => {

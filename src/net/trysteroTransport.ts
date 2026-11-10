@@ -1,10 +1,14 @@
 import { joinRoom, selfId } from 'trystero';
 import { CONFIG } from '../config';
 import type { Transport } from './transport';
+import { MSG_TYPES } from './protocol';
+import { normalizeRoomCode } from './roomCode';
 
 // Trystero 0.25 API: onPeerJoin/onPeerLeave/onMessage are properties,
 // action.send(data, { target }) returns a promise.
-export function joinTrysteroRoom(code: string): Transport {
+export function joinTrysteroRoom(rawCode: string): Transport {
+  const code = normalizeRoomCode(rawCode);
+  if (code === null) throw new Error(`Invalid room code: ${rawCode}`);
   const iceServers: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
@@ -39,13 +43,19 @@ export function joinTrysteroRoom(code: string): Transport {
     return a;
   };
 
+  for (const type of MSG_TYPES) getAction(type);
+  let left = false;
+
   room.onPeerJoin = (id) => joinCbs.forEach((cb) => cb(id));
   room.onPeerLeave = (id) => leaveCbs.forEach((cb) => cb(id));
 
   return {
     selfId,
     send(type, data, to) {
-      void getAction(type).send(data as never, to !== undefined ? { target: to } : undefined);
+      if (left) return;
+      getAction(type)
+        .send(data as never, to !== undefined ? { target: to } : undefined)
+        .catch((e) => console.warn('send failed', type, e));
     },
     on(type, cb) {
       const list = handlers.get(type) ?? [];
@@ -60,6 +70,8 @@ export function joinTrysteroRoom(code: string): Transport {
       leaveCbs.push(cb);
     },
     leave() {
+      if (left) return;
+      left = true;
       void room.leave();
     },
   };

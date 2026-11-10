@@ -38,6 +38,17 @@ describe('LocalHub', () => {
     await tick();
     expect(got).toEqual([0, 1, 2, 3, 4]);
   });
+  it('join is symmetric', async () => {
+    const hub = createLocalHub();
+    const a = hub.join();
+    const aSaw: string[] = [], bSaw: string[] = [];
+    a.onPeerJoin((id) => aSaw.push(id));
+    const b = hub.join();
+    b.onPeerJoin((id) => bSaw.push(id));
+    await tick();
+    expect(aSaw).toEqual([b.selfId]);
+    expect(bSaw).toEqual([a.selfId]);
+  });
   it('fires join and leave events', async () => {
     const hub = createLocalHub();
     const a = hub.join();

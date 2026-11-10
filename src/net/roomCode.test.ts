@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { generateRoomCode, normalizeRoomCode, ROOM_WORDS } from './roomCode';
 
 describe('normalizeRoomCode', () => {
+  it('handles decomposed umlauts (NFD)', () => {
+    expect(normalizeRoomCode('käse 42')).toBe('KAESE-42');
+  });
   it('maps umlauts and spaces', () => {
     expect(normalizeRoomCode('käse 42')).toBe('KAESE-42');
   });
@@ -21,7 +24,7 @@ describe('normalizeRoomCode', () => {
 describe('generateRoomCode', () => {
   it('has a big enough ASCII word list', () => {
     expect(ROOM_WORDS.length).toBeGreaterThanOrEqual(40);
-    for (const w of ROOM_WORDS) expect(w).toMatch(/^[A-Z]{3,12}$/);
+    for (const w of ROOM_WORDS) expect(w, w).toMatch(/^[A-Z]{3,12}$/);
   });
   it('always yields normalized codes', () => {
     for (let i = 0; i < 1000; i++) {

@@ -38,4 +38,7 @@ export type Msg =
   | { type: 'bye'; data: unknown };
 
 export type MsgType = Msg['type'];
+export const MSG_TYPES: readonly MsgType[] = [
+  'hello', 'welcome', 'reject', 'roster', 'ready', 'settings', 'start', 'input', 'snap', 'phase', 'bye',
+];
 export type MsgData<T extends MsgType> = Extract<Msg, { type: T }>['data'];

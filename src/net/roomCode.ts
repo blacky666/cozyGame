@@ -3,10 +3,10 @@ export const ROOM_WORDS: readonly string[] = [
   'KAESE', 'KARTOFFEL', 'SCHNEE', 'PINSEL', 'KUERBIS', 'KAMIN', 'DECKE', 'KAKAO',
   'TEEKANNE', 'KERZE', 'LATERNE', 'WOLLSOCKE', 'APFEL', 'BIRNE', 'HONIG', 'BRETZEL',
   'KEKS', 'PLAETZCHEN', 'MARMELADE', 'SOFA', 'KISSEN', 'PANTOFFEL', 'MUETZE', 'SCHAL',
-  'HANDSCHUH', 'SCHLITTEN', 'IGLU', 'LAGERFEUER', 'PILZ', 'EICHHOERNCHEN', 'IGEL', 'HASE',
+  'HANDSCHUH', 'SCHLITTEN', 'IGLU', 'LAGERFEUER', 'PILZ', 'IGEL', 'HASE',
   'KATZE', 'WALD', 'WIESE', 'BAECKEREI', 'BROT', 'SEMMEL', 'WAFFEL', 'PUDDING',
   'ZIMT', 'MANDEL', 'NUSS', 'TANNE', 'STERN', 'MONDSCHEIN', 'REGEN', 'GARTEN',
-].filter((w) => /^[A-Z]{3,12}$/.test(w));
+];
 
 export function generateRoomCode(rand: () => number = Math.random): string {
   const word = ROOM_WORDS[Math.min(ROOM_WORDS.length - 1, Math.floor(rand() * ROOM_WORDS.length))];
@@ -16,12 +16,12 @@ export function generateRoomCode(rand: () => number = Math.random): string {
 
 export function normalizeRoomCode(input: string): string | null {
   const s = input
+    .normalize('NFC')
     .trim()
     .toUpperCase()
     .replace(/Ä/g, 'AE')
     .replace(/Ö/g, 'OE')
     .replace(/Ü/g, 'UE')
-    .replace(/ß/g, 'SS')
     .replace(/[\s_]+/g, '-')
     .replace(/-{2,}/g, '-');
   return /^[A-Z]{3,12}-\d{2}$/.test(s) ? s : null;
