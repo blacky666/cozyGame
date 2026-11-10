@@ -14,11 +14,12 @@ type Candidate = {
 const BASE = `${import.meta.env.BASE_URL}fonts/`;
 
 const FONTS: Candidate[] = [
-  { name: 'Silkscreen', files: [{ file: 'test/Silkscreen-Regular.ttf', weight: '400' }, { file: 'test/Silkscreen-Bold.ttf', weight: '700' }], weights: [400, 700], note: 'nur Großbuchstaben-Stil, sehr klar' },
+  { name: 'Silkscreen', files: [{ file: 'Silkscreen-Regular.ttf', weight: '400' }, { file: 'test/Silkscreen-Bold.ttf', weight: '700' }], weights: [400, 700], note: 'nur Großbuchstaben-Stil, sehr klar' },
   { name: 'Press Start 2P', files: [{ file: 'test/PressStart2P.ttf', weight: '400' }], weights: [400, 400], note: 'klassisch Arcade, breit, kein Fettschnitt' },
   { name: 'VT323', files: [{ file: 'test/VT323.ttf', weight: '400' }], weights: [400, 400], note: 'Terminal-Look, schmal, kein Fettschnitt' },
   { name: 'Jersey 10', files: [{ file: 'test/Jersey10.ttf', weight: '400' }], weights: [400, 400], note: 'kräftig, sportlich, kein Fettschnitt' },
-  { name: 'Tiny5', files: [{ file: 'Tiny5.ttf', weight: '100 900' }], weights: [400, 700], note: 'aktuell im Spiel' },
+  { name: 'GameFont', files: [], weights: [400, 700], note: 'aktuell im Spiel: Tiny5 mit Ziffern von Silkscreen' },
+  { name: 'Tiny5', files: [{ file: 'Tiny5.ttf', weight: '100 900' }], weights: [400, 700], note: 'nur Tiny5' },
   { name: 'Micro 5', files: [{ file: 'test/Micro5.ttf', weight: '400' }], weights: [400, 400], note: 'sehr schmal, kein Fettschnitt' },
   { name: 'Handjet', files: [{ file: 'test/Handjet.ttf', weight: '100 900' }], weights: [400, 700], note: 'Pixel-Raster, viele Stärken' },
   { name: 'Bytesized', files: [{ file: 'test/Bytesized.ttf', weight: '400' }], weights: [400, 400], note: 'winzige Pixel-Schrift' },

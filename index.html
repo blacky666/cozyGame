@@ -5,14 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>cozyGame</title>
     <style>
+      /* Game font: Tiny5 letters, digits from Silkscreen (same 1/8-em pixel grid, clearer 8/6/9). */
       @font-face {
-        font-family: 'Tiny5';
+        font-family: 'GameFont';
         src: url('/fonts/Tiny5.ttf') format('truetype');
         font-weight: 100 900;
         font-display: swap;
       }
+      /* Declared last: for overlapping ranges the last face wins, so digits come from here. */
+      @font-face {
+        font-family: 'GameFont';
+        src: url('/fonts/Silkscreen-Regular.ttf') format('truetype');
+        font-weight: 100 900;
+        font-display: swap;
+        unicode-range: U+0030-0039;
+      }
       html, body { margin: 0; height: 100%; background: #1b1b2a; overflow: hidden; }
-      body { font-family: 'Tiny5', monospace; color: #fff; }
+      body { font-family: 'GameFont', monospace; color: #fff; }
       #game { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
       #game canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
       #ui { position: fixed; inset: 0; pointer-events: none; }

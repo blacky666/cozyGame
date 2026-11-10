@@ -31,7 +31,7 @@
 .cg-error { color: var(--hi); font-weight: 700; text-align: center; min-height: 1.2em; }
 .cg-good { color: var(--ok); }
 .cg-hint { color: var(--soft); font-size: 15px; text-align: center; min-height: 1.2em; }
-.cg-code { font-size: 40px; font-weight: 700; letter-spacing: 2px; text-align: center; }
+.cg-code { font-size: 48px; font-weight: 400; letter-spacing: 4px; text-align: center; }
 .cg-slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .cg-slot {
   background: var(--card); border: 3px solid var(--border); border-radius: 4px; padding: 10px 6px;

@@ -16,7 +16,7 @@ export class BootScene extends Phaser.Scene {
     const label = this.add
       .text(CONFIG.view.width / 2, CONFIG.view.height / 2, 'Lade …', { fontFamily: FONT, fontSize: '10px', color: '#ffffff', resolution: zoomOf(this) })
       .setOrigin(0.5);
-    const font = document.fonts?.load(`10px ${FONT}`).catch(() => undefined) ?? Promise.resolve();
+    const font = document.fonts?.load(`10px ${FONT}`, 'Aa0123456789').catch(() => undefined) ?? Promise.resolve();
     void Promise.all([loadAssets(), font]).then(
       ([assets]) => {
         this.registry.set('assets', assets);

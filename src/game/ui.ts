@@ -6,7 +6,8 @@ import type { PlayerInfo } from '../net/roster';
 import type { PlayerKey } from '../minigames/types';
 import { zoomOf } from './zoom';
 
-export const FONT = '"Tiny5", monospace';
+/** Tiny5 letters + Silkscreen digits, declared in index.html. */
+export const FONT = '"GameFont", monospace';
 export const INK = '#3b2418';
 
 /** Smallest font size (virtual px) that stays legible at x3 zoom. */
