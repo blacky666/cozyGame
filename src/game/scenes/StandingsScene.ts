@@ -39,11 +39,11 @@ export class StandingsScene extends Phaser.Scene {
         playerSymbol(this, p.slot, 108, y);
       }
       txt(this, 118, y, p?.name ?? key, 11).setOrigin(0, 0.5);
-      const totalText = txt(this, 330, y, `${total - pts}`, 12, '#ffd27a');
-      const plus = txt(this, 380, y, `+${pts}`, 11, pts > 0 ? '#9be37a' : '#dddddd');
+      const totalText = txt(this, 305, y, `${total - pts}`, 12, '#ffd27a');
+      const plus = txt(this, 355, y, `+${pts}`, 11, pts > 0 ? '#9be37a' : '#dddddd');
       this.tweens.add({
         targets: plus,
-        x: 330,
+        x: 305,
         alpha: 0,
         delay: flyAt + i * 150,
         duration: 600,

@@ -72,7 +72,7 @@ export class SandboxView implements MiniGameView<SandboxState> {
       if (!sp) continue;
       const p = key === selfKey && this.pred ? { ...sp, ...this.pred } : sp;
       a.char.setPosition(Math.round(p.x), Math.round(p.y)).setDepth(p.y);
-      a.label.setPosition(Math.round(p.x), Math.round(p.y) - 36).setDepth(p.y + 0.5);
+      a.label.setPosition(Math.round(p.x), Math.round(p.y) - 44).setDepth(p.y + 0.5);
       const anim = p.moving ? 'run' : 'idle';
       if (anim !== a.anim || p.dir !== a.dir) {
         a.anim = anim;

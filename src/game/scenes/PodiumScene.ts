@@ -38,15 +38,15 @@ export class PodiumScene extends Phaser.Scene {
       group.forEach((key, i) => {
         const p = info.get(key);
         const step = STEPS[place];
-        const off = (i - (group.length - 1) / 2) * 14;
+        const off = (i - (group.length - 1) / 2) * 22;
         const x = step ? step.x + off : (besideX += 34);
         const y = step ? GROUND - step.h + 2 : GROUND;
         if (p) {
           const c = new Character(this, assets, p.look, p.slot).setPosition(x, y).setDepth(y);
           c.play(last ? 'cry' : 'cheer', 'down');
         }
-        txt(this, x, y - 44 - (i % 2) * 10, `${p?.name ?? key}`, 8).setDepth(500);
-        txt(this, x, y - 35 - (i % 2) * 10, `${phase.totals[key] ?? 0} P.`, 8, '#ffd27a').setDepth(500);
+        txt(this, x, y - 52 - (i % 2) * 18, `${p?.name ?? key}`, 8).setDepth(500);
+        txt(this, x, y - 43 - (i % 2) * 18, `${phase.totals[key] ?? 0} P.`, 8, '#ffd27a').setDepth(500);
       });
       place += group.length;
     });
