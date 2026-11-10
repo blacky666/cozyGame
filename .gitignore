@@ -1,2 +1,4 @@
 .superpowers/
 work-files/
+node_modules/
+dist/
