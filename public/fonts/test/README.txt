@@ -1,0 +1,1 @@
+Test fonts for ?dev=text. All from github.com/google/fonts (ofl/*), licensed under the SIL Open Font License 1.1 (see ../OFL.txt for the license text; each font keeps its own copyright notice in its file).

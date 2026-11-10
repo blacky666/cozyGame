@@ -41,17 +41,17 @@ describe('createKeyboard', () => {
     expect(idle).toBe(2);
   });
 
-  it('counts fresh presses of E as shoves (auto-repeat and holding count once)', () => {
+  it('counts fresh presses of Space as shoves (auto-repeat and holding count once)', () => {
     const win = new FakeTarget();
     const doc = new FakeTarget();
     const kb = createKeyboard({ win, doc });
     expect(kb.state().shoves).toBe(0);
-    win.dispatchEvent(key('keydown', 'KeyE'));
-    win.dispatchEvent(Object.assign(key('keydown', 'KeyE'), { repeat: true }));
-    win.dispatchEvent(key('keydown', 'KeyE')); // still held, no keyup yet
+    win.dispatchEvent(key('keydown', 'Space'));
+    win.dispatchEvent(Object.assign(key('keydown', 'Space'), { repeat: true }));
+    win.dispatchEvent(key('keydown', 'Space')); // still held, no keyup yet
     expect(kb.state().shoves).toBe(1);
-    win.dispatchEvent(key('keyup', 'KeyE'));
-    win.dispatchEvent(key('keydown', 'KeyE'));
+    win.dispatchEvent(key('keyup', 'Space'));
+    win.dispatchEvent(key('keydown', 'Space'));
     expect(kb.state().shoves).toBe(2);
     win.dispatchEvent(new Event('blur'));
     expect(kb.state().shoves).toBe(2);

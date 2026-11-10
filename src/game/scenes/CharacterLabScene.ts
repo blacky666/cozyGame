@@ -3,6 +3,8 @@ import type { AssetFile } from '../../gfx/assetTypes';
 import { Character, type FacingDir } from '../../gfx/character';
 import { loadAssets } from '../../gfx/textures';
 import { defaultProfile, type Look } from '../../save/profile';
+import { txt } from '../ui';
+import { fitCamera, ZOOM_KEY } from '../zoom';
 
 const DIRS: FacingDir[] = ['down', 'up', 'side', 'left'];
 
@@ -20,7 +22,9 @@ export class CharacterLabScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.label = this.add.text(4, 4, 'loading...', { fontSize: '10px', color: '#fff' });
+    this.registry.set(ZOOM_KEY, 3);
+    fitCamera(this);
+    this.label = txt(this, 4, 4, 'loading...', 10).setOrigin(0, 0);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.dead = true;
       this.input.keyboard?.removeAllListeners();

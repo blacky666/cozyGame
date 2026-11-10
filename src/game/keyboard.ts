@@ -4,8 +4,8 @@ const UP = ['KeyW', 'ArrowUp'];
 const DOWN = ['KeyS', 'ArrowDown'];
 const LEFT = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
-/** Shove key. Not Shift: pressing it 5x opens the Windows "Sticky Keys" prompt. */
-export const SHOVE_KEY = 'KeyE';
+/** Shove key: the thumb rests on it while the fingers are on WASD. */
+export const SHOVE_KEY = 'Space';
 const ALL = new Set([...UP, ...DOWN, ...LEFT, ...RIGHT, SHOVE_KEY]);
 
 /** Build an InputState from pressed key codes (WASD; arrows as a fallback) and the shove count. */

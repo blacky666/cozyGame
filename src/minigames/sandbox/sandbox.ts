@@ -8,7 +8,7 @@ export const sandbox: MiniGame<SandboxState> = {
   id: 'muenzjagd',
   title: 'Münzjagd',
   rule: 'Sammle so viele Münzen wie möglich! Wer geschubst wird, verliert eine.',
-  controls: 'WASD – laufen · E – schubsen',
+  controls: 'WASD – laufen · Leertaste – schubsen',
   durationMs: CONFIG.sandbox.durationMs,
   createHost: (players, rand, opts) =>
     createSandboxHost(

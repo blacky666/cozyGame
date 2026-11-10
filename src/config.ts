@@ -82,6 +82,6 @@ export const CONFIG = deepFreeze<GameConfig>({
   standings: { showMs: 8000 },
   // Placeholder minigame "Münzjagd" (speed in px/s, sizes in px).
   sandbox: { durationMs: 30000, speed: 60, spawnMs: 1500, coinSize: 8, pickupRadius: 9, maxCoins: 12 },
-  // Shove (E) in all top-down games.
+  // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
 });
