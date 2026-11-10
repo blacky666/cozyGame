@@ -45,8 +45,8 @@ export class PodiumScene extends Phaser.Scene {
           const c = new Character(this, assets, p.look, p.slot).setPosition(x, y).setDepth(y);
           c.play(last ? 'cry' : 'cheer', 'down');
         }
-        txt(this, x, y - 52 - (i % 2) * 18, `${p?.name ?? key}`, 8).setDepth(500);
-        txt(this, x, y - 43 - (i % 2) * 18, `${phase.totals[key] ?? 0} P.`, 8, '#ffd27a').setDepth(500);
+        txt(this, x, y - 57 - (i % 2) * 18, `${p?.name ?? key}`, 10).setDepth(500);
+        txt(this, x, y - 45 - (i % 2) * 18, `${phase.totals[key] ?? 0} P.`, 10, '#ffd27a').setDepth(500);
       });
       place += group.length;
     });
@@ -55,7 +55,7 @@ export class PodiumScene extends Phaser.Scene {
       const again = ctx.playAgain;
       button(this, w / 2, h - 18, 'Nochmal?', () => again()).setDepth(1000);
     } else {
-      txt(this, w / 2, h - 18, 'Warte auf den Gastgeber …', 9).setDepth(1000);
+      txt(this, w / 2, h - 18, 'Warte auf den Gastgeber …', 10).setDepth(1000);
     }
   }
 }

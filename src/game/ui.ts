@@ -4,11 +4,19 @@ import { findSprite } from '../gfx/layerPlan';
 import { getTextureKey } from '../gfx/textures';
 import type { PlayerInfo } from '../net/roster';
 import type { PlayerKey } from '../minigames/types';
+import { zoomOf } from './zoom';
 
 export const FONT = '"Pixelify Sans", monospace';
 export const INK = '#3b2418';
 
-/** Pixel-font text, centred by default; rendered at 3x so it stays crisp under zoom. */
+/** Smallest font size (virtual px) that stays legible at x3 zoom. */
+export const MIN_FONT = 10;
+
+/**
+ * Pixel-font text, centred by default. Rendered at the screen's real resolution so glyphs stay
+ * sharp under zoom. Light text gets a thin ink outline (a thick one fills the letters in);
+ * ink-coloured text (on parchment) gets none unless asked.
+ */
 export function txt(
   scene: Phaser.Scene,
   x: number,
@@ -16,16 +24,18 @@ export function txt(
   s: string,
   size = 10,
   color = '#ffffff',
+  outline = color.toLowerCase() !== INK,
 ): Phaser.GameObjects.Text {
+  const px = Math.max(MIN_FONT, size);
   return scene.add
     .text(x, y, s, {
       fontFamily: FONT,
-      fontSize: `${size}px`,
+      fontSize: `${px}px`,
       color,
       stroke: INK,
-      strokeThickness: Math.max(2, Math.round(size / 5)),
+      strokeThickness: outline ? (px >= 18 ? 2 : 1) : 0,
       align: 'center',
-      resolution: 3,
+      resolution: zoomOf(scene),
     })
     .setOrigin(0.5);
 }

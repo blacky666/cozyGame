@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { CONFIG } from '../../config';
 import { getMinigame } from '../../minigames/registry';
 import type { SceneData } from '../stageCtx';
-import { assetSprite, txt } from '../ui';
+import { assetSprite, INK, txt } from '../ui';
 
 export const DOUBLE_BANNER = 'Letzte Runde – doppelte Punkte!';
 
@@ -25,10 +25,10 @@ export class RoundIntroScene extends Phaser.Scene {
     }
 
     const info = [
-      txt(this, w / 2, 62, `Runde ${phase.round}`, 10, '#fff4de'),
-      txt(this, w / 2, 86, game?.title ?? phase.game, 20, '#ffd27a'),
-      txt(this, w / 2, 124, game?.rule ?? '', 11, '#ffffff').setWordWrapWidth(w - 90),
-      txt(this, w / 2, 160, game ? `Steuerung: ${game.controls}` : '', 9, '#ffffff'),
+      txt(this, w / 2, 60, `Runde ${phase.round}`, 12, INK),
+      txt(this, w / 2, 86, game?.title ?? phase.game, 22, '#ffd27a'),
+      txt(this, w / 2, 124, game?.rule ?? '', 13, INK).setWordWrapWidth(w - 90),
+      txt(this, w / 2, 160, game ? `Steuerung: ${game.controls}` : '', 11, INK),
     ];
 
     const step = ctx.timing.countdownMs / 3;

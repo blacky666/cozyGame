@@ -32,17 +32,17 @@ export class SandboxView implements MiniGameView<SandboxState> {
     const info = byKey(players);
     for (const [key, p] of info) {
       const char = new Character(scene, assets, p.look, p.slot);
-      const label = txt(scene, 0, 0, p.name, 7, key === selfKey ? '#fff4a8' : '#ffffff');
+      const label = txt(scene, 0, 0, p.name, 10, key === selfKey ? '#fff4a8' : '#ffffff');
       this.avatars.set(key, { char, label, anim: 'idle', dir: 'down' });
       this.objects.push(char, label);
     }
     // HUD: time in the middle, one score per player (symbol + number) in slot order.
-    this.objects.push(scene.add.rectangle(0, 0, width, 14, 0x3b2418, 0.55).setOrigin(0).setDepth(1000));
-    this.time = txt(scene, width / 2, 7, '', 9).setDepth(1001);
+    this.objects.push(scene.add.rectangle(0, 0, width, 16, 0x3b2418, 0.55).setOrigin(0).setDepth(1000));
+    this.time = txt(scene, width / 2, 8, '', 10).setDepth(1001);
     [...info.entries()].forEach(([key, p], i) => {
       const x = i < 2 ? 14 + i * 50 : width - 86 + (i - 2) * 50;
-      playerSymbol(scene, p.slot, x, 7)?.setDepth(1001);
-      const t = txt(scene, x + 8, 7, '0', 9).setOrigin(0, 0.5).setDepth(1001);
+      playerSymbol(scene, p.slot, x, 8)?.setDepth(1001);
+      const t = txt(scene, x + 8, 8, '0', 10).setOrigin(0, 0.5).setDepth(1001);
       this.scores.set(key, t);
     });
   }
@@ -69,7 +69,7 @@ export class SandboxView implements MiniGameView<SandboxState> {
       if (!sp) continue;
       const p = key === selfKey && this.pred ? { ...sp, ...this.pred } : sp;
       a.char.setPosition(Math.round(p.x), Math.round(p.y)).setDepth(p.y);
-      a.label.setPosition(Math.round(p.x), Math.round(p.y) - 44).setDepth(p.y + 0.5);
+      a.label.setPosition(Math.round(p.x), Math.round(p.y) - 46).setDepth(p.y + 0.5);
       const anim = p.moving ? 'run' : 'idle';
       if (anim !== a.anim || p.dir !== a.dir) {
         a.anim = anim;

@@ -10,7 +10,7 @@ import { PodiumScene } from './scenes/PodiumScene';
 import { RoundIntroScene } from './scenes/RoundIntroScene';
 import { StandingsScene } from './scenes/StandingsScene';
 import type { StageCtx } from './stageCtx';
-import { integerZoom } from './zoom';
+import { fitCamera, integerZoom, ZOOM_KEY } from './zoom';
 
 const SCENE_OF: Record<Exclude<EveningPhase['kind'], 'lobby'>, string> = {
   intro: 'RoundIntroScene',
@@ -30,19 +30,20 @@ export class Stage {
   private current: EveningPhase | null = null;
   private snapCb: ((tick: number, p: SnapPayload, at: number) => void) | null = null;
   private destroyed = false;
-  private readonly onResize = () => this.game.scale.setZoom(integerZoom(window.innerWidth, window.innerHeight));
+  private readonly onResize = () => this.applyZoom(integerZoom(window.innerWidth, window.innerHeight));
 
   constructor(ctx: Omit<StageCtx, 'onSnap'>) {
     this.ctx = { ...ctx, onSnap: (cb) => void (this.snapCb = cb) };
+    const zoom = integerZoom(window.innerWidth, window.innerHeight);
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: 'game',
-      width: CONFIG.view.width,
-      height: CONFIG.view.height,
+      // The canvas has the real screen size and every camera zooms the 426x240 world into it,
+      // so text is drawn at full resolution instead of being upscaled together with the pixels.
+      width: CONFIG.view.width * zoom,
+      height: CONFIG.view.height * zoom,
       pixelArt: true,
       backgroundColor: '#2b2b3d',
-      // Whole-number zoom only (crisp pixels): x3 at 1280x720 (CONFIG.view.zoom), recomputed on resize.
-      zoom: integerZoom(window.innerWidth, window.innerHeight),
       // Centering comes from the #game flex container (index.html); Phaser margins would double it.
       scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
       scene: [
@@ -54,7 +55,22 @@ export class Stage {
         EndedScene,
       ],
     });
+    this.game.registry.set(ZOOM_KEY, zoom);
+    // Fit each scene's camera whenever it starts (scene instances exist once the game is ready).
+    this.game.events.once(Phaser.Core.Events.READY, () => {
+      for (const s of this.game.scene.getScenes(false)) {
+        s.sys.events.on(Phaser.Scenes.Events.CREATE, () => fitCamera(s));
+      }
+    });
     window.addEventListener('resize', this.onResize);
+  }
+
+  /** Whole-number zoom only (crisp pixels): x3 at 1280x720, recomputed on resize. */
+  private applyZoom(zoom: number): void {
+    if (this.destroyed || zoom === this.game.registry.get(ZOOM_KEY)) return;
+    this.game.registry.set(ZOOM_KEY, zoom);
+    this.game.scale.resize(CONFIG.view.width * zoom, CONFIG.view.height * zoom);
+    for (const s of this.game.scene.getScenes(true)) fitCamera(s);
   }
 
   /** Show a phase; repeats of the current phase (re-sent after a reconnect) are ignored. */

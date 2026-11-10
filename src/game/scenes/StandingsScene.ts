@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import type { SceneData } from '../stageCtx';
-import { assetsOf, byKey, playerSymbol, txt } from '../ui';
+import { assetsOf, byKey, INK, playerSymbol, txt } from '../ui';
 
 export const CARD_PLACEHOLDER = 'Gemeinheit-Karte (kommt in Plan 7)';
 
@@ -33,14 +33,14 @@ export class StandingsScene extends Phaser.Scene {
       const pts = phase.points[key] ?? 0;
       const total = phase.totals[key];
       this.add.rectangle(w / 2, y, w - 80, ROW_H - 4, 0xefdcb0).setStrokeStyle(2, 0x8a5a3a);
-      txt(this, 58, y, `${rank}.`, 12);
+      txt(this, 58, y, `${rank}.`, 13, INK);
       if (p) {
         new Character(this, assets, p.look, p.slot).setPosition(86, y + 13);
         playerSymbol(this, p.slot, 108, y);
       }
-      txt(this, 118, y, p?.name ?? key, 11).setOrigin(0, 0.5);
-      const totalText = txt(this, 305, y, `${total - pts}`, 12, '#ffd27a');
-      const plus = txt(this, 355, y, `+${pts}`, 11, pts > 0 ? '#9be37a' : '#dddddd');
+      txt(this, 118, y, p?.name ?? key, 12, INK).setOrigin(0, 0.5);
+      const totalText = txt(this, 305, y, `${total - pts}`, 13, INK);
+      const plus = txt(this, 355, y, `+${pts}`, 12, pts > 0 ? '#2f7a3f' : '#6b4a32', false);
       this.tweens.add({
         targets: plus,
         x: 305,
