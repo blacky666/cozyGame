@@ -6,7 +6,7 @@ import type { PlayerInfo } from '../net/roster';
 import type { PlayerKey } from '../minigames/types';
 import { zoomOf } from './zoom';
 
-export const FONT = '"Pixelify Sans", monospace';
+export const FONT = '"Tiny5", monospace';
 export const INK = '#3b2418';
 
 /** Smallest font size (virtual px) that stays legible at x3 zoom. */
