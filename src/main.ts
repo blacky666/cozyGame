@@ -1,12 +1,11 @@
-import { APP_VERSION, CONFIG } from './config';
+import './ui/ui.css';
+import { isMobile, MOBILE_TEXT } from './ui/mobile';
 
 const ui = document.getElementById('ui');
-if (ui) {
-  ui.textContent = `cozyGame v${APP_VERSION} (${CONFIG.players.min}-${CONFIG.players.max} players)`;
-}
+const dev = new URLSearchParams(location.search).get('dev');
 
-// Dev entry: ?dev=chars shows the character lab (lazy-loaded scene).
-if (new URLSearchParams(location.search).get('dev') === 'chars') {
+if (dev === 'chars') {
+  // Dev entry: ?dev=chars shows the character lab (lazy-loaded scene).
   void Promise.all([import('phaser'), import('./game/scenes/CharacterLabScene')]).then(([{ default: Phaser }, { CharacterLabScene }]) => {
     new Phaser.Game({
       type: Phaser.AUTO,
@@ -19,4 +18,14 @@ if (new URLSearchParams(location.search).get('dev') === 'chars') {
       scene: [CharacterLabScene],
     });
   });
+}
+else if (ui) {
+  if (isMobile(navigator, window.innerWidth)) {
+    const note = document.createElement('div');
+    note.className = 'cg-mobile';
+    note.textContent = MOBILE_TEXT;
+    ui.append(note);
+  } else {
+    void import('./ui/menus').then(({ startMenus }) => startMenus(ui));
+  }
 }

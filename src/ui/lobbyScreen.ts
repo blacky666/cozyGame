@@ -1,0 +1,95 @@
+import type { AssetFile } from '../gfx/assetTypes';
+import type { PlayerInfo } from '../net/roster';
+import { CONFIG } from '../config';
+import { drawCharacter } from './charPreview';
+import { clear, h } from './dom';
+import { lobbyModel } from './lobbyModel';
+
+export type LobbyOptions = {
+  code: string;
+  selfId: string;
+  isHost: boolean;
+  rounds: number;
+  assets: Record<string, AssetFile> | null;
+  onReady(ready: boolean): void;
+  onRounds(n: number): void;
+  onStart(): void;
+  onLeave(): void;
+};
+
+/** Renders the lobby; returns an updater to call on each roster change. */
+export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInfo[]): (roster: PlayerInfo[]) => void {
+  clear(root);
+  const slotsEl = h('div', { class: 'cg-slots' });
+  const hint = h('p', { class: 'cg-hint' });
+  const readyBtn = h('button', { class: 'cg-btn cg-ok' });
+  const startBtn = h('button', { class: 'cg-btn', text: "Los geht's!", onclick: o.onStart });
+  let selfReady = false;
+  readyBtn.addEventListener('click', () => o.onReady(!selfReady));
+
+  const copy = h('button', {
+    class: 'cg-btn cg-secondary', text: 'Kopieren',
+    onclick: () => {
+      void navigator.clipboard?.writeText(o.code).then(() => {
+        copy.textContent = 'Kopiert!';
+        setTimeout(() => (copy.textContent = 'Kopieren'), 1500);
+      });
+    },
+  });
+  const rounds = h('select', { class: 'cg-input', 'aria-label': 'Runden', onchange: () => o.onRounds(Number(rounds.value)) });
+  for (let n = CONFIG.rounds.min; n <= CONFIG.rounds.max; n++) {
+    const opt = h('option', { value: n, text: `${n} Runden` });
+    opt.selected = n === o.rounds;
+    rounds.append(opt);
+  }
+
+  root.append(
+    h(
+      'div',
+      { class: 'cg-screen' },
+      h(
+        'div',
+        { class: 'cg-panel cg-wide' },
+        h('p', { class: 'cg-label', text: 'Raumcode' }),
+        h('div', { class: 'cg-row' }, h('div', { class: 'cg-code', text: o.code }), copy),
+        slotsEl,
+        hint,
+        h(
+          'div',
+          { class: 'cg-row' },
+          readyBtn,
+          o.isHost ? rounds : null,
+          o.isHost ? startBtn : null,
+          h('button', { class: 'cg-btn cg-secondary', text: 'Raum verlassen', onclick: o.onLeave }),
+        ),
+      ),
+    ),
+  );
+
+  const update = (roster: PlayerInfo[]): void => {
+    const m = lobbyModel(roster, o.selfId, o.isHost, o.rounds);
+    selfReady = roster.find((p) => p.id === o.selfId)?.ready ?? false;
+    readyBtn.textContent = selfReady ? 'Nicht bereit' : 'Bereit';
+    startBtn.disabled = !m.canStart;
+    hint.textContent = o.isHost ? m.startHint : 'Der Gastgeber startet den Abend.';
+    clear(slotsEl);
+    m.slots.forEach((s, i) => {
+      if (!s) {
+        slotsEl.append(h('div', { class: 'cg-slot empty' }, h('span', { class: 'cg-sub', text: 'Frei' })));
+        return;
+      }
+      slotsEl.append(
+        h(
+          'div',
+          { class: `cg-slot${s.isSelf ? ' self' : ''}` },
+          o.assets ? drawCharacter(s.look, i, o.assets) : null,
+          h('span', { class: 'cg-name', text: s.name }),
+          h('span', { class: 'cg-sub', text: 'Level 1' }),
+          h('span', { class: 'cg-ready', text: !s.connected ? 'getrennt' : s.ready ? '✓ Bereit' : '' }),
+        ),
+      );
+    });
+  };
+  update(initial);
+  return update;
+}
