@@ -56,12 +56,12 @@ export class EveningHost {
   private readonly bots = new Map<string, BotBrain>();
   private known = new Set<string>();
   private active = false;
+  private unsubRoster: (() => void) | null = null;
 
   constructor(private readonly o: EveningHostOptions) {
     this.session = o.session;
     this.timing = o.timing ?? DEFAULT_TIMING;
     this.rand = o.rand ?? Math.random;
-    o.session.onRoster((list) => this.onRoster(list));
   }
 
   addBot(id: string, brain: BotBrain): void {
@@ -74,6 +74,8 @@ export class EveningHost {
     this.known = new Set(players.map((p) => p.id));
     this.evening = new Evening(this.keys, this.o.rounds, this.o.games.map((g) => g.id), this.rand);
     this.active = true;
+    this.unsubRoster?.();
+    this.unsubRoster = this.session.onRoster((list) => this.onRoster(list));
     this.enter(this.evening.phase);
     const start = this.o.startTicker ?? ((hz, cb) => startHostTicker(hz, cb));
     this.stopTicker = start(CONFIG.net.simHz, (dt) => this.tick(dt));
@@ -89,6 +91,8 @@ export class EveningHost {
   stop(): void {
     this.active = false;
     this.game = null;
+    this.unsubRoster?.();
+    this.unsubRoster = null;
     this.stopTicker?.();
     this.stopTicker = null;
   }

@@ -22,25 +22,44 @@ export interface KeyboardInput {
   destroy(): void;
 }
 
-/** Window-level key reader: independent of Phaser scenes, cleared on blur. */
-export function createKeyboard(target: Window = window): KeyboardInput {
+type KeyTarget = Pick<EventTarget, 'addEventListener' | 'removeEventListener'>;
+export type KeyboardOptions = {
+  win?: KeyTarget;
+  doc?: KeyTarget & { hidden: boolean };
+  /** Called when all keys were released because the window lost focus or the page got hidden. */
+  onIdle?: () => void;
+};
+
+/** Window-level key reader: independent of Phaser scenes, cleared on blur and when the page gets hidden. */
+export function createKeyboard(o: KeyboardOptions = {}): KeyboardInput {
+  const win = o.win ?? window;
+  const doc = o.doc ?? document;
   const down = new Set<string>();
-  const onDown = (e: KeyboardEvent) => {
-    if (!ALL.has(e.code)) return;
-    down.add(e.code);
+  const onDown = (e: Event) => {
+    const code = (e as KeyboardEvent).code;
+    if (!ALL.has(code)) return;
+    down.add(code);
     e.preventDefault();
   };
-  const onUp = (e: KeyboardEvent) => void down.delete(e.code);
-  const onBlur = () => down.clear();
-  target.addEventListener('keydown', onDown);
-  target.addEventListener('keyup', onUp);
-  target.addEventListener('blur', onBlur);
+  const onUp = (e: Event) => void down.delete((e as KeyboardEvent).code);
+  const release = () => {
+    down.clear();
+    o.onIdle?.();
+  };
+  const onVisibility = () => {
+    if (doc.hidden) release();
+  };
+  win.addEventListener('keydown', onDown);
+  win.addEventListener('keyup', onUp);
+  win.addEventListener('blur', release);
+  doc.addEventListener('visibilitychange', onVisibility);
   return {
     state: () => inputFromKeys(down),
     destroy() {
-      target.removeEventListener('keydown', onDown);
-      target.removeEventListener('keyup', onUp);
-      target.removeEventListener('blur', onBlur);
+      win.removeEventListener('keydown', onDown);
+      win.removeEventListener('keyup', onUp);
+      win.removeEventListener('blur', release);
+      doc.removeEventListener('visibilitychange', onVisibility);
       down.clear();
     },
   };

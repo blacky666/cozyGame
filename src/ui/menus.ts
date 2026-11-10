@@ -70,9 +70,13 @@ export function startMenus(root: HTMLElement): void {
     addDevBots(session, devFlags(location.search).bots);
     let rounds: number = CONFIG.rounds.default;
     let alive = true;
+    // Closing/reloading the tab: say `bye` so clients notice at once (not after the WebRTC timeout).
+    const onPageHide = () => session.close();
+    window.addEventListener('pagehide', onPageHide);
     const leave = () => {
       alive = false;
-      session.close();
+      window.removeEventListener('pagehide', onPageHide);
+      session.close(); // sends `bye`
       toStart();
     };
     const update = showLobby(
@@ -86,7 +90,7 @@ export function startMenus(root: HTMLElement): void {
       },
       session.roster.list(),
     );
-    session.onRoster((r) => alive && update(r));
+    session.onRoster((r) => void (alive && update(r)));
   };
 
   const join = async (rawCode: string): Promise<void> => {

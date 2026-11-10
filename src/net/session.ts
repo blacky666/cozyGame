@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import { APP_VERSION } from '../version';
 import { migrate, type Look, type Profile } from '../save/profile';
 import { neutralInput, parseInputState, type InputState, type MsgData, type MsgType, type RejectReason } from './protocol';
@@ -22,15 +23,25 @@ type Snap = MsgData<'snap'>;
 type PhaseMsg = MsgData<'phase'>;
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null;
+/** Add a listener; returns its unsubscribe function. */
+const subscribe = <F>(list: F[], cb: F): (() => void) => {
+  list.push(cb);
+  return () => {
+    const i = list.indexOf(cb);
+    if (i >= 0) list.splice(i, 1);
+  };
+};
+export type Unsubscribe = () => void;
+
 const send = <T extends MsgType>(t: Transport, type: T, data: MsgData<T>, to?: string) => t.send(type, data, to);
 
 export interface HostSession {
   readonly selfId: string;
   readonly roster: Roster;
   readonly phase: string;
-  onInput(cb: (playerId: string, state: InputState, seq: number) => void): void;
-  onRoster(cb: (players: PlayerInfo[]) => void): void;
-  /** Latest input of a player (neutral if none). */
+  onInput(cb: (playerId: string, state: InputState, seq: number) => void): Unsubscribe;
+  onRoster(cb: (players: PlayerInfo[]) => void): Unsubscribe;
+  /** Latest input of a player (neutral if none, or if a remote input is older than CONFIG.net.inputStaleMs). */
   input(playerId: string): InputState;
   /** Send a snapshot of the current phase to all connected clients. */
   broadcast(phase: string, payload: unknown): void;
@@ -42,6 +53,7 @@ export interface HostSession {
   setLocalReady(playerId: string, ready: boolean): void;
   /** Back to the lobby after an evening: drop disconnected players, reset ready (bots stay ready). */
   resetForLobby(data?: unknown): void;
+  /** Says `bye` to all clients (so they notice at once), then leaves the room. */
   close(): void;
 }
 
@@ -50,6 +62,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
   const roster = new Roster();
   const inputs = new Map<string, InputState>();
   const lastSeq = new Map<string, number>();
+  const inputAt = new Map<string, number>();
   const local = new Set<string>([t.selfId]);
   const inputCbs: Array<(id: string, s: InputState, seq: number) => void> = [];
   const rosterCbs: Array<(players: PlayerInfo[]) => void> = [];
@@ -71,6 +84,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
   };
   const emitInput = (id: string, s: InputState, seq: number) => {
     inputs.set(id, s);
+    inputAt.set(id, now());
     inputCbs.forEach((cb) => cb(id, s, seq));
   };
 
@@ -122,9 +136,15 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     get phase() {
       return phase;
     },
-    onInput: (cb) => void inputCbs.push(cb),
-    onRoster: (cb) => void rosterCbs.push(cb),
-    input: (id) => inputs.get(id) ?? neutralInput(),
+    onInput: (cb) => subscribe(inputCbs, cb),
+    onRoster: (cb) => subscribe(rosterCbs, cb),
+    input(id) {
+      const s = inputs.get(id);
+      if (!s) return neutralInput();
+      // Remote input that stopped arriving (lost packets, frozen tab) must not keep a player running.
+      if (!local.has(id) && now() - (inputAt.get(id) ?? 0) > CONFIG.net.inputStaleMs) return neutralInput();
+      return s;
+    },
     broadcast(ph, payload) {
       if (roster.expire(now()).length > 0) rosterChanged();
       toAll('snap', { tick: ++tick, phase: ph, payload });
@@ -161,7 +181,10 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       toAll('phase', data === undefined ? { phase: LOBBY } : { phase: LOBBY, data });
       rosterChanged();
     },
-    close: () => t.leave(),
+    close() {
+      toAll('bye', {});
+      t.leave();
+    },
   };
 }
 
@@ -173,11 +196,12 @@ export interface ClientSession {
   readonly phase: string;
   sendInput(state: InputState): void;
   setReady(ready: boolean): void;
-  onRoster(cb: (players: PlayerInfo[]) => void): void;
-  onSnapshot(cb: (snap: Snap) => void): void;
-  onPhase(cb: (phase: PhaseMsg) => void): void;
-  onRejected(cb: (reason: RejectReason) => void): void;
-  onHostLost(cb: () => void): void;
+  onRoster(cb: (players: PlayerInfo[]) => void): Unsubscribe;
+  onSnapshot(cb: (snap: Snap) => void): Unsubscribe;
+  onPhase(cb: (phase: PhaseMsg) => void): Unsubscribe;
+  onRejected(cb: (reason: RejectReason) => void): Unsubscribe;
+  /** Host left: its `bye` arrived or its peer disconnected (whichever comes first). */
+  onHostLost(cb: () => void): Unsubscribe;
   close(): void;
 }
 
@@ -240,10 +264,15 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
     snapCbs.forEach((cb) => cb(snap));
   });
 
-  t.onPeerLeave((id) => {
-    if (done || id !== hostId) return;
+  const hostLost = () => {
     done = true;
     lostCbs.forEach((cb) => cb());
+  };
+  t.on('bye', (_data, from) => {
+    if (!done && fromHost(from)) hostLost();
+  });
+  t.onPeerLeave((id) => {
+    if (!done && id === hostId) hostLost();
   });
 
   return {
@@ -266,11 +295,11 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
     setReady(ready) {
       if (!done && hostId) send(t, 'ready', { ready }, hostId);
     },
-    onRoster: (cb) => void rosterCbs.push(cb),
-    onSnapshot: (cb) => void snapCbs.push(cb),
-    onPhase: (cb) => void phaseCbs.push(cb),
-    onRejected: (cb) => void rejectCbs.push(cb),
-    onHostLost: (cb) => void lostCbs.push(cb),
+    onRoster: (cb) => subscribe(rosterCbs, cb),
+    onSnapshot: (cb) => subscribe(snapCbs, cb),
+    onPhase: (cb) => subscribe(phaseCbs, cb),
+    onRejected: (cb) => subscribe(rejectCbs, cb),
+    onHostLost: (cb) => subscribe(lostCbs, cb),
     close() {
       done = true;
       t.leave();

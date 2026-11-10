@@ -14,13 +14,13 @@ export type SandboxState = {
 };
 
 export const SANDBOX = {
-  speed: 60,
-  spawnMs: 1500,
-  coinSize: 8,
+  speed: CONFIG.sandbox.speed,
+  spawnMs: CONFIG.sandbox.spawnMs,
+  coinSize: CONFIG.sandbox.coinSize,
   /** Distance between the player's lower body and a coin centre that counts as a touch. */
-  pickupRadius: 9,
-  maxCoins: 12,
-  /** Walkable area for the player pivot (feet); the top keeps room for head + HUD. */
+  pickupRadius: CONFIG.sandbox.pickupRadius,
+  maxCoins: CONFIG.sandbox.maxCoins,
+  /** Walkable area for the player pivot (feet); the top keeps room for head + HUD. Derived from the view. */
   bounds: { minX: 8, maxX: CONFIG.view.width - 8, minY: 40, maxY: CONFIG.view.height - 4 },
 } as const;
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EveningPhase } from '../flow/evening';
 import { mulberry32 } from '../flow/rng';
 import { neutralInput, type InputState } from '../net/protocol';
-import { createClient, createHost } from '../net/session';
+import { createClient, createHost, type HostSession } from '../net/session';
 import { createLocalHub } from '../net/transport';
 import { createSandboxHost, type SandboxState } from '../minigames/sandbox/sandboxHost';
 import type { MiniGame } from '../minigames/types';
@@ -123,6 +123,35 @@ describe('EveningHost', () => {
     const before = (s.evening.latest as SandboxState).players.p1.x;
     s.tick(0.5);
     expect((s.evening.latest as SandboxState).players.p1.x).toBeGreaterThan(before + 20);
+  });
+
+  it('unsubscribes from the roster on stop/backToLobby (no stale listener per "Nochmal?")', () => {
+    const hub = createLocalHub();
+    const session = createHost(hub.join(), prof('Host'));
+    session.addLocalPlayer('Bot Mo', prof('x').look, { isBot: true });
+    let live = 0;
+    const spy: HostSession = Object.create(session, {
+      onRoster: {
+        value: (cb: Parameters<HostSession['onRoster']>[0]) => {
+          live++;
+          const off = session.onRoster(cb);
+          return () => {
+            live--;
+            off();
+          };
+        },
+      },
+    });
+    for (let i = 0; i < 3; i++) {
+      const ev = new EveningHost({
+        session: spy, rounds: 5, games: [game as MiniGame], localInput: () => neutralInput(),
+        startTicker: () => () => {},
+      });
+      ev.start();
+      expect(live).toBe(1);
+      ev.backToLobby();
+      expect(live).toBe(0);
+    }
   });
 
   it('drives dev bots through the game bot view', async () => {

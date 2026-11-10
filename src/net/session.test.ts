@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONFIG } from '../config';
 import { defaultProfile } from '../save/profile';
 import { neutralInput, type InputState, type RejectReason } from './protocol';
 import { createClient, createHost, startHostTicker, type TickWorker } from './session';
@@ -184,6 +185,79 @@ describe('session', () => {
     ]);
     expect(c1.roster.map((p) => p.name)).toEqual(['Host', 'Bot Mo', 'Eins']);
     expect(c1.roster.every((p) => p.isBot || !p.ready)).toBe(true);
+  });
+
+  it('treats a remote input older than inputStaleMs as neutral (local input never goes stale)', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    let now = 1000;
+    const host = createHost(ht, prof('Host'), { now: () => now });
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    await flush();
+    const up = { ...neutralInput(), up: true };
+    client.sendInput(up);
+    host.setLocalInput(ht.selfId, up);
+    await flush();
+    expect(host.input(ct.selfId)).toEqual(up);
+    now += CONFIG.net.inputStaleMs;
+    expect(host.input(ct.selfId)).toEqual(up);
+    now += 1;
+    expect(host.input(ct.selfId)).toEqual(neutralInput());
+    expect(host.input(ht.selfId)).toEqual(up);
+    client.sendInput(up);
+    await flush();
+    expect(host.input(ct.selfId)).toEqual(up);
+  });
+
+  it('host close() sends bye and the client reports the host lost immediately', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    const host = createHost(ht, prof('Host'));
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    let lost = 0;
+    client.onHostLost(() => lost++);
+    await flush();
+    const byes: string[] = [];
+    ct.on('bye', (_d, from) => byes.push(from));
+    host.close();
+    await flush();
+    expect(byes).toEqual([ht.selfId]);
+    expect(lost).toBe(1);
+  });
+
+  it('ignores a bye from a peer that is not the host', async () => {
+    const hub = createLocalHub();
+    createHost(hub.join(), prof('Host'));
+    const client = createClient(hub.join(), prof('Gast'));
+    const other = hub.join();
+    let lost = 0;
+    client.onHostLost(() => lost++);
+    await flush();
+    other.send('bye', {});
+    await flush();
+    expect(lost).toBe(0);
+  });
+
+  it('subscriptions return an unsubscribe function', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    const host = createHost(ht, prof('Host'));
+    let n = 0;
+    const off = host.onRoster(() => n++);
+    host.addLocalPlayer('Bot Mo', prof('x').look, { isBot: true });
+    off();
+    host.addLocalPlayer('Bot Lotte', prof('x').look, { isBot: true });
+    expect(n).toBe(1);
+    const client = createClient(hub.join(), prof('Gast'));
+    let phases = 0;
+    const offPhase = client.onPhase(() => phases++);
+    await flush();
+    offPhase();
+    host.setPhase('intro');
+    await flush();
+    expect(phases).toBe(0);
   });
 
   it('supports local bot players with local input', () => {

@@ -10,6 +10,7 @@ import { PodiumScene } from './scenes/PodiumScene';
 import { RoundIntroScene } from './scenes/RoundIntroScene';
 import { StandingsScene } from './scenes/StandingsScene';
 import type { StageCtx } from './stageCtx';
+import { integerZoom } from './zoom';
 
 const SCENE_OF: Record<Exclude<EveningPhase['kind'], 'lobby'>, string> = {
   intro: 'RoundIntroScene',
@@ -29,6 +30,7 @@ export class Stage {
   private current: EveningPhase | null = null;
   private snapCb: ((tick: number, p: SnapPayload, at: number) => void) | null = null;
   private destroyed = false;
+  private readonly onResize = () => this.game.scale.setZoom(integerZoom(window.innerWidth, window.innerHeight));
 
   constructor(ctx: Omit<StageCtx, 'onSnap'>) {
     this.ctx = { ...ctx, onSnap: (cb) => void (this.snapCb = cb) };
@@ -39,8 +41,10 @@ export class Stage {
       height: CONFIG.view.height,
       pixelArt: true,
       backgroundColor: '#2b2b3d',
-      // FIT keeps the 426x240 view whole on any window (CONFIG.view.zoom = 1278x720 at full size).
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      // Whole-number zoom only (crisp pixels): x3 at 1280x720 (CONFIG.view.zoom), recomputed on resize.
+      zoom: integerZoom(window.innerWidth, window.innerHeight),
+      // Centering comes from the #game flex container (index.html); Phaser margins would double it.
+      scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
       scene: [
         new BootScene(() => this.booted()),
         RoundIntroScene,
@@ -50,6 +54,7 @@ export class Stage {
         EndedScene,
       ],
     });
+    window.addEventListener('resize', this.onResize);
   }
 
   /** Show a phase; repeats of the current phase (re-sent after a reconnect) are ignored. */
@@ -74,6 +79,7 @@ export class Stage {
     if (this.destroyed) return;
     this.destroyed = true;
     this.snapCb = null;
+    window.removeEventListener('resize', this.onResize);
     this.ctx.keyboard.destroy();
     this.game.destroy(true);
   }

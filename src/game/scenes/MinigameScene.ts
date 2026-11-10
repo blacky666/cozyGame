@@ -7,8 +7,6 @@ import type { MiniGame, MiniGameView } from '../../minigames/types';
 import type { SceneData, StageCtx } from '../stageCtx';
 import { assetSprite, txt } from '../ui';
 
-/** Re-send unchanged input at least this often (covers a lost packet). */
-const INPUT_HEARTBEAT_MS = 200;
 const stepLerp = <S>(a: S, b: S, t: number): S => (t < 0.5 ? a : b);
 const sameInput = (a: InputState, b: InputState) =>
   a.up === b.up && a.down === b.down && a.left === b.left && a.right === b.right &&
@@ -77,7 +75,7 @@ export class MinigameScene extends Phaser.Scene {
       return;
     }
     const input = this.ctx.keyboard.state();
-    if (!sameInput(input, this.lastSent) || time - this.lastSentAt >= INPUT_HEARTBEAT_MS) {
+    if (!sameInput(input, this.lastSent) || time - this.lastSentAt >= CONFIG.net.inputHeartbeatMs) {
       this.ctx.sendInput?.(input);
       this.lastSent = input;
       this.lastSentAt = time;

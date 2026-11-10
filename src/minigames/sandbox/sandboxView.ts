@@ -9,9 +9,6 @@ import { moveStep, SANDBOX, type Facing, type SandboxState } from './sandboxHost
 const GRASS = 0x86b45a;
 const COIN = 0xf5d442;
 const COIN_EDGE = 0xb7861d;
-/** Prediction: ease toward the server position when the error exceeds this many pixels. */
-const ERR_PX = 4;
-const EASE = 0.3;
 
 type Avatar = { char: Character; label: Phaser.GameObjects.Text; anim: string; dir: Facing };
 type Pred = { x: number; y: number; dir: Facing; moving: boolean };
@@ -60,9 +57,9 @@ export class SandboxView implements MiniGameView<SandboxState> {
     p.y = m.y;
     p.moving = m.moving;
     if (m.dir) p.dir = m.dir;
-    if (Math.hypot(server.x - p.x, server.y - p.y) > ERR_PX) {
-      p.x += (server.x - p.x) * EASE;
-      p.y += (server.y - p.y) * EASE;
+    if (Math.hypot(server.x - p.x, server.y - p.y) > CONFIG.net.predictErrPx) {
+      p.x += (server.x - p.x) * CONFIG.net.predictEase;
+      p.y += (server.y - p.y) * CONFIG.net.predictEase;
     }
   }
 
