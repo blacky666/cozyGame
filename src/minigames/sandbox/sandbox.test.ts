@@ -87,4 +87,43 @@ describe('sandbox host (muenzjagd)', () => {
     expect(m.players.p0.x).toBeCloseTo((a.players.p0.x + b.players.p0.x) / 2, 5);
     expect(m.players.p0.dir).toBe('side');
   });
+
+  it('a shove pushes the victim, stuns them, and makes them drop a coin', () => {
+    const g = createSandboxHost(['p0', 'p1'], mulberry32(3), 60000);
+    // p1 collects a coin first.
+    for (let i = 0; i < 900 && g.snapshot().players.p1.score === 0; i++) {
+      const s = g.snapshot();
+      const me = s.players.p1;
+      const c = s.coins[0];
+      const inp = c
+        ? press({ right: c.x > me.x + 1, left: c.x < me.x - 1, down: c.y > me.y + 1, up: c.y < me.y - 1 })
+        : idle;
+      g.tick(DT, { p0: idle, p1: inp });
+    }
+    expect(g.snapshot().players.p1.score).toBe(1);
+    // p0 walks up to p1 and ends up facing them from the left.
+    for (let i = 0; i < 900; i++) {
+      const s = g.snapshot();
+      const a = s.players.p0;
+      const b = s.players.p1;
+      if (Math.abs(b.y - a.y) <= 1 && b.x - a.x <= 12 && b.x - a.x > 0) break;
+      const tx = b.x - 10;
+      g.tick(DT, { p0: press({ right: a.x < tx - 1, left: a.x > tx + 1, down: a.y < b.y - 1, up: a.y > b.y + 1 }), p1: idle });
+    }
+    g.tick(DT, { p0: press({ right: true }), p1: idle }); // face right
+    const before = g.snapshot();
+    const coinsBefore = before.coins.length;
+    g.tick(DT, { p0: press({ shoves: 1 }), p1: idle });
+    const hit = g.snapshot();
+    expect(hit.players.p1.stun).toBe(true);
+    expect(hit.players.p1.score).toBe(0);
+    expect(hit.players.p0.swing).toBe(true);
+    expect(hit.players.p0.shoveCdMs).toBeGreaterThan(0);
+    expect(hit.coins.length).toBeGreaterThanOrEqual(coinsBefore + 1);
+    // While stunned, input is ignored; afterwards p1 has slid about pushPx to the right.
+    for (let i = 0; i < 15; i++) g.tick(DT, { p0: idle, p1: press({ left: true }) });
+    const after = g.snapshot().players.p1;
+    expect(after.stun).toBe(false);
+    expect(after.x - before.players.p1.x).toBeGreaterThan(20);
+  });
 });

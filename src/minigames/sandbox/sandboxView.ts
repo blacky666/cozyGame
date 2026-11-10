@@ -19,6 +19,8 @@ export class SandboxView implements MiniGameView<SandboxState> {
   private readonly scores = new Map<PlayerKey, Phaser.GameObjects.Text>();
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
   private readonly time: Phaser.GameObjects.Text;
+  /** Shove cooldown ring under the own figure. */
+  private readonly ring: Phaser.GameObjects.Graphics;
   private pred: Pred | null = null;
 
   constructor(
@@ -36,6 +38,8 @@ export class SandboxView implements MiniGameView<SandboxState> {
       this.avatars.set(key, { char, label, anim: 'idle', dir: 'down' });
       this.objects.push(char, label);
     }
+    this.ring = scene.add.graphics();
+    this.objects.push(this.ring);
     // HUD: time in the middle, one score per player (symbol + number) in slot order.
     this.objects.push(scene.add.rectangle(0, 0, width, 16, 0x3b2418, 0.55).setOrigin(0).setDepth(1000));
     this.time = txt(scene, width / 2, 8, '', 10).setDepth(1001);
@@ -52,6 +56,11 @@ export class SandboxView implements MiniGameView<SandboxState> {
     if (!server) return;
     if (!this.pred) this.pred = { x: server.x, y: server.y, dir: server.dir, moving: false };
     const p = this.pred;
+    if (server.stun) {
+      // Being shoved: the host moves us, input does nothing.
+      Object.assign(p, { x: server.x, y: server.y, dir: server.dir, moving: false });
+      return;
+    }
     const m = moveStep(p, input, dt);
     p.x = m.x;
     p.y = m.y;
@@ -70,13 +79,14 @@ export class SandboxView implements MiniGameView<SandboxState> {
       const p = key === selfKey && this.pred ? { ...sp, ...this.pred } : sp;
       a.char.setPosition(Math.round(p.x), Math.round(p.y)).setDepth(p.y);
       a.label.setPosition(Math.round(p.x), Math.round(p.y) - 46).setDepth(p.y + 0.5);
-      const anim = p.moving ? 'run' : 'idle';
+      const anim = sp.stun ? 'stumble' : sp.swing ? 'throw' : p.moving ? 'run' : 'idle';
       if (anim !== a.anim || p.dir !== a.dir) {
         a.anim = anim;
         a.dir = p.dir;
         a.char.play(anim, p.dir);
       }
       this.scores.get(key)?.setText(String(sp.score));
+      if (key === selfKey) this.drawRing(Math.round(p.x), Math.round(p.y), sp.shoveCdMs);
     }
     const alive = new Set(s.coins.map((c) => c.id));
     for (const [id, r] of this.coins) {
@@ -95,6 +105,17 @@ export class SandboxView implements MiniGameView<SandboxState> {
       this.coins.set(c.id, r);
     }
     this.time.setText(`${Math.ceil(s.timeLeftMs / 1000)} s`);
+  }
+
+  /** Filling ellipse under the feet while the shove cools down; hidden when ready. */
+  private drawRing(x: number, y: number, cdMs: number): void {
+    const g = this.ring.clear();
+    if (cdMs <= 0) return;
+    const done = 1 - cdMs / CONFIG.shove.cooldownMs;
+    g.setPosition(x, y + 1).setScale(1, 0.5).setDepth(y - 1);
+    g.lineStyle(2, 0x3b2418, 0.35).strokeCircle(0, 0, 10);
+    g.lineStyle(2, 0xfff4a8, 0.9).beginPath();
+    g.arc(0, 0, 10, -Math.PI / 2, -Math.PI / 2 + done * Math.PI * 2, false).strokePath();
   }
 
   destroy(): void {

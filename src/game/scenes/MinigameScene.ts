@@ -10,7 +10,7 @@ import { assetSprite, txt } from '../ui';
 const stepLerp = <S>(a: S, b: S, t: number): S => (t < 0.5 ? a : b);
 const sameInput = (a: InputState, b: InputState) =>
   a.up === b.up && a.down === b.down && a.left === b.left && a.right === b.right &&
-  a.primary === b.primary && a.secondary === b.secondary && a.special === b.special && a.emote === b.emote;
+  a.primary === b.primary && a.secondary === b.secondary && a.special === b.special && a.emote === b.emote && a.shoves === b.shoves;
 
 /**
  * Renders the running minigame. Host: draws its authoritative snapshot directly (the simulation

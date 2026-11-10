@@ -12,13 +12,18 @@ export type InputState = {
   emote: 0 | 1 | 2 | 3 | 4;
   aimX: number;
   aimY: number;
+  /**
+   * How often the shove key was pressed so far (only ever grows). A counter instead of a held
+   * flag, so a quick tap between two host ticks is never lost.
+   */
+  shoves: number;
 };
 
 export function neutralInput(): InputState {
   return {
     up: false, down: false, left: false, right: false,
     primary: false, secondary: false, special: false,
-    emote: 0, aimX: 0, aimY: 0,
+    emote: 0, aimX: 0, aimY: 0, shoves: 0,
   };
 }
 
@@ -55,10 +60,13 @@ export function parseInputState(x: unknown): InputState | null {
   if (emote !== 0 && emote !== 1 && emote !== 2 && emote !== 3 && emote !== 4) return null;
   if (typeof aimX !== 'number' || !Number.isFinite(aimX)) return null;
   if (typeof aimY !== 'number' || !Number.isFinite(aimY)) return null;
+  const { shoves } = r;
+  if (typeof shoves !== 'number' || !Number.isSafeInteger(shoves) || shoves < 0) return null;
   const s = neutralInput();
   for (const k of BUTTONS) s[k] = r[k] as boolean;
   s.emote = emote;
   s.aimX = aimX;
   s.aimY = aimY;
+  s.shoves = shoves;
   return s;
 }

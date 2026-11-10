@@ -35,6 +35,19 @@ interface GameConfig {
   intro: { ruleMs: number; countdownMs: number };
   standings: { showMs: number };
   sandbox: { durationMs: number; speed: number; spawnMs: number; coinSize: number; pickupRadius: number; maxCoins: number };
+  shove: {
+    /** Max distance between two pivots for a shove to land (px). */
+    reachPx: number;
+    /** How far the victim slides in total (px). */
+    pushPx: number;
+    /** Victim cannot steer for this long; the slide happens in this time. */
+    stunMs: number;
+    cooldownMs: number;
+    /** After being shoved, nobody can shove you again for this long. */
+    immuneMs: number;
+    /** Length of the shove arm animation. */
+    swingMs: number;
+  };
 }
 
 function deepFreeze<T extends object>(obj: T): DeepReadonly<T> {
@@ -69,4 +82,6 @@ export const CONFIG = deepFreeze<GameConfig>({
   standings: { showMs: 8000 },
   // Placeholder minigame "Münzjagd" (speed in px/s, sizes in px).
   sandbox: { durationMs: 30000, speed: 60, spawnMs: 1500, coinSize: 8, pickupRadius: 9, maxCoins: 12 },
+  // Shove (E) in all top-down games.
+  shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
 });

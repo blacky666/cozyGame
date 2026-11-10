@@ -1,11 +1,23 @@
 import { CONFIG } from '../../config';
 import { neutralInput } from '../../net/protocol';
+import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import type { BotView, InputState, MiniGameHost, PlayerKey } from '../types';
 
-/** Facing as used by Character ('side' = right). Kept local so this file never imports Phaser. */
-export type Facing = 'down' | 'up' | 'side' | 'left';
+export type { Facing } from '../common/shove';
 
-export type SandboxPlayer = { x: number; y: number; dir: Facing; moving: boolean; score: number };
+export type SandboxPlayer = {
+  x: number;
+  y: number;
+  dir: Facing;
+  moving: boolean;
+  score: number;
+  /** Being shoved away right now (no steering). */
+  stun: boolean;
+  /** Playing the own shove animation. */
+  swing: boolean;
+  /** Remaining shove cooldown in ms (0 = ready). */
+  shoveCdMs: number;
+};
 export type Coin = { id: number; x: number; y: number };
 export type SandboxState = {
   timeLeftMs: number;
@@ -57,9 +69,11 @@ export function createSandboxHost(
   durationMs: number = CONFIG.sandbox.durationMs,
 ): MiniGameHost<SandboxState> {
   const players: Record<PlayerKey, SandboxPlayer> = {};
+  const shove: Record<PlayerKey, ShoveSlot> = {};
   keys.forEach((k, i) => {
     const [x, y] = START[Number(k.slice(1))] ?? START[i % START.length];
-    players[k] = { x, y, dir: 'down', moving: false, score: 0 };
+    players[k] = { x, y, dir: 'down', moving: false, score: 0, stun: false, swing: false, shoveCdMs: 0 };
+    shove[k] = newShoveSlot();
   });
   let coins: Coin[] = [];
   let elapsedMs = 0;
@@ -84,13 +98,36 @@ export function createSandboxHost(
         spawnMs -= SANDBOX.spawnMs;
         spawn();
       }
+      // Shoving makes the victim drop a coin where they stood.
+      for (const h of resolveShoves(keys, players, shove, inputs)) {
+        const v = players[h.to];
+        if (v.score <= 0) continue;
+        v.score -= 1;
+        coins.push({ id: nextId++, x: Math.round(v.x), y: Math.round(v.y - 4) });
+      }
       for (const k of keys) {
         const p = players[k];
-        const m = moveStep(p, inputs[k] ?? neutralInput(), ms / 1000);
-        p.x = m.x;
-        p.y = m.y;
-        p.moving = m.moving;
-        if (m.dir) p.dir = m.dir;
+        const sh = shove[k];
+        const stunned = sh.stunMs > 0;
+        const slide = stepShove(sh, ms / 1000);
+        if (stunned) {
+          const b = SANDBOX.bounds;
+          p.x = clamp(p.x + slide.dx, b.minX, b.maxX);
+          p.y = clamp(p.y + slide.dy, b.minY, b.maxY);
+          p.moving = false;
+        } else {
+          const m = moveStep(p, inputs[k] ?? neutralInput(), ms / 1000);
+          p.x = m.x;
+          p.y = m.y;
+          p.moving = m.moving;
+          if (m.dir) p.dir = m.dir;
+        }
+        p.stun = sh.stunMs > 0;
+        p.swing = sh.swingMs > 0;
+        p.shoveCdMs = Math.ceil(sh.cooldownMs);
+        // No pickups while being shoved (the victim would catch their own coin) or while swinging
+        // (the shover would grab it instantly instead of it visibly dropping).
+        if (stunned || sh.swingMs > 0) continue;
         // Coins float slightly above the ground; compare against the lower body.
         const hit = coins.find((c) => Math.hypot(c.x - p.x, c.y - (p.y - 4)) <= SANDBOX.pickupRadius);
         if (hit) {

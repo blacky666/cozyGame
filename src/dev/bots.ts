@@ -29,12 +29,16 @@ export function addDevBots(session: HostSession, n: number): string[] {
 const JITTER_CHANCE = 0.04; // per call (~30 Hz): roughly one detour per second
 const JITTER_TICKS = 6;
 const DEAD_ZONE = 2;
+/** Chance per tick that a bot presses shove (about once every 1.5 s at 30 Hz). */
+const SHOVE_CHANCE = 0.02;
 
 /** Bot brain: walks toward the nearest target, with occasional random detours. */
 export function createBotInputs(seed: number): (view: BotView) => InputState {
   const rand = mulberry32(seed);
   let detour: InputState | null = null;
   let detourLeft = 0;
+  // Bots press shove now and then (the host decides whether it lands).
+  let shoves = 0;
 
   const randomDir = (): InputState => {
     const s = neutralInput();
@@ -46,7 +50,7 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
     return s;
   };
 
-  return (view) => {
+  const brain = (view: BotView): InputState => {
     if (detourLeft > 0 && detour) {
       detourLeft--;
       return { ...detour };
@@ -72,5 +76,9 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
     s.down = best.y > self.y + DEAD_ZONE;
     s.up = best.y < self.y - DEAD_ZONE;
     return s;
+  };
+  return (view) => {
+    if (rand() < SHOVE_CHANCE) shoves++;
+    return { ...brain(view), shoves };
   };
 }
