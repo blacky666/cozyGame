@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { AssetFile } from './assetTypes';
-import { layerPlan } from './layerPlan';
+import { layerPlan, mirrorX } from './layerPlan';
 import { defaultProfile } from '../save/profile';
 
 const load = (n: string) =>
@@ -11,6 +11,7 @@ const assets: Record<string, AssetFile> = {
   'char-head': load('char-head'),
   'char-misc': load('char-misc'),
   outfits: load('outfits'),
+  accessories: load('accessories'),
 };
 const look = () => ({ ...defaultProfile().look, hat: null });
 
@@ -67,5 +68,54 @@ describe('layerPlan', () => {
 
   it('skips missing accessories silently', () => {
     expect(() => layerPlan({ ...look(), hat: 'nope', glasses: 'nope', back: 'nope' }, 0, 'down', 'idle', 0, assets)).not.toThrow();
+  });
+
+  it('places glasses as face.<n>.<dir> at anchors.head - [10,20]', () => {
+    const plan = layerPlan({ ...look(), glasses: 'rundbrille' }, 0, 'down', 'idle', 0, assets);
+    const a = assets['char-body'].sprites['char.body.down.idle'].frames[0].anchors!.head;
+    const g = plan.find((l) => l.sprite === 'face.rundbrille.down')!;
+    expect([g.x, g.y]).toEqual([a[0] - 10, a[1] - 20]);
+  });
+
+  it('uses hat.<n>.fall with the head_pose frame on lying poses', () => {
+    const plan = layerPlan({ ...look(), hat: 'zylinder' }, 0, 'down', 'fall', 2, assets);
+    const h = plan.find((l) => l.sprite === 'hat.zylinder.fall')!;
+    expect(h.frame).toBe(2);
+  });
+
+  it('draws the cape after the body when facing up, before it otherwise', () => {
+    const idx = (dir: 'up' | 'down', n: string) => {
+      const names = layerPlan({ ...look(), back: 'umhang_rot' }, 0, dir, 'idle', 0, assets).map((l) => l.sprite);
+      return [names.indexOf(`cape.umhang_rot.${dir}`), names.indexOf(n)];
+    };
+    const [cu, bu] = idx('up', 'char.body.up.idle');
+    expect(cu).toBeGreaterThan(bu);
+    const [cd, bd] = idx('down', 'char.body.down.idle');
+    expect(cd).toBeGreaterThanOrEqual(0);
+    expect(cd).toBeLessThan(bd);
+  });
+
+  it('hides the cape on lying poses but keeps the symbol', () => {
+    const plan = layerPlan({ ...look(), back: 'umhang_rot' }, 0, 'down', 'fall', 2, assets);
+    expect(plan.some((l) => l.sprite.startsWith('cape.'))).toBe(false);
+    expect(plan.some((l) => l.sprite === 'ui.symbol.kreis')).toBe(true);
+  });
+
+  it('keeps head/symbol when a frame has no back anchor, and symbol without head anchor', () => {
+    const a2 = structuredClone(assets);
+    const fr = a2['char-body'].sprites['char.body.down.idle'].frames[0];
+    delete (fr.anchors as Partial<typeof fr.anchors>)!.back;
+    const p1 = layerPlan({ ...look(), back: 'umhang_rot' }, 0, 'down', 'idle', 0, a2);
+    expect(p1.some((l) => l.sprite === 'char.head.down.normal')).toBe(true);
+    expect(p1.some((l) => l.sprite.startsWith('cape.'))).toBe(false);
+    delete fr.anchors;
+    const p2 = layerPlan(look(), 0, 'down', 'idle', 0, a2);
+    expect(p2.some((l) => l.sprite === 'ui.symbol.kreis')).toBe(true);
+  });
+
+  it('mirrors x around the body centre', () => {
+    expect(mirrorX(4, 10)).toBe(10);
+    expect(mirrorX(0, 24)).toBe(0);
+    expect(mirrorX(mirrorX(3, 7), 7)).toBe(3);
   });
 });

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { AssetFile } from './assetTypes';
-import { BODY_W, findSprite, layerPlan, type Dir } from './layerPlan';
+import { BODY_W, findSprite, layerPlan, mirrorX, type Dir } from './layerPlan';
 import { getTextureKey } from './textures';
 import type { Look } from '../save/profile';
 
@@ -9,12 +9,14 @@ export type FacingDir = Dir | 'left';
 /** Layered pixel character; the container origin is the body pivot (feet). */
 export class Character extends Phaser.GameObjects.Container {
   private readonly assets: Record<string, AssetFile>;
-  private readonly look: Look;
+  private look: Look;
   private readonly slot: number;
   private anim = 'idle';
   private dir: FacingDir = 'down';
   private expression = 'normal';
   private elapsed = 0;
+  private lastKey = '';
+  private bodyDef: { fps: number; loop: boolean; n: number } | null = null;
   private readonly sprites: Phaser.GameObjects.Image[] = [];
 
   constructor(scene: Phaser.Scene, assets: Record<string, AssetFile>, look: Look, slot: number) {
@@ -34,11 +36,19 @@ export class Character extends Phaser.GameObjects.Container {
     if (anim !== this.anim || dir !== this.dir) this.elapsed = 0;
     this.anim = anim;
     this.dir = dir;
+    this.bodyDef = null;
     this.refresh();
   }
 
   setExpression(e: string): void {
     this.expression = e;
+    this.refresh();
+  }
+
+  setLook(look: Look): void {
+    this.look = look;
+    this.bodyDef = null;
+    this.lastKey = '';
     this.refresh();
   }
 
@@ -50,15 +60,19 @@ export class Character extends Phaser.GameObjects.Container {
   private refresh(): void {
     const left = this.dir === 'left';
     const d: Dir = this.dir === 'left' ? 'side' : this.dir;
-    // Frame index from the body sprite of the first plan (needs fps/loop/length).
-    const probe = layerPlan(this.look, this.slot, d, this.anim, 0, this.assets);
-    const bodyName = probe.find((l) => /^(char\.body|outfit\.)/.test(l.sprite))?.sprite;
-    const def = bodyName ? findSprite(this.assets, bodyName)?.def : undefined;
-    let frame = 0;
-    if (def) {
-      const n = Math.floor((this.elapsed / 1000) * def.fps);
-      frame = def.loop ? n % def.frames.length : Math.min(n, def.frames.length - 1);
+    if (!this.bodyDef) {
+      const probe = layerPlan(this.look, this.slot, d, this.anim, 0, this.assets);
+      const bodyName = probe.find((l) => /^(char\.body|outfit\.)/.test(l.sprite))?.sprite;
+      const def = bodyName ? findSprite(this.assets, bodyName)?.def : undefined;
+      this.bodyDef = def ? { fps: def.fps, loop: def.loop, n: def.frames.length } : { fps: 1, loop: false, n: 1 };
     }
+    const bd = this.bodyDef;
+    const n = Math.floor((this.elapsed / 1000) * bd.fps);
+    const frame = bd.loop ? n % bd.n : Math.min(n, bd.n - 1);
+    // Re-plan only when something visible changed.
+    const key = `${this.anim}|${this.dir}|${frame}|${this.expression}`;
+    if (key === this.lastKey) return;
+    this.lastKey = key;
     const plan = layerPlan(this.look, this.slot, d, this.anim, frame, this.assets);
 
     while (this.sprites.length < plan.length) {
@@ -83,7 +97,7 @@ export class Character extends Phaser.GameObjects.Container {
       img.setTexture(key, l.frame).setVisible(true);
       img.setFlipX(left);
       // Mirror x around the body frame centre; origin 0,0 so the sprite spans [x, x+w].
-      const x = left ? BODY_W - l.x - found.def.w : l.x;
+      const x = left ? mirrorX(l.x, found.def.w) : l.x;
       img.setPosition(x - BODY_W / 2, l.y - 22);
     });
     for (let i = plan.length; i < this.sprites.length; i++) this.sprites[i].setVisible(false);

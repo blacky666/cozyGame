@@ -1,4 +1,3 @@
-import Phaser from 'phaser';
 import { APP_VERSION, CONFIG } from './config';
 
 const ui = document.getElementById('ui');
@@ -8,7 +7,7 @@ if (ui) {
 
 // Dev entry: ?dev=chars shows the character lab (lazy-loaded scene).
 if (new URLSearchParams(location.search).get('dev') === 'chars') {
-  void import('./game/scenes/CharacterLabScene').then(({ CharacterLabScene }) => {
+  void Promise.all([import('phaser'), import('./game/scenes/CharacterLabScene')]).then(([{ default: Phaser }, { CharacterLabScene }]) => {
     new Phaser.Game({
       type: Phaser.AUTO,
       parent: 'game',

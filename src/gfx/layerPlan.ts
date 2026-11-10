@@ -8,7 +8,6 @@ export type LayerSpec = {
   x: number;
   y: number;
   colors: ColorMap;
-  flipX: boolean;
 };
 
 /** Body pivot x in the 24-wide body frame; used to mirror `left`. */
@@ -60,9 +59,8 @@ export function layerPlan(
 
   const layers: LayerSpec[] = [];
   const push = (sprite: string, frame: number, x: number, y: number, colors: ColorMap): void => {
-    layers.push({ sprite, frame, x, y, colors, flipX: false });
+    layers.push({ sprite, frame, x, y, colors });
   };
-  const exists = (n: string): boolean => findSprite(assets, n) !== null;
 
   // shadow, centred on its pivot at the body pivot (12, 22)
   const sh = findSprite(assets, 'char.shadow');
@@ -75,20 +73,30 @@ export function layerPlan(
   const bf = frameIndex % body.def.frames.length;
   const fr = body.def.frames[bf];
   const anchors = fr.anchors;
+  const lying = !!fr.head_pose;
 
-  // back item (before body)
-  if (look.back && anchors) {
-    const n = `back.${look.back}`;
+  // Cape: hidden on lying poses; above the body when facing up, else behind it.
+  // Frame 1 (waving) while running.
+  const capeLayer = (): void => {
+    if (!look.back || lying || !anchors?.back) return;
+    const n = `cape.${look.back}.${d}`;
     const s = findSprite(assets, n);
-    if (s) push(n, 0, anchors.back[0] - s.def.pivot[0], anchors.back[1] - s.def.pivot[1], playerColors);
-  }
-
+    if (!s) return;
+    const waving = anim === 'run' || anim === 'sprint';
+    const f = waving ? frameIndex % s.def.frames.length : 0;
+    push(n, f, anchors.back[0] - s.def.pivot[0], anchors.back[1] - s.def.pivot[1], {});
+  };
+  if (d !== 'up') capeLayer();
   push(bodyName, bf, 0, 0, { ...playerColors, ...skinColors });
+  if (d === 'up') capeLayer();
 
-  if (anchors) {
+  let headTop = 0; // y of the top of the head sprite actually used (symbol sits above it)
+  let symbolX = BODY_W / 2;
+  if (anchors?.head) {
     const [ax, ay] = anchors.head;
     let headName = `char.head.${d}.normal`;
     let hairName = `char.hair.${look.hair}.${d}`;
+    let accName: string = d;
     let hf = 0;
     if (fr.head_pose) {
       // head_pose looks like "fall.2" / "fall_laugh.2": sprite suffix + frame index
@@ -98,25 +106,33 @@ export function layerPlan(
         hf = Number(m[2]);
       }
       hairName = `char.hair.${look.hair}.fall`;
+      accName = 'fall';
     }
     const at = (n: string, frame: number, colors: ColorMap): void => {
       const s = findSprite(assets, n);
       if (s) push(n, frame, ax - s.def.pivot[0], ay - s.def.pivot[1], colors);
     };
+    const hs = findSprite(assets, headName);
+    if (hs) headTop = ay - hs.def.pivot[1];
+    else headTop = ay - 14;
+    symbolX = ax;
     at(headName, hf, skinColors);
     at(hairName, hf, { ...hairColors, ...skinColors });
-    if (look.glasses) {
-      const n = [`glasses.${look.glasses}.${d}`, `glasses.${look.glasses}`].find(exists);
-      if (n) at(n, 0, {});
-    }
-    if (look.hat) {
-      const n = [`hat.${look.hat}.${d}`, `hat.${look.hat}`].find(exists);
-      if (n) at(n, 0, playerColors);
-    }
-    // player symbol floats above the head
-    const symName = `ui.symbol.${SYMBOLS[slot]}`;
-    const sym = findSprite(assets, symName);
-    if (sym) push(symName, 0, ax - sym.def.pivot[0], ay - 14 - sym.def.h, playerColors);
+    // hats/faces carry their own colours (empty recolor maps)
+    if (look.glasses) at(`face.${look.glasses}.${accName}`, hf, {});
+    if (look.hat) at(`hat.${look.hat}.${accName}`, hf, {});
+  }
+
+  const symName = `ui.symbol.${SYMBOLS[slot]}`;
+  const sym = findSprite(assets, symName);
+  if (sym) {
+    // fallback without a head anchor: above the top of the body frame
+    push(symName, 0, symbolX - sym.def.pivot[0], headTop - 2 - sym.def.h, playerColors);
   }
   return layers;
+}
+
+/** Mirror a sprite's left edge x (width w) around the body frame centre, for `left`. */
+export function mirrorX(x: number, w: number): number {
+  return BODY_W - x - w;
 }

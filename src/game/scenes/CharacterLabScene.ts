@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { AssetFile } from '../../gfx/assetTypes';
 import { Character, type FacingDir } from '../../gfx/character';
 import { loadAssets } from '../../gfx/textures';
-import { defaultProfile } from '../../save/profile';
+import { defaultProfile, type Look } from '../../save/profile';
 
 const DIRS: FacingDir[] = ['down', 'up', 'side', 'left'];
 
@@ -12,6 +12,7 @@ export class CharacterLabScene extends Phaser.Scene {
   private anims_: string[] = [];
   private ai = 0;
   private di = 0;
+  private dead = false;
   private label!: Phaser.GameObjects.Text;
 
   constructor() {
@@ -20,7 +21,13 @@ export class CharacterLabScene extends Phaser.Scene {
 
   create(): void {
     this.label = this.add.text(4, 4, 'loading...', { fontSize: '10px', color: '#fff' });
-    void loadAssets().then((assets) => this.build(assets));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.dead = true;
+      this.input.keyboard?.removeAllListeners();
+    });
+    void loadAssets().then((assets) => {
+      if (!this.dead) this.build(assets);
+    });
   }
 
   private build(assets: Record<string, AssetFile>): void {
@@ -28,8 +35,14 @@ export class CharacterLabScene extends Phaser.Scene {
     for (const n of Object.keys(assets['char-body'].sprites)) names.add(n.split('.').slice(3).join('.'));
     this.anims_ = [...names];
     const hairs = ['kurz', 'wuschel', 'zopf', 'kurz'];
+    const acc: Partial<Look>[] = [
+      { hat: 'bommelmuetze' },
+      { hat: 'zylinder', glasses: 'rundbrille', back: 'umhang_rot' },
+      { hat: 'ritterhelm', back: 'sternenumhang' },
+      { hat: null },
+    ];
     this.chars = [0, 1, 2, 3].map((slot) => {
-      const look = { ...defaultProfile().look, hat: null, hair: hairs[slot], hairColor: slot, skin: slot };
+      const look: Look = { ...defaultProfile().look, hair: hairs[slot], hairColor: slot, skin: slot, ...acc[slot] };
       const c = new Character(this, assets, look, slot);
       c.setPosition(71 + slot * 95, 140);
       return c;

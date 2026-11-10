@@ -3,7 +3,22 @@ import type { AssetFile, ColorMap } from './assetTypes';
 import { rasterize } from './rasterize';
 
 /** Asset files fetched by loadAssets(); later packages add more names. */
-export const ASSET_FILES = ['char-body', 'char-head', 'char-misc', 'outfits'] as const;
+export const ASSET_FILES = [
+  'char-body',
+  'char-head',
+  'char-misc',
+  'outfits',
+  'accessories',
+  'arena-farbkrieg',
+  'arena-kartoffel',
+  'arena-schneeball',
+  'arena-wackelturm',
+  'cards',
+  'emotes',
+  'fx',
+  'ui',
+  'ui-big',
+] as const;
 
 export async function loadAssets(): Promise<Record<string, AssetFile>> {
   const base = import.meta.env.BASE_URL;
