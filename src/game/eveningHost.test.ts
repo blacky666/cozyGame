@@ -199,4 +199,23 @@ describe('EveningHost', () => {
     expect(snaps.length).toBeLessThanOrEqual(21);
     expect(snaps[0]).toMatchObject({ round: 1 });
   });
+
+  it('snapshots carry the last processed input seq per player key', async () => {
+    const s = setup();
+    const ct = s.hub.join();
+    const client = createClient(ct, prof('Gast'));
+    const snaps: Array<{ acks?: Record<string, number> }> = [];
+    client.onSnapshot((sn) => snaps.push(sn.payload as { acks?: Record<string, number> }));
+    await flush();
+    s.evening.start();
+    s.tick(1.1);
+    client.sendInput(right);
+    client.sendInput(right);
+    await flush();
+    snaps.length = 0;
+    s.tick(0.2);
+    await flush();
+    expect(snaps.length).toBeGreaterThan(0);
+    expect(snaps.at(-1)?.acks).toEqual({ p0: 0, p1: 2 });
+  });
 });

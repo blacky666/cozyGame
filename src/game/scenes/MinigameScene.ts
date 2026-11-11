@@ -8,6 +8,7 @@ import type { SceneData, StageCtx } from '../stageCtx';
 import { assetSprite, txt } from '../ui';
 
 const stepLerp = <S>(a: S, b: S, t: number): S => (t < 0.5 ? a : b);
+/** Equal in everything but the aim (aim-only changes are throttled separately). */
 const sameInput = (a: InputState, b: InputState) =>
   a.up === b.up && a.down === b.down && a.left === b.left && a.right === b.right &&
   a.primary === b.primary && a.secondary === b.secondary && a.special === b.special && a.emote === b.emote && a.shoves === b.shoves &&
@@ -27,6 +28,9 @@ export class MinigameScene extends Phaser.Scene {
   private latest: unknown = null;
   private lastSent: InputState = neutralInput();
   private lastSentAt = 0;
+  private lastSentSeq = 0;
+  private lastAimAt = 0;
+  private acks: Record<string, number> = {};
 
   constructor() {
     super('MinigameScene');
@@ -38,6 +42,9 @@ export class MinigameScene extends Phaser.Scene {
     this.buffer.clear();
     this.latest = null;
     this.lastSentAt = 0;
+    this.lastSentSeq = 0;
+    this.lastAimAt = 0;
+    this.acks = {};
     this.def = getMinigame(phase.game) ?? null;
     if (!this.def) {
       txt(this, CONFIG.view.width / 2, CONFIG.view.height / 2, `Unbekanntes Spiel: ${phase.game}`, 10);
@@ -49,6 +56,7 @@ export class MinigameScene extends Phaser.Scene {
         if (p.round !== this.round) return;
         this.buffer.push(tick, at, p.state);
         this.latest = p.state;
+        this.acks = p.acks ?? {};
       });
     }
     const los = assetSprite(this, 'ui.countdown.los', CONFIG.view.width / 2, CONFIG.view.height / 2)
@@ -76,12 +84,19 @@ export class MinigameScene extends Phaser.Scene {
       return;
     }
     const input = this.ctx.keyboard.state();
-    if (!sameInput(input, this.lastSent) || time - this.lastSentAt >= CONFIG.net.inputHeartbeatMs) {
-      this.ctx.sendInput?.(input);
+    const aimMoved = input.aimX !== this.lastSent.aimX || input.aimY !== this.lastSent.aimY;
+    if (
+      !sameInput(input, this.lastSent) ||
+      (aimMoved && time - this.lastAimAt >= CONFIG.net.aimSendMs) ||
+      time - this.lastSentAt >= CONFIG.net.inputHeartbeatMs
+    ) {
+      const seq = this.ctx.sendInput?.(input) ?? 0;
+      if (seq > 0) this.lastSentSeq = seq;
       this.lastSent = input;
       this.lastSentAt = time;
+      this.lastAimAt = time;
     }
-    view.predict?.(input, delta / 1000, this.latest);
+    view.predict?.(input, delta / 1000, this.latest, this.acks[self] ?? 0, this.lastSentSeq);
     const s = this.buffer.sample(performance.now() - CONFIG.net.interpDelayMs, this.def.lerp ?? stepLerp);
     if (s !== null) view.render(s, self);
   }

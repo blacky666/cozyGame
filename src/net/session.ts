@@ -42,6 +42,8 @@ export interface HostSession {
   onRoster(cb: (players: PlayerInfo[]) => void): Unsubscribe;
   /** Latest input of a player (neutral if none, or if a remote input is older than CONFIG.net.inputStaleMs). */
   input(playerId: string): InputState;
+  /** Seq of the last accepted input of a player (0 for local players and unknown ids). */
+  lastSeq(playerId: string): number;
   /** Send a snapshot of the current phase to all connected clients. */
   broadcast(phase: string, payload: unknown): void;
   setPhase(phase: string, data?: unknown): void;
@@ -153,6 +155,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       }
       return s;
     },
+    lastSeq: (id) => lastSeq.get(id) ?? 0,
     broadcast(ph, payload) {
       if (roster.expire(now()).length > 0) rosterChanged();
       toAll('snap', { tick: ++tick, phase: ph, payload });
@@ -214,7 +217,8 @@ export interface ClientSession {
   readonly playerId: string | null;
   readonly roster: PlayerInfo[];
   readonly phase: string;
-  sendInput(state: InputState): void;
+  /** Returns the seq it sent (0 if nothing was sent). */
+  sendInput(state: InputState): number;
   setReady(ready: boolean): void;
   onRoster(cb: (players: PlayerInfo[]) => void): Unsubscribe;
   onSnapshot(cb: (snap: Snap) => void): Unsubscribe;
@@ -312,7 +316,9 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
       return phase;
     },
     sendInput(state) {
-      if (!done && hostId) send(t, 'input', { seq: ++seq, state }, hostId);
+      if (done || !hostId) return 0;
+      send(t, 'input', { seq: ++seq, state }, hostId);
+      return seq;
     },
     setReady(ready) {
       if (!done && hostId) send(t, 'ready', { ready }, hostId);

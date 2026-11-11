@@ -14,7 +14,8 @@ import { playerKey, type BotView, type MiniGame, type MiniGameHost, type PlayerK
  */
 
 export type EveningTiming = { introMs: number; standingsMs: number; durationScale: number };
-export type SnapPayload = { round: number; state: unknown };
+/** acks: per player key, the seq of the last input the host processed (for client reconciliation). */
+export type SnapPayload = { round: number; state: unknown; acks: Record<PlayerKey, number> };
 export type BotBrain = (view: BotView) => InputState;
 
 export const DEFAULT_TIMING: EveningTiming = {
@@ -125,7 +126,12 @@ export class EveningHost {
       s.setLocalInput(id, view ? brain(view) : neutralInput());
     }
     const inputs: Record<PlayerKey, InputState> = {};
-    for (const p of s.roster.list()) if (p.connected) inputs[keyOf(p)] = s.input(p.id);
+    const acks: Record<PlayerKey, number> = {};
+    for (const p of s.roster.list()) {
+      if (!p.connected) continue;
+      inputs[keyOf(p)] = s.input(p.id);
+      acks[keyOf(p)] = s.lastSeq(p.id);
+    }
 
     game.tick(dt, inputs);
     this.latest = game.snapshot();
@@ -134,7 +140,7 @@ export class EveningHost {
     const period = 1 / CONFIG.net.snapshotHz;
     if (this.snapAcc >= period - 1e-6 || result) {
       this.snapAcc = Math.min(this.snapAcc - period, period);
-      s.broadcast('playing', { round: ph.round, state: this.latest } satisfies SnapPayload);
+      s.broadcast('playing', { round: ph.round, state: this.latest, acks } satisfies SnapPayload);
     }
     if (result) {
       this.game = null;

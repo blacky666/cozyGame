@@ -24,6 +24,8 @@ interface GameConfig {
     predictErrPx: number;
     /** Client prediction: fraction of the error corrected per frame. */
     predictEase: number;
+    /** Aim-only changes are sent at most this often (ms). */
+    aimSendMs: number;
     /** Clients re-send unchanged input at least this often. */
     inputHeartbeatMs: number;
     /** Host treats a remote input older than this as neutral. */
@@ -72,6 +74,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     stun: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'],
     predictErrPx: 4,
     predictEase: 0.3,
+    aimSendMs: 50,
     inputHeartbeatMs: 200,
     inputStaleMs: 500,
   },

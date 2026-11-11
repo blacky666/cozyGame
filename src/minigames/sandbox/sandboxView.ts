@@ -3,6 +3,7 @@ import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import { assetsOf, byKey, playerSymbol, txt } from '../../game/ui';
 import type { PlayerInfo } from '../../net/roster';
+import { Reconciler } from '../../net/reconcile';
 import type { InputState, MiniGameView, PlayerKey } from '../types';
 import { moveStep, SANDBOX, type Facing, type SandboxState } from './sandboxHost';
 
@@ -13,6 +14,11 @@ const COIN_EDGE = 0xb7861d;
 type Avatar = { char: Character; label: Phaser.GameObjects.Text; anim: string; dir: Facing };
 type Pred = { x: number; y: number; dir: Facing; moving: boolean };
 
+const predStep = (p: Pred, input: InputState, dt: number): Pred => {
+  const m = moveStep(p, input, dt);
+  return { x: m.x, y: m.y, dir: m.dir ?? p.dir, moving: m.moving };
+};
+
 export class SandboxView implements MiniGameView<SandboxState> {
   private readonly avatars = new Map<PlayerKey, Avatar>();
   private readonly coins = new Map<number, Phaser.GameObjects.Rectangle>();
@@ -21,6 +27,14 @@ export class SandboxView implements MiniGameView<SandboxState> {
   private readonly time: Phaser.GameObjects.Text;
   /** Shove cooldown ring under the own figure. */
   private readonly ring: Phaser.GameObjects.Graphics;
+  private readonly reconciler = new Reconciler<Pred>(predStep);
+  /** Reconciled position (server state plus unacknowledged input), before visual easing. */
+  private target: Pred | null = null;
+  /** Visual error still to ease out (prediction shown so far minus the reconciled position). */
+  private off = { x: 0, y: 0 };
+  private lastLatest: SandboxState | null = null;
+  private lastSentSeq = 0;
+  /** What is drawn for the own figure. */
   private pred: Pred | null = null;
 
   constructor(
@@ -51,25 +65,35 @@ export class SandboxView implements MiniGameView<SandboxState> {
     });
   }
 
-  predict(input: InputState, dt: number, latest: SandboxState | null): void {
+  predict(input: InputState, dt: number, latest: SandboxState | null, ackSeq: number, sentSeq: number): void {
+    // A lower seq means a new connection: the host restarted its ack counter.
+    if (sentSeq < this.lastSentSeq) this.reconciler.clear();
+    this.lastSentSeq = sentSeq;
     const server = latest?.players[this.selfKey];
     if (!server) return;
-    if (!this.pred) this.pred = { x: server.x, y: server.y, dir: server.dir, moving: false };
-    const p = this.pred;
+    const fresh = latest !== this.lastLatest;
+    this.lastLatest = latest;
     if (server.stun) {
       // Being shoved: the host moves us, input does nothing.
-      Object.assign(p, { x: server.x, y: server.y, dir: server.dir, moving: false });
+      this.reconciler.clear();
+      this.target = { x: server.x, y: server.y, dir: server.dir, moving: false };
+      this.off = { x: 0, y: 0 };
+      this.pred = { ...this.target };
       return;
     }
-    const m = moveStep(p, input, dt);
-    p.x = m.x;
-    p.y = m.y;
-    p.moving = m.moving;
-    if (m.dir) p.dir = m.dir;
-    if (Math.hypot(server.x - p.x, server.y - p.y) > CONFIG.net.predictErrPx) {
-      p.x += (server.x - p.x) * CONFIG.net.predictEase;
-      p.y += (server.y - p.y) * CONFIG.net.predictEase;
+    this.reconciler.record(sentSeq, input, dt);
+    const shown = this.pred;
+    if (fresh || !this.target) {
+      const base: Pred = { x: server.x, y: server.y, dir: server.dir, moving: false };
+      this.target = this.reconciler.reconcile(base, ackSeq);
+      if (shown) this.off = { x: shown.x - this.target.x, y: shown.y - this.target.y };
+    } else {
+      this.target = predStep(this.target, input, dt);
     }
+    const keep = 1 - CONFIG.net.predictEase;
+    this.off = { x: this.off.x * keep, y: this.off.y * keep };
+    if (Math.abs(this.off.x) < 0.01 && Math.abs(this.off.y) < 0.01) this.off = { x: 0, y: 0 };
+    this.pred = { ...this.target, x: this.target.x + this.off.x, y: this.target.y + this.off.y };
   }
 
   render(s: SandboxState, selfKey: PlayerKey): void {

@@ -22,7 +22,7 @@ export interface MiniGameHost<S> {
 export interface MiniGameView<S> {
   render(s: S, selfKey: PlayerKey): void;
   /** Client-side prediction of the own player (called every frame before render; clients only). */
-  predict?(input: InputState, dt: number, latest: S | null): void;
+  predict?(input: InputState, dt: number, latest: S | null, ackSeq: number, sentSeq: number): void;
   destroy(): void;
 }
 

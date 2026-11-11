@@ -11,6 +11,21 @@ const flush = async () => {
 const prof = (name: string) => defaultProfile(name);
 
 describe('session', () => {
+  it('client sendInput returns increasing seqs and the host reports lastSeq', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    const host = createHost(ht, prof('Host'));
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    await flush();
+    expect(client.sendInput(neutralInput())).toBe(1);
+    expect(client.sendInput({ ...neutralInput(), up: true })).toBe(2);
+    await flush();
+    expect(host.lastSeq(ct.selfId)).toBe(2);
+    expect(host.lastSeq(ht.selfId)).toBe(0);
+    expect(host.lastSeq('nobody')).toBe(0);
+  });
+
   it('lets the host kick a player from the lobby and refuses their next hello', async () => {
     const hub = createLocalHub();
     const ht = hub.join();

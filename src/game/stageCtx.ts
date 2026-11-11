@@ -18,8 +18,8 @@ export interface StageCtx {
   hostSnapshot?(): SnapPayload | null;
   /** Client: subscribe to minigame snapshots (null unsubscribes). */
   onSnap(cb: ((tick: number, p: SnapPayload, at: number) => void) | null): void;
-  /** Client: send own input to the host. */
-  sendInput?(s: InputState): void;
+  /** Client: send own input to the host; returns the seq sent (0 if none). */
+  sendInput?(s: InputState): number;
   /** Host: "Nochmal?" on the podium. */
   playAgain?(): void;
   /** Ended screen: back to the start menu. */
