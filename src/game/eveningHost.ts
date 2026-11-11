@@ -3,7 +3,7 @@ import { Evening, type EveningPhase } from '../flow/evening';
 import { neutralInput, type InputState } from '../net/protocol';
 import type { PlayerInfo } from '../net/roster';
 import { startHostTicker, type HostSession } from '../net/session';
-import { playerKey, type BotView, type MiniGame, type MiniGameHost, type PlayerKey } from '../minigames/types';
+import { playerKey, type BotView, type GamePlayer, type MiniGame, type MiniGameHost, type PlayerKey } from '../minigames/types';
 
 /*
  * Host-side evening driver (no Phaser, so it is unit-tested):
@@ -32,6 +32,8 @@ export interface EveningHostOptions {
   localInput: () => InputState;
   rand?: () => number;
   timing?: EveningTiming;
+  /** Clock for snapshot tick times (ms); default performance.now. */
+  now?: () => number;
   startTicker?: (hz: number, onTick: (dt: number) => void) => () => void;
   /** Local rendering hook (the host renders the same phases it broadcasts). */
   onPhase?: (p: EveningPhase) => void;
@@ -41,12 +43,16 @@ const keyOf = (p: PlayerInfo): PlayerKey => playerKey(p.slot);
 
 export class EveningHost {
   phase: EveningPhase = { kind: 'lobby' };
-  /** Latest minigame snapshot (host renders it directly, no interpolation). */
+  /** Latest minigame snapshot; the host scene interpolates over (latestTick, latestAt). */
   latest: unknown = null;
+  latestTick = 0;
+  /** Clock time (ms) at which `latest` was produced. */
+  latestAt = 0;
 
   private readonly session: HostSession;
   private readonly timing: EveningTiming;
   private readonly rand: () => number;
+  private readonly now: () => number;
   private evening: Evening | null = null;
   private keys: PlayerKey[] = [];
   private game: MiniGameHost<unknown> | null = null;
@@ -63,6 +69,7 @@ export class EveningHost {
     this.session = o.session;
     this.timing = o.timing ?? DEFAULT_TIMING;
     this.rand = o.rand ?? Math.random;
+    this.now = o.now ?? (() => performance.now());
   }
 
   addBot(id: string, brain: BotBrain): void {
@@ -135,6 +142,8 @@ export class EveningHost {
 
     game.tick(dt, inputs);
     this.latest = game.snapshot();
+    this.latestTick++;
+    this.latestAt = this.now();
     const result = game.result();
     this.snapAcc += dt;
     const period = 1 / CONFIG.net.snapshotHz;
@@ -160,11 +169,22 @@ export class EveningHost {
   private startGame(id: string): void {
     const def = this.o.games.find((g) => g.id === id);
     if (!def) throw new Error(`unknown minigame ${id}`);
-    const players = this.session.roster.list().filter((p) => this.keys.includes(keyOf(p)));
+    const players: GamePlayer[] = this.session.roster
+      .list()
+      .filter((p) => this.keys.includes(keyOf(p)))
+      .map((p) => ({
+        key: keyOf(p),
+        slot: p.slot,
+        name: p.name,
+        look: p.look,
+        remote: !p.isBot && p.id !== this.session.selfId && !this.bots.has(p.id),
+      }));
     const durationMs = def.durationMs === null ? undefined : def.durationMs * this.timing.durationScale;
     this.def = def;
     this.game = def.createHost(players, this.rand, { durationMs });
     this.latest = this.game.snapshot();
+    this.latestTick = 0;
+    this.latestAt = this.now();
   }
 
   /** A reconnecting peer has a new id: re-send the current phase so it can join in. */

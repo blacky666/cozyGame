@@ -1,5 +1,5 @@
 import { CONFIG } from '../../config';
-import { playerKey, type MiniGame } from '../types';
+import type { MiniGame } from '../types';
 import { createSandboxHost, lerpSandbox, sandboxBotView, type SandboxState } from './sandboxHost';
 import { SandboxView } from './sandboxView';
 
@@ -11,11 +11,7 @@ export const sandbox: MiniGame<SandboxState> = {
   controls: 'WASD – laufen · Leertaste – schubsen',
   durationMs: CONFIG.sandbox.durationMs,
   createHost: (players, rand, opts) =>
-    createSandboxHost(
-      players.map((p) => playerKey(p.slot)),
-      rand,
-      opts?.durationMs ?? CONFIG.sandbox.durationMs,
-    ),
+    createSandboxHost(players, rand, opts?.durationMs ?? CONFIG.sandbox.durationMs),
   createView: (scene, players, selfKey) => new SandboxView(scene, players, selfKey),
   lerp: lerpSandbox,
   botView: sandboxBotView,

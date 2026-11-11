@@ -56,7 +56,10 @@ export function runHostEvening(session: HostSession, rounds: number, onLobby: ()
     selfKey: () => keyFor(session.roster.list(), session.selfId),
     keyboard,
     timing: t.stage,
-    hostSnapshot: () => (host.phase.kind === 'playing' ? { round: host.phase.round, state: host.latest, acks: {} } : null),
+    hostSnapshot: () =>
+      host.phase.kind === 'playing'
+        ? { round: host.phase.round, state: host.latest, acks: {}, tick: host.latestTick, at: host.latestAt }
+        : null,
     playAgain: () => {
       host.backToLobby();
       stage?.destroy();

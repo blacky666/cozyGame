@@ -5,7 +5,7 @@ import { neutralInput, type InputState } from '../net/protocol';
 import { createClient, createHost, type HostSession } from '../net/session';
 import { createLocalHub } from '../net/transport';
 import { createSandboxHost, type SandboxState } from '../minigames/sandbox/sandboxHost';
-import type { MiniGame } from '../minigames/types';
+import type { GamePlayer, MiniGame } from '../minigames/types';
 import { defaultProfile } from '../save/profile';
 import { EveningHost } from './eveningHost';
 
@@ -15,6 +15,8 @@ const flush = async () => {
 const prof = (name: string) => defaultProfile(name);
 const right: InputState = { ...neutralInput(), right: true };
 
+const seen: GamePlayer[][] = [];
+
 /** Headless test game: the sandbox host without a Phaser view. */
 const game: MiniGame<SandboxState> = {
   id: 'muenzjagd',
@@ -22,8 +24,10 @@ const game: MiniGame<SandboxState> = {
   rule: 'R',
   controls: 'C',
   durationMs: 2000,
-  createHost: (players, rand, o) =>
-    createSandboxHost(players.map((p) => 'p' + p.slot), rand, o?.durationMs ?? 2000),
+  createHost: (players, rand, o) => {
+    seen.push(players);
+    return createSandboxHost(players, rand, o?.durationMs ?? 2000);
+  },
   createView: () => {
     throw new Error('no view in tests');
   },
@@ -36,6 +40,7 @@ function setup() {
   const session = createHost(ht, prof('Host'));
   let stopped = 0;
   let ticker: ((dt: number) => void) | null = null;
+  let clock = 1000;
   const local: InputState[] = [];
   const phases: EveningPhase[] = [];
   const evening = new EveningHost({
@@ -45,6 +50,7 @@ function setup() {
     rand: mulberry32(1),
     localInput: () => local[0] ?? neutralInput(),
     timing: { introMs: 1000, standingsMs: 1000, durationScale: 1 },
+    now: () => clock,
     startTicker: (_hz, cb) => {
       ticker = cb;
       return () => void stopped++;
@@ -54,7 +60,7 @@ function setup() {
   const tick = (sec: number) => {
     for (let t = 0; t < sec; t += 0.05) ticker?.(0.05);
   };
-  return { hub, ht, session, evening, phases, local, tick, stopped: () => stopped };
+  return { hub, ht, session, evening, phases, local, tick, now: () => clock, stopped: () => stopped };
 }
 
 describe('EveningHost', () => {
@@ -163,6 +169,28 @@ describe('EveningHost', () => {
       ev.backToLobby();
       expect(live).toBe(0);
     }
+  });
+
+  it('hands GamePlayers with remote flags to the game and stamps snapshots with tick time', async () => {
+    const s = setup();
+    createClient(s.hub.join(), prof('Gast'));
+    const bot = s.session.addLocalPlayer('Bot Mo', prof('x').look, { isBot: true })!;
+    s.evening.addBot(bot.id, () => right);
+    await flush();
+    seen.length = 0;
+    s.evening.start();
+    s.tick(1.1);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].map((p) => [p.key, p.slot, p.name, p.remote])).toEqual([
+      ['p0', 0, 'Host', false],
+      ['p1', 1, 'Bot Mo', false], // local bot joins before the peer's join arrives
+      ['p2', 2, 'Gast', true],
+    ]);
+    expect(seen[0][2].look).toEqual(prof('Gast').look);
+    const t0 = s.evening.latestTick;
+    s.tick(0.1);
+    expect(s.evening.latestTick).toBe(t0 + 2);
+    expect(s.evening.latestAt).toBe(s.now());
   });
 
   it('drives dev bots through the game bot view', async () => {

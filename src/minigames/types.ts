@@ -1,12 +1,15 @@
 import type Phaser from 'phaser';
 import type { InputState } from '../net/protocol';
-import type { PlayerInfo } from '../net/roster';
+import type { Look } from '../save/profile';
 
 export type { InputState };
 
 /** Stable per-player key (survives reconnects, unlike PlayerInfo.id). */
 export type PlayerKey = string;
 export const playerKey = (slot: 0 | 1 | 2 | 3): PlayerKey => 'p' + slot;
+
+/** What a minigame knows about a player. `remote`: a real remote peer (false for the host's own player and bots). */
+export type GamePlayer = { key: PlayerKey; slot: 0 | 1 | 2 | 3; name: string; look: Look; remote: boolean };
 
 /** Minimal world view handed to dev bots (see src/dev/bots.ts). */
 export type BotView = { self: { x: number; y: number }; targets: { x: number; y: number }[] };
@@ -33,8 +36,8 @@ export interface MiniGame<S = unknown> {
   controls: string;
   durationMs: number | null;
   /** `opts.durationMs` overrides the game's duration (dev-only fast mode). */
-  createHost(players: PlayerInfo[], rand: () => number, opts?: { durationMs?: number }): MiniGameHost<S>;
-  createView(scene: Phaser.Scene, players: PlayerInfo[], selfKey: PlayerKey): MiniGameView<S>;
+  createHost(players: GamePlayer[], rand: () => number, opts?: { durationMs?: number }): MiniGameHost<S>;
+  createView(scene: Phaser.Scene, players: GamePlayer[], selfKey: PlayerKey): MiniGameView<S>;
   /** Snapshot interpolation for clients (default: step to the newer state). */
   lerp?(a: S, b: S, t: number): S;
   /** World view for dev bots; null when the bot has nothing to do. */

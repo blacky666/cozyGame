@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { mulberry32 } from '../../flow/rng';
 import { neutralInput, type InputState } from '../../net/protocol';
-import { createSandboxHost, lerpSandbox, moveStep } from './sandboxHost';
+import { defaultProfile } from '../../save/profile';
+import { playerKey, type GamePlayer } from '../types';
+import { createSandboxHost as createByPlayers, lerpSandbox, moveStep } from './sandboxHost';
+
+/** Test helper: GamePlayers for the given keys ('p0'..'p3'). */
+const gp = (keys: string[]): GamePlayer[] =>
+  keys.map((k) => {
+    const slot = Number(k.slice(1)) as 0 | 1 | 2 | 3;
+    return { key: playerKey(slot), slot, name: k, look: defaultProfile(k).look, remote: true };
+  });
+const createSandboxHost = (keys: string[], rand: () => number, ms: number) => createByPlayers(gp(keys), rand, ms);
 
 const DT = 1 / 30;
 const idle = neutralInput();
@@ -22,6 +32,12 @@ function collectOne(g: ReturnType<typeof createSandboxHost>): void {
 }
 
 describe('sandbox host (muenzjagd)', () => {
+  it('createHost places players by slot', () => {
+    const g = createByPlayers(gp(['p0', 'p3']), mulberry32(1), 30000);
+    expect(g.snapshot().players.p3).toMatchObject({ x: 306, y: 190 });
+    expect(g.snapshot().players.p0).toMatchObject({ x: 120, y: 100 });
+  });
+
   it('moves a player 60 px to the right in 1 s', () => {
     const g = createSandboxHost(['p0', 'p1'], mulberry32(1), 30000);
     const x0 = g.snapshot().players.p0.x;

@@ -22,7 +22,8 @@ export class StandingsScene extends Phaser.Scene {
     this.add.rectangle(0, 0, w, h, 0x2b2b3d).setOrigin(0);
     txt(this, w / 2, 20, `Zwischenstand nach Runde ${phase.round}`, 14, '#ffd27a');
 
-    const keys = Object.keys(phase.totals).sort((a, b) => phase.totals[b] - phase.totals[a] || a.localeCompare(b));
+    const tie = (k: string) => phase.tieOrder.indexOf(k);
+    const keys = Object.keys(phase.totals).sort((a, b) => phase.totals[b] - phase.totals[a] || tie(a) - tie(b));
     // Animation timing: rows appear, then the points fly over (well within standings.showMs).
     const flyAt = Math.min(1200, ctx.timing.standingsMs * 0.25);
     let rank = 0;

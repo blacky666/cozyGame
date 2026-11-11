@@ -3,7 +3,7 @@ import { CONFIG } from '../../config';
 import { SnapshotBuffer } from '../../net/interpolation';
 import { neutralInput, type InputState } from '../../net/protocol';
 import { getMinigame } from '../../minigames/registry';
-import type { MiniGame, MiniGameView } from '../../minigames/types';
+import { playerKey, type GamePlayer, type MiniGame, type MiniGameView } from '../../minigames/types';
 import type { SceneData, StageCtx } from '../stageCtx';
 import { shouldSend } from '../inputSend';
 import { assetSprite, txt } from '../ui';
@@ -21,6 +21,8 @@ export class MinigameScene extends Phaser.Scene {
   private def: MiniGame | null = null;
   private view: MiniGameView<unknown> | null = null;
   private readonly buffer = new SnapshotBuffer<unknown>();
+  /** Host only: own buffer of per-tick states, sampled one tick behind for smooth motion. */
+  private readonly hostBuffer = new SnapshotBuffer<unknown>();
   private latest: unknown = null;
   private lastSent: InputState = neutralInput();
   private lastSentAt = 0;
@@ -36,6 +38,7 @@ export class MinigameScene extends Phaser.Scene {
     this.ctx = ctx;
     this.round = phase.round;
     this.buffer.clear();
+    this.hostBuffer.clear();
     this.latest = null;
     this.lastSentAt = 0;
     this.lastSentSeq = 0;
@@ -46,7 +49,7 @@ export class MinigameScene extends Phaser.Scene {
       txt(this, CONFIG.view.width / 2, CONFIG.view.height / 2, `Unbekanntes Spiel: ${phase.game}`, 10);
       return;
     }
-    this.view = this.def.createView(this, ctx.players(), ctx.selfKey());
+    this.view = this.def.createView(this, this.gamePlayers(), ctx.selfKey());
     if (!ctx.isHost) {
       ctx.onSnap((tick, p, at) => {
         if (p.round !== this.round) return;
@@ -70,13 +73,25 @@ export class MinigameScene extends Phaser.Scene {
     });
   }
 
+  private gamePlayers(): GamePlayer[] {
+    const selfKey = this.ctx.selfKey();
+    return this.ctx.players().map((p) => {
+      const key = playerKey(p.slot);
+      return { key, slot: p.slot, name: p.name, look: p.look, remote: !p.isBot && key !== selfKey };
+    });
+  }
+
   update(time: number, delta: number): void {
     const view = this.view;
     if (!view || !this.def) return;
     const self = this.ctx.selfKey();
     if (this.ctx.isHost) {
       const snap = this.ctx.hostSnapshot?.();
-      if (snap && snap.round === this.round) view.render(snap.state, self);
+      if (snap && snap.round === this.round) {
+        this.hostBuffer.push(snap.tick, snap.at, snap.state);
+        const s = this.hostBuffer.sample(performance.now() - 1000 / CONFIG.net.simHz, this.def.lerp ?? stepLerp);
+        view.render(s ?? snap.state, self);
+      }
       return;
     }
     const input = this.ctx.keyboard.state();

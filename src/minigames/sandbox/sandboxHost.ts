@@ -1,7 +1,7 @@
 import { CONFIG } from '../../config';
 import { neutralInput } from '../../net/protocol';
 import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
-import type { BotView, InputState, MiniGameHost, PlayerKey } from '../types';
+import type { BotView, GamePlayer, InputState, MiniGameHost, PlayerKey } from '../types';
 
 export type { Facing } from '../common/shove';
 
@@ -64,14 +64,15 @@ export function moveStep(
 
 /** Host simulation of the placeholder game "Münzjagd". dt in seconds. */
 export function createSandboxHost(
-  keys: PlayerKey[],
+  gamePlayers: GamePlayer[],
   rand: () => number,
   durationMs: number = CONFIG.sandbox.durationMs,
 ): MiniGameHost<SandboxState> {
+  const keys = gamePlayers.map((p) => p.key);
   const players: Record<PlayerKey, SandboxPlayer> = {};
   const shove: Record<PlayerKey, ShoveSlot> = {};
-  keys.forEach((k, i) => {
-    const [x, y] = START[Number(k.slice(1))] ?? START[i % START.length];
+  gamePlayers.forEach(({ key: k, slot }) => {
+    const [x, y] = START[slot];
     players[k] = { x, y, dir: 'down', moving: false, score: 0, stun: false, swing: false, shoveCdMs: 0 };
     shove[k] = newShoveSlot();
   });

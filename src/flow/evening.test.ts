@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config';
 import { Evening } from './evening';
+import { mulberry32 } from './rng';
 import { roundPoints } from './scoring';
 
 const P = ['p0', 'p1', 'p2', 'p3'];
@@ -51,5 +52,36 @@ describe('Evening', () => {
     expect(() => new Evening(P, CONFIG.rounds.min - 1, games, rand)).toThrow();
     expect(() => new Evening(P, CONFIG.rounds.max + 1, games, rand)).toThrow();
     expect(() => new Evening(['p0'], 5, games, rand)).toThrow();
+  });
+
+  it('drops unknown and duplicate keys and appends missing players last', () => {
+    const run = (placements: string[][]) => {
+      const ev = new Evening(['p0', 'p1', 'p2'], 5, games, rand);
+      ev.advance({ type: 'introDone' });
+      const ph = ev.advance({ type: 'gameResult', placements });
+      if (ph.kind !== 'standings') throw new Error('expected standings');
+      return ph.points;
+    };
+    expect(run([['p1', 'p9'], ['p1'], ['p0']])).toEqual(run([['p1'], ['p0'], ['p2']]));
+  });
+
+  it('does not throw on empty or all-unknown placements', () => {
+    const ev = new Evening(['p0', 'p1'], 5, games, rand);
+    ev.advance({ type: 'introDone' });
+    expect(() => ev.advance({ type: 'gameResult', placements: [['x'], []] })).not.toThrow();
+  });
+
+  it('keeps the same random tie order for the whole evening', () => {
+    const ev = new Evening(P, 5, games, mulberry32(7));
+    const orders: string[][] = [];
+    for (let r = 1; r <= 2; r++) {
+      ev.advance({ type: 'introDone' });
+      const ph = ev.advance({ type: 'gameResult', placements: [P] });
+      if (ph.kind !== 'standings') throw new Error('expected standings');
+      orders.push(ph.tieOrder);
+      ev.advance({ type: 'standingsDone' });
+    }
+    expect(orders[0]).toEqual(orders[1]);
+    expect([...orders[0]].sort()).toEqual(P);
   });
 });

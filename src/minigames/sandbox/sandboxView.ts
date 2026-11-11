@@ -2,9 +2,8 @@ import Phaser from 'phaser';
 import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import { assetsOf, byKey, playerSymbol, txt } from '../../game/ui';
-import type { PlayerInfo } from '../../net/roster';
 import { Reconciler } from '../../net/reconcile';
-import type { InputState, MiniGameView, PlayerKey } from '../types';
+import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { moveStep, SANDBOX, type Facing, type SandboxState } from './sandboxHost';
 
 const GRASS = 0x86b45a;
@@ -40,7 +39,7 @@ export class SandboxView implements MiniGameView<SandboxState> {
 
   constructor(
     private readonly scene: Phaser.Scene,
-    players: PlayerInfo[],
+    players: GamePlayer[],
     private readonly selfKey: PlayerKey,
   ) {
     const { width, height } = CONFIG.view;

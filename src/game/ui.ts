@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import type { AssetFile, ColorMap } from '../gfx/assetTypes';
 import { findSprite } from '../gfx/layerPlan';
 import { getTextureKey } from '../gfx/textures';
-import type { PlayerInfo } from '../net/roster';
 import type { PlayerKey } from '../minigames/types';
 import { zoomOf } from './zoom';
 
@@ -84,5 +83,5 @@ export function button(scene: Phaser.Scene, x: number, y: number, label: string,
   return c;
 }
 
-export const byKey = (players: PlayerInfo[]): Map<PlayerKey, PlayerInfo> =>
+export const byKey = <T extends { slot: number }>(players: T[]): Map<PlayerKey, T> =>
   new Map(players.map((p) => ['p' + p.slot, p]));

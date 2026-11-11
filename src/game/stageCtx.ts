@@ -14,8 +14,8 @@ export interface StageCtx {
   selfKey(): PlayerKey;
   keyboard: KeyboardInput;
   timing: StageTiming;
-  /** Host: latest authoritative minigame snapshot (rendered directly). */
-  hostSnapshot?(): SnapPayload | null;
+  /** Host: latest authoritative minigame snapshot with its tick number and tick time (ms, performance.now clock). */
+  hostSnapshot?(): (SnapPayload & { tick: number; at: number }) | null;
   /** Client: subscribe to minigame snapshots (null unsubscribes). */
   onSnap(cb: ((tick: number, p: SnapPayload, at: number) => void) | null): void;
   /** Client: send own input to the host; returns the seq sent (0 if none). */
