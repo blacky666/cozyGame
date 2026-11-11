@@ -1,3 +1,4 @@
+import { CONFIG } from '../../config';
 import { buildArena } from '../common/arena';
 import type { BotView, MiniGame, PlayerKey } from '../types';
 import { createSpudHost, type SpudPlayer, type SpudState } from './spudHost';
@@ -15,8 +16,11 @@ export function lerpSpud(a: SpudState, b: SpudState, t: number): SpudState {
 
 /** Non-holders run to a point at least this far from the nearest holder. */
 const BOT_FLEE = 60;
-/** Bot targets stay inside the garden fence (map coordinates). */
-const BOT_BOUNDS = { minX: 24, maxX: 392, minY: 24, maxY: 184 };
+/** Bot targets stay inside the garden fence (map coordinates): the map minus the fence margin. */
+const BOT_BOUNDS = (() => {
+  const { mapW, mapH, botMarginPx: m } = CONFIG.kartoffel;
+  return { minX: m, maxX: mapW - m, minY: m, maxY: mapH - m };
+})();
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** Nearest living player (other than `key`) passing `ok`, with its distance. */

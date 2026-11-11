@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONFIG } from '../../config';
 import type { Cue } from '../snowball/snowballSounds';
 import type { Potato, SpudFx, SpudPlayer, SpudState } from './spudHost';
 import { SpudSounds } from './spudSounds';
@@ -61,11 +62,27 @@ describe('SpudSounds', () => {
     expect(names(t.update(state({ players: { p0: player(), p1: player({ x: 300 }) } }), 32))).toEqual(['aktion.schubs_bereit']);
   });
 
-  it('phase done plays letzter_uebrig once', () => {
+  it('phase done with one living player plays letzter_uebrig once', () => {
+    const t = new SpudSounds('p0');
+    const last = { p0: player(), p1: player({ x: 300, ghost: true }), p2: player({ ghost: true }), p3: player({ ghost: true }) };
+    t.update(state({ players: last }), 0);
+    expect(names(t.update(state({ phase: 'done', players: last }), 16))).toEqual(['letzter_uebrig']);
+    expect(t.update(state({ phase: 'done', players: last }), 32)).toEqual([]);
+  });
+
+  it('no letzter_uebrig when the safety limit ends the round with several living players', () => {
     const t = new SpudSounds('p0');
     t.update(state(), 0);
-    expect(names(t.update(state({ phase: 'done' }), 16))).toEqual(['letzter_uebrig']);
-    expect(t.update(state({ phase: 'done' }), 32)).toEqual([]);
+    expect(names(t.update(state({ phase: 'done' }), 16))).not.toContain('letzter_uebrig');
+  });
+
+  it('pans across the map width from CONFIG', () => {
+    const t = new SpudSounds('p0');
+    t.update(state(), 0);
+    const at = (id: number, x: number) => t.update(state({ fx: [{ ...fx(id, 'uebergabe'), x }] }), id * 16)[0].pan;
+    expect(at(1, 0)).toBeCloseTo(-0.6);
+    expect(at(2, CONFIG.kartoffel.mapW / 2)).toBeCloseTo(0);
+    expect(at(3, CONFIG.kartoffel.mapW)).toBeCloseTo(0.6);
   });
 
   it('ticking follows the highest heat; none in pause/done', () => {

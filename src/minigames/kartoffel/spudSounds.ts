@@ -1,10 +1,10 @@
+import { CONFIG } from '../../config';
 import type { PlayerKey } from '../types';
 import type { Cue } from '../snowball/snowballSounds';
 import type { SpudFx, SpudState } from './spudHost';
 
 export type { Cue };
 
-const MAP_WIDTH = 416;
 /** Stereo spread: the arena edges are this far left/right. */
 const PAN_SPREAD = 0.6;
 const STEP_MS = 280;
@@ -23,7 +23,7 @@ const FX_SOUND: Record<SpudFx['kind'], string> = {
   sprint: 'sprint',
 };
 
-const panAt = (x: number): number => Math.max(-1, Math.min(1, (x / MAP_WIDTH) * 2 - 1)) * PAN_SPREAD;
+const panAt = (x: number): number => Math.max(-1, Math.min(1, (x / CONFIG.kartoffel.mapW) * 2 - 1)) * PAN_SPREAD;
 const maxHeat = (s: SpudState): number => s.potatoes.reduce((m, p) => Math.max(m, p.heat), -1);
 
 /**
@@ -105,7 +105,9 @@ export class SpudSounds {
       }
     }
 
-    if (s.phase === 'done' && prev.phase !== 'done') out.push({ name: 'letzter_uebrig' });
+    // Only a real last one standing (not the safety limit ending with several alive).
+    const lastOne = Object.values(s.players).filter((p) => !p.ghost).length === 1;
+    if (s.phase === 'done' && prev.phase !== 'done' && lastOne) out.push({ name: 'letzter_uebrig' });
     return out;
   }
 }

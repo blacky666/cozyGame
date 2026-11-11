@@ -125,6 +125,11 @@ interface GameConfig {
     bestOf: number;
     /** How long fx stay in snapshots. */
     fxKeepMs: number;
+    /** Garden map size in px (26x13 tiles of 16 px; a test checks it against the map file). */
+    mapW: number;
+    mapH: number;
+    /** Bot targets stay this far inside the map edges (the fence). */
+    botMarginPx: number;
   };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
@@ -192,6 +197,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     fuseMinMs: 12000, fuseMaxMs: 20000, heatSteps: [0.5, 0.75, 0.9], heatJitter: 0.08, boomPauseMs: 1800,
     shortFuseMs: 3000, fakeFuseMinMs: 6000, fakeFuseMaxMs: 10000, slowMs: 2000, slowFactor: 0.6,
     leaderFactor: 0.95, pickupSpawnMs: 7000, maxPickups: 2, pickupTouchPx: 12, pickupClearPx: 24, pickupTries: 20, idRange: 1000000, idTries: 10, safetyMs: 180000, bestOf: 3, fxKeepMs: 500,
+    mapW: 416, mapH: 208, botMarginPx: 24,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { CONFIG } from '../../config';
 import { mulberry32 } from '../../flow/rng';
 import type { AssetFile } from '../../gfx/assetTypes';
 import { defaultProfile } from '../../save/profile';
@@ -84,6 +85,12 @@ describe('kartoffel botView', () => {
     s.players.p1 = player(30, 30);
     s.players.p0 = player(60, 60);
     expect(spudBotView(s, 'p1')?.targets[0]).toEqual({ x: 24, y: 24 });
+    s.players.p1 = player(400, 200);
+    s.players.p0 = player(380, 180);
+    expect(spudBotView(s, 'p1')?.targets[0]).toEqual({ x: 392, y: 184 });
+    // Bounds come from CONFIG: the map size minus the fence margin.
+    expect(CONFIG.kartoffel.mapW - CONFIG.kartoffel.botMarginPx).toBe(392);
+    expect(CONFIG.kartoffel.mapH - CONFIG.kartoffel.botMarginPx).toBe(184);
     // Ghosts idle.
     expect(spudBotView(s, 'p3')).toEqual({ self: { x: 110, y: 100 }, targets: [], idle: true });
     // Pause and done: everybody idles.

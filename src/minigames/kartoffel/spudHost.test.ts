@@ -92,6 +92,11 @@ describe('Heiße Kartoffel host', () => {
     }
   });
 
+  it('CONFIG map size matches the garden map', () => {
+    expect(arena.w).toBe(K.mapW);
+    expect(arena.h).toBe(K.mapH);
+  });
+
   it('starts at the slot spawns', () => {
     const d = driver(['p0', 'p1', 'p2', 'p3']);
     const s = d.snap();
