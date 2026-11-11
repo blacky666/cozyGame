@@ -74,10 +74,12 @@ describe('kartoffel botView', () => {
     );
     // Holder: towards the nearest living non-holder (the ghost p3 is closer but does not count).
     expect(spudBotView(s, 'p0')).toEqual({ self: { x: 100, y: 100 }, targets: [{ x: 140, y: 100 }] });
-    // Non-holder: a point 60 px from the holder, on its own side.
+    // Near non-holder: a point 60 px from the holder, on its own side.
     expect(spudBotView(s, 'p1')).toEqual({ self: { x: 140, y: 100 }, targets: [{ x: 160, y: 100 }] });
+    // Far non-holder: keeps its distance, never walks toward the holder.
     const far = spudBotView(s, 'p2')?.targets[0] ?? { x: 0, y: 0 };
-    expect(Math.hypot(far.x - 100, far.y - 100)).toBeCloseTo(60, 5);
+    const now = Math.hypot(300 - 100, 150 - 100);
+    expect(Math.hypot(far.x - 100, far.y - 100)).toBeGreaterThanOrEqual(now - 1e-9);
     // Clamped into the garden.
     s.players.p1 = player(30, 30);
     s.players.p0 = player(60, 60);
@@ -89,5 +91,20 @@ describe('kartoffel botView', () => {
       expect(spudBotView({ ...s, phase }, 'p0')).toMatchObject({ targets: [], idle: true });
     }
     expect(spudBotView(s, 'p9')).toBeNull();
+  });
+
+  it('holder bot skips the player its potato cannot go back to', () => {
+    const s = state(
+      { p0: player(100, 100), p1: player(120, 100), p2: player(200, 100) },
+      [potato(9, 'p0', { noBackFrom: 'p1', noBackMs: 600 })],
+    );
+    expect(spudBotView(s, 'p0')?.targets).toEqual([{ x: 200, y: 100 }]);
+    // Once noBackMs ran out, the nearest player counts again.
+    s.potatoes = [potato(9, 'p0', { noBackFrom: 'p1', noBackMs: 0 })];
+    expect(spudBotView(s, 'p0')?.targets).toEqual([{ x: 120, y: 100 }]);
+    // The blocked player is the only one left: idle.
+    s.players.p2 = player(200, 100, { ghost: true });
+    s.potatoes = [potato(9, 'p0', { noBackFrom: 'p1', noBackMs: 600 })];
+    expect(spudBotView(s, 'p0')).toEqual({ self: { x: 100, y: 100 }, targets: [], idle: true });
   });
 });

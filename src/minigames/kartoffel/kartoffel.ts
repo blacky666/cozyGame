@@ -13,7 +13,7 @@ export function lerpSpud(a: SpudState, b: SpudState, t: number): SpudState {
   return { ...b, players };
 }
 
-/** Non-holders run to a point this far from the nearest holder. */
+/** Non-holders run to a point at least this far from the nearest holder. */
 const BOT_FLEE = 60;
 /** Bot targets stay inside the garden fence (map coordinates). */
 const BOT_BOUNDS = { minX: 24, maxX: 392, minY: 24, maxY: 184 };
@@ -32,8 +32,9 @@ function nearest(s: SpudState, key: PlayerKey, ok: (k: PlayerKey) => boolean): {
 }
 
 /**
- * Bots holding a potato chase the nearest living non-holder; the others run to a point BOT_FLEE px
- * from the nearest holder, on their own side. Ghosts and the pause/done phases idle.
+ * Bots holding a potato chase the nearest living non-holder (not the one their potato cannot go back
+ * to yet); the others run away from the nearest holder to a point max(BOT_FLEE, current distance)
+ * from it, so a far bot never walks toward it. Ghosts and the pause/done phases idle.
  */
 export function spudBotView(s: SpudState, key: PlayerKey): BotView | null {
   const me = s.players[key];
@@ -43,7 +44,10 @@ export function spudBotView(s: SpudState, key: PlayerKey): BotView | null {
   if (me.ghost || s.phase !== 'play') return idle;
   const holders = new Set(s.potatoes.map((p) => p.holder));
   if (holders.has(key)) {
-    const prey = nearest(s, key, (k) => !holders.has(k));
+    const blocked = new Set(
+      s.potatoes.filter((p) => p.holder === key && p.noBackMs > 0 && p.noBackFrom).map((p) => p.noBackFrom),
+    );
+    const prey = nearest(s, key, (k) => !holders.has(k) && !blocked.has(k));
     return prey ? { self, targets: [{ x: prey.p.x, y: prey.p.y }] } : idle;
   }
   const hunter = nearest(s, key, (k) => holders.has(k));
@@ -51,9 +55,10 @@ export function spudBotView(s: SpudState, key: PlayerKey): BotView | null {
   // Standing exactly on the holder: flee to the right.
   const ux = hunter.d > 0 ? (me.x - hunter.p.x) / hunter.d : 1;
   const uy = hunter.d > 0 ? (me.y - hunter.p.y) / hunter.d : 0;
+  const dist = Math.max(BOT_FLEE, hunter.d);
   const target = {
-    x: clamp(hunter.p.x + ux * BOT_FLEE, BOT_BOUNDS.minX, BOT_BOUNDS.maxX),
-    y: clamp(hunter.p.y + uy * BOT_FLEE, BOT_BOUNDS.minY, BOT_BOUNDS.maxY),
+    x: clamp(hunter.p.x + ux * dist, BOT_BOUNDS.minX, BOT_BOUNDS.maxX),
+    y: clamp(hunter.p.y + uy * dist, BOT_BOUNDS.minY, BOT_BOUNDS.maxY),
   };
   return { self, targets: [target] };
 }

@@ -34,6 +34,8 @@ const SIGN_BOB_MS = 150;
 const SIGN_FADE_MS = 200;
 /** Potato at the hand when the body frame has no hand anchor (relative to the feet, facing right). */
 const HAND_FALLBACK = { x: 6, y: -12 };
+/** Offset of each further potato on the same holder (px, facing right; depth step stays below the label). */
+const STACK = { x: 4, y: 3, depth: 0.02 };
 
 const HEAT_SPRITE: Record<Potato['heat'], string> = {
   0: 'kartoffel.bombe.ruhig',
@@ -201,7 +203,12 @@ export class SpudView implements MiniGameView<SpudState> {
       v.fuse?.destroy();
       this.potatoes.delete(id);
     }
-    for (const pot of potatoes) {
+    // Several potatoes on one holder (a fake next to the real one) stack: the n-th (by id, so they
+    // never swap places) sits STACK px further out and up, slightly in front.
+    const stacked = new Map<PlayerKey, number>();
+    for (const pot of [...potatoes].sort((x, y) => x.id - y.id)) {
+      const n = stacked.get(pot.holder) ?? 0;
+      stacked.set(pot.holder, n + 1);
       const name = HEAT_SPRITE[pot.heat];
       let v = this.potatoes.get(pot.id);
       if (!v) {
@@ -215,16 +222,17 @@ export class SpudView implements MiniGameView<SpudState> {
       if (!a || !show) continue;
       const flip = a.dir === 'left';
       const hand = a.char.anchor('hand') ?? { x: flip ? -HAND_FALLBACK.x : HAND_FALLBACK.x, y: HAND_FALLBACK.y };
-      const bx = a.x + hand.x;
-      const by = a.y + hand.y;
+      const bx = a.x + hand.x + n * (flip ? -STACK.x : STACK.x);
+      const by = a.y + hand.y - n * STACK.y;
       // Facing up, the hand (and the potato) is behind the body.
-      const depth = a.y + (a.dir === 'up' ? -0.3 : 0.3);
+      const depth = a.y + (a.dir === 'up' ? -0.3 : 0.3) + n * STACK.depth;
       if (v.bomb) {
         swapSprite(this.scene, v.bomb, name, flip);
         v.bomb.setPosition(bx, by).setDepth(depth);
       }
       const f = this.fuseOf(name);
-      v.fuse?.setFlipX(flip).setPosition(bx + (flip ? -f.x : f.x), by + f.y).setDepth(depth + 0.01);
+      if (v.fuse) swapSprite(this.scene, v.fuse, 'kartoffel.lunte', flip);
+      v.fuse?.setPosition(bx + (flip ? -f.x : f.x), by + f.y).setDepth(depth + 0.01);
     }
   }
 
