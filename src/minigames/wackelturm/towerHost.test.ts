@@ -584,6 +584,16 @@ describe('Wackel-Turm host', () => {
       expect(FIES_KINDS).toContain(dropReady(d, 'p1'));
     });
 
+    it('the round end clears every armed action', () => {
+      const d = driver(['p0', 'p1'], { rand: always('kurz'), durationMs: 6000 });
+      charge(d, 'p0', 0);
+      arm(d, 'p0', 'wind');
+      expect(d.snap().players.p0.armed).toBe('wind');
+      d.tick(ticksFor(6000));
+      expect(d.g.result()).not.toBeNull();
+      expect(d.snap().players.p0.armed).toBeNull();
+    });
+
     it('absent players cannot arm or fire, but can be targeted', () => {
       const d = driver(['p0', 'p1', 'p2'], { rand: always('kurz') });
       charge(d, 'p0', 0);

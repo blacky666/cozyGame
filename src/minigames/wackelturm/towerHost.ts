@@ -412,8 +412,9 @@ export function createTowerHost(
         addFx('ziel', winner, plotOf(winner).centre, layout.surfaceY - c.goalPx);
       }
 
-      // 10. Timer.
+      // 10. Timer. A finished round leaves nobody armed (the HUD stops blinking, the crosshair hides).
       elapsedMs += ms;
+      if (over()) for (const k of keys) players[k].armed = null;
     },
     snapshot() {
       const ps: Record<PlayerKey, TowerPlayer> = {};

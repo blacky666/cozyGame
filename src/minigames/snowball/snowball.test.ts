@@ -787,8 +787,8 @@ describe('schneeball definition', () => {
     expect(toMap(105, 126)).toEqual({ x: 100, y: 100 });
   });
 
-  it('registry offers schneeball, kartoffel and farbkrieg', () => {
-    expect(MINIGAMES.map((g) => g.id)).toEqual(['schneeball', 'kartoffel', 'farbkrieg']);
+  it('registry offers schneeball, kartoffel, farbkrieg and wackelturm', () => {
+    expect(MINIGAMES.map((g) => g.id)).toEqual(['schneeball', 'kartoffel', 'farbkrieg', 'wackelturm']);
   });
 
   it('describes the game and builds its host from the asset map', () => {
