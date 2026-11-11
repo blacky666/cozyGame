@@ -1,0 +1,117 @@
+{
+ "paket": "aktion",
+ "toene": [
+  {
+   "id": "aktion.schubsen",
+   "datei": [
+    "audio/aktion/schubsen_1.mp3",
+    "audio/aktion/schubsen_2.mp3",
+    "audio/aktion/schubsen_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 240,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "aktion.geschubst",
+   "datei": [
+    "audio/aktion/geschubst_1.mp3",
+    "audio/aktion/geschubst_2.mp3",
+    "audio/aktion/geschubst_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 350,
+   "lautstaerke": 0.74
+  },
+  {
+   "id": "aktion.schubs_bereit",
+   "datei": "audio/aktion/schubs_bereit.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 150,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "aktion.emote_winken",
+   "datei": "audio/aktion/emote_winken.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 569,
+   "lautstaerke": 0.58
+  },
+  {
+   "id": "aktion.emote_lachen",
+   "datei": "audio/aktion/emote_lachen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 575,
+   "lautstaerke": 0.56
+  },
+  {
+   "id": "aktion.emote_zunge",
+   "datei": "audio/aktion/emote_zunge.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 650,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "aktion.emote_weinen",
+   "datei": "audio/aktion/emote_weinen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 929,
+   "lautstaerke": 0.54
+  },
+  {
+   "id": "aktion.emote_tanzen",
+   "datei": "audio/aktion/emote_tanzen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1059,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "aktion.emote_daumen_runter",
+   "datei": "audio/aktion/emote_daumen_runter.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 990,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "aktion.emote_herz",
+   "datei": "audio/aktion/emote_herz.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 610,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "aktion.emote_wut",
+   "datei": "audio/aktion/emote_wut.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 750,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "aktion.emote_schnarchen",
+   "datei": "audio/aktion/emote_schnarchen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 967,
+   "lautstaerke": 0.57
+  },
+  {
+   "id": "aktion.emote_gg",
+   "datei": "audio/aktion/emote_gg.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 857,
+   "lautstaerke": 0.65
+  }
+ ]
+}

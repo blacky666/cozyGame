@@ -1,0 +1,93 @@
+{
+ "paket": "ui",
+ "toene": [
+  {
+   "id": "ui.klick",
+   "datei": "audio/ui/klick.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 80,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "ui.fehler",
+   "datei": "audio/ui/fehler.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 295,
+   "lautstaerke": 0.73
+  },
+  {
+   "id": "ui.kopiert",
+   "datei": "audio/ui/kopiert.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 200,
+   "lautstaerke": 0.77
+  },
+  {
+   "id": "ui.bereit",
+   "datei": "audio/ui/bereit.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 200,
+   "lautstaerke": 0.71
+  },
+  {
+   "id": "ui.nicht_bereit",
+   "datei": "audio/ui/nicht_bereit.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 200,
+   "lautstaerke": 0.72
+  },
+  {
+   "id": "ui.raum_erstellt",
+   "datei": "audio/ui/raum_erstellt.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 800,
+   "lautstaerke": 0.69
+  },
+  {
+   "id": "ui.spieler_kommt",
+   "datei": "audio/ui/spieler_kommt.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 400,
+   "lautstaerke": 0.52
+  },
+  {
+   "id": "ui.spieler_geht",
+   "datei": "audio/ui/spieler_geht.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 400,
+   "lautstaerke": 0.58
+  },
+  {
+   "id": "ui.entfernt",
+   "datei": "audio/ui/entfernt.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 456,
+   "lautstaerke": 0.41
+  },
+  {
+   "id": "ui.abend_start",
+   "datei": "audio/ui/abend_start.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 2463,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "ui.musik_lobby_schleife",
+   "datei": "audio/ui/musik_lobby_schleife.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 57600,
+   "lautstaerke": 0.6
+  }
+ ]
+}

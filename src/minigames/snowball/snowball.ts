@@ -62,6 +62,7 @@ export const snowball: MiniGame<SnowState> = {
   controls: 'WASD laufen · Maus zielen · Linksklick werfen · Rechtsklick fest werfen · Leertaste schubsen',
   durationMs: CONFIG.snowball.durationMs,
   aimOffset: ARENA_OFFSET,
+  sounds: 'schneeball',
   createHost: (players, rand, opts) => {
     const file = opts?.assets?.[ARENA_FILE];
     if (!file) throw new Error(`schneeball: assets missing (${ARENA_FILE}); pass opts.assets to createHost`);

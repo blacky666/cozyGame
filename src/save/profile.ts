@@ -17,7 +17,8 @@ export type Profile = {
   xp: number;
   unlocked: string[];
   look: Look;
-  settings: { music: number; sfx: number };
+  /** Sound sliders as of the last save (live values: src/audio/settings.ts). */
+  settings: { music: number; sfx: number; muted: boolean };
   createdAt: string;
 };
 
@@ -38,7 +39,7 @@ export function defaultProfile(name = ''): Profile {
       emotes: ['winken', 'lachen'],
       prank: null,
     },
-    settings: { music: 0.6, sfx: 0.8 },
+    settings: { music: 0.6, sfx: 0.8, muted: false },
     createdAt: new Date().toISOString(),
   };
 }
@@ -77,6 +78,7 @@ export function migrate(raw: unknown): Profile {
     settings: {
       music: Math.min(1, Math.max(0, num(s.music, d.settings.music))),
       sfx: Math.min(1, Math.max(0, num(s.sfx, d.settings.sfx))),
+      muted: typeof s.muted === 'boolean' ? s.muted : d.settings.muted,
     },
     createdAt: str(raw.createdAt, d.createdAt),
   };

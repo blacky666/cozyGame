@@ -1,6 +1,8 @@
 import type { AssetFile } from '../gfx/assetTypes';
 import type { PlayerInfo } from '../net/roster';
 import { CONFIG } from '../config';
+import { sound } from '../audio/sound';
+import { LOBBY_MUSIC, OWN_SOUND, rosterChange, uiSound } from '../audio/uiSounds';
 import { drawCharacter } from './charPreview';
 import { clear, h } from './dom';
 import { lobbyModel } from './lobbyModel';
@@ -22,17 +24,22 @@ export type LobbyOptions = {
 /** Renders the lobby; returns an updater to call on each roster change. */
 export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInfo[]): (roster: PlayerInfo[]) => void {
   clear(root);
+  sound.setMusic(LOBBY_MUSIC);
   const slotsEl = h('div', { class: 'cg-slots' });
   const hint = h('p', { class: 'cg-hint' });
-  const readyBtn = h('button', { class: 'cg-btn cg-ok' });
+  const readyBtn = h('button', { class: 'cg-btn cg-ok', [OWN_SOUND]: true });
   const startBtn = h('button', { class: 'cg-btn', text: "Los geht's!", onclick: o.onStart });
   let selfReady = false;
-  readyBtn.addEventListener('click', () => o.onReady(!selfReady));
+  readyBtn.addEventListener('click', () => {
+    uiSound(selfReady ? 'nicht_bereit' : 'bereit');
+    o.onReady(!selfReady);
+  });
 
   const copy = h('button', {
-    class: 'cg-btn cg-secondary', text: 'Kopieren',
+    class: 'cg-btn cg-secondary', text: 'Kopieren', [OWN_SOUND]: true,
     onclick: () => {
       void navigator.clipboard?.writeText(o.code).then(() => {
+        uiSound('kopiert');
         copy.textContent = 'Kopiert!';
         setTimeout(() => (copy.textContent = 'Kopieren'), 1500);
       });
@@ -68,7 +75,15 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
     ),
   );
 
+  let present: string[] | null = null;
   const update = (roster: PlayerInfo[]): void => {
+    const now = roster.filter((p) => p.connected).map((p) => p.id);
+    if (present) {
+      const { joined, left } = rosterChange(present, now);
+      if (joined > 0) uiSound('spieler_kommt');
+      else if (left > 0) uiSound('spieler_geht');
+    }
+    present = now;
     const m = lobbyModel(roster, o.selfId, o.isHost, o.rounds);
     selfReady = roster.find((p) => p.id === o.selfId)?.ready ?? false;
     readyBtn.textContent = selfReady ? 'Nicht bereit' : 'Bereit';

@@ -9,6 +9,10 @@ import { joinTrysteroRoom } from '../net/trysteroTransport';
 import type { RejectReason } from '../net/protocol';
 import { loadProfile, saveProfile } from '../save/storage';
 import type { Profile } from '../save/profile';
+import { SOUND_PACKAGES } from '../audio/packages';
+import { sound } from '../audio/sound';
+import { mountSoundButton } from '../audio/soundButton';
+import { mountClickSounds, uiSound } from '../audio/uiSounds';
 import { setFavicon } from './favicon';
 import { showLobby } from './lobbyScreen';
 import { showProfile } from './profileScreen';
@@ -43,6 +47,9 @@ const getAssets = () =>
 export function startMenus(root: HTMLElement): void {
   let profile: Profile = loadProfile();
   void getAssets();
+  mountSoundButton();
+  mountClickSounds();
+  for (const p of SOUND_PACKAGES) void sound.loadPackage(p);
 
   const toStart = (message?: string): void => {
     showStart(root, {
@@ -88,10 +95,14 @@ export function startMenus(root: HTMLElement): void {
         onRounds: (n) => (rounds = n),
         onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, assets, root }),
         onLeave: leave,
-        onKick: (id) => void session.kick(id),
+        onKick: (id) => {
+          uiSound('entfernt');
+          void session.kick(id);
+        },
       },
       session.roster.list(),
     );
+    uiSound('raum_erstellt');
     session.onRoster((r) => void (alive && update(r)));
   };
 

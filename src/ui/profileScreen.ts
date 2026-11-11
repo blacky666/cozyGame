@@ -1,3 +1,4 @@
+import { sound } from '../audio/sound';
 import { CONFIG } from '../config';
 import { decodeSave, encodeSave, saveFileName } from '../save/saveFile';
 import { saveProfile } from '../save/storage';
@@ -42,6 +43,7 @@ export function showProfile(root: HTMLElement, profile: Profile, onBack: (p: Pro
     if (!ok) return;
     current = res.profile;
     saveProfile(current);
+    sound.update(current.settings);
     name.value = current.name;
     showStats();
     msg.textContent = 'Spielstand geladen.';
@@ -49,6 +51,9 @@ export function showProfile(root: HTMLElement, profile: Profile, onBack: (p: Pro
   });
 
   const save = async () => {
+    sound.play('ablauf.gesichert');
+    current = { ...current, settings: sound.settings() };
+    saveProfile(current);
     const url = URL.createObjectURL(new Blob([await encodeSave(current)], { type: 'text/plain' }));
     h('a', { href: url, download: saveFileName(current, new Date()) }).click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);

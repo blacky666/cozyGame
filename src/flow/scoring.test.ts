@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { finalRanking, roundPoints } from './scoring';
+import { finalRanking, roundPoints, rankOf } from './scoring';
 
 describe('roundPoints', () => {
   it('awards 5/3/1/0 for four distinct places', () => {
@@ -22,5 +22,14 @@ describe('finalRanking', () => {
   });
   it('keeps ties when totals and wins are equal', () => {
     expect(finalRanking({ a: 10, b: 10, c: 3 }, { a: 1, b: 1, c: 0 })).toEqual([['a', 'b'], ['c']]);
+  });
+});
+
+describe('rankOf', () => {
+  it('ties share a rank', () => {
+    const t = { a: 10, b: 10, c: 5 };
+    expect(rankOf(t, 'a')).toBe(1);
+    expect(rankOf(t, 'b')).toBe(1);
+    expect(rankOf(t, 'c')).toBe(3);
   });
 });

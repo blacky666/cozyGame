@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
 import { getMinigame } from '../../minigames/registry';
 import type { SceneData } from '../stageCtx';
@@ -31,10 +32,16 @@ export class RoundIntroScene extends Phaser.Scene {
       txt(this, w / 2, 168, game ? `Steuerung: ${game.controls}` : '', 11, INK).setWordWrapWidth(w - 90),
     ];
 
+    // One opener: last round > evening start > the game's own jingle.
+    sound.setMusic(null);
+    if (phase.double) sound.play('ablauf.letzte_runde');
+    else if (phase.round === 1) sound.play('ui.abend_start');
+    else sound.playRound(game?.sounds, 'jingle_runde_start');
     const step = ctx.timing.countdownMs / 3;
     let shown: Phaser.GameObjects.GameObject | null = null;
     const show = (n: number) => {
       shown?.destroy();
+      sound.playRound(game?.sounds, 'countdown_tick');
       shown = assetSprite(this, `ui.countdown.${n}`, w / 2, h / 2 + 8) ?? txt(this, w / 2, h / 2 + 8, String(n), 40);
     };
     this.time.delayedCall(ctx.timing.ruleMs, () => {

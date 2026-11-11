@@ -744,7 +744,7 @@ describe('schneeball definition', () => {
     x, y, vx: 0, vy: 0, dir: 'down' as const, score: 0, balls: 5, reloading: false, invulnMs: 0, down: false,
     strongCdMs: 0, stun: false, swing: false, shoveCdMs: 0, extra: null, extraLeft: 0, hat: false, throwAnimMs: 0,
   });
-  const ball = (id: number, x: number, y: number) => ({ id, x, y, vx: 10, vy: 0, left: 100, total: 100, owner: 'p0', kind: 'normal' as const, bounces: 0 });
+  const ball = (id: number, x: number, y: number) => ({ id, x, y, vx: 10, vy: 0, left: 100, total: 100, owner: 'p0', kind: 'normal' as const, bounces: 0, strong: false });
 
   it('lerps players and balls by id and takes the rest from the newer state', () => {
     const a: SnowState = {

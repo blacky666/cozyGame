@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
 import { SnapshotBuffer } from '../../net/interpolation';
 import { neutralInput, type InputState } from '../../net/protocol';
@@ -8,6 +9,8 @@ import type { SceneData, StageCtx } from '../stageCtx';
 import { shouldSend } from '../inputSend';
 import { assetSprite, txt } from '../ui';
 
+/** Round-end jingle after the whistle. */
+const ROUND_END_JINGLE_MS = 700;
 const stepLerp = <S>(a: S, b: S, t: number): S => (t < 0.5 ? a : b);
 
 /**
@@ -55,6 +58,8 @@ export class MinigameScene extends Phaser.Scene {
     ctx.keyboard.setCounting(true);
     ctx.pointer.setCounting(true);
     const unwire = () => {
+      sound.setMusic(null);
+      sound.stopLoops();
       ctx.keyboard.setCounting(false);
       ctx.pointer.setCounting(false);
       unwirePointer();
@@ -70,12 +75,17 @@ export class MinigameScene extends Phaser.Scene {
     const los = assetSprite(this, 'ui.countdown.los', CONFIG.view.width / 2, CONFIG.view.height / 2)
       ?? txt(this, CONFIG.view.width / 2, CONFIG.view.height / 2, 'LOS!', 40);
     los.setDepth(2000);
+    sound.playRound(this.def.sounds, 'countdown_los');
     this.tweens.add({ targets: los, alpha: 0, delay: 600, duration: 300, onComplete: () => los.destroy() });
 
     // game.destroy() fires DESTROY, not SHUTDOWN: hook both, the window listener must not leak.
     this.events.once(Phaser.Scenes.Events.DESTROY, unwire);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       unwire();
+      // Round over: whistle, then the jingle (the game's own sounds, else the shared ones).
+      const pkg = this.def?.sounds;
+      sound.playFirst([`${pkg}.zeit_um_pfiff`, 'ablauf.zeit_um']);
+      sound.playRound(pkg, 'jingle_runde_ende', { delayMs: ROUND_END_JINGLE_MS });
       if (!ctx.isHost) {
         ctx.onSnap(null);
         // Released buttons, but the counters stay (a drop would make the next host re-base them).

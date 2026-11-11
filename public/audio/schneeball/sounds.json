@@ -1,0 +1,257 @@
+{
+ "paket": "schneeball",
+ "toene": [
+  {
+   "id": "schneeball.wurf",
+   "datei": [
+    "audio/schneeball/wurf_1.mp3",
+    "audio/schneeball/wurf_2.mp3",
+    "audio/schneeball/wurf_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 240,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "schneeball.wurf_fest",
+   "datei": "audio/schneeball/wurf_fest.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 340,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.treffer_platsch",
+   "datei": [
+    "audio/schneeball/treffer_platsch_1.mp3",
+    "audio/schneeball/treffer_platsch_2.mp3",
+    "audio/schneeball/treffer_platsch_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 260,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.getroffen_autsch",
+   "datei": "audio/schneeball/getroffen_autsch.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 300,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.abpraller",
+   "datei": "audio/schneeball/abpraller.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 190,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.ball_zerfaellt",
+   "datei": "audio/schneeball/ball_zerfaellt.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 140,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "schneeball.schritt_schnee",
+   "datei": [
+    "audio/schneeball/schritt_schnee_1.mp3",
+    "audio/schneeball/schritt_schnee_2.mp3",
+    "audio/schneeball/schritt_schnee_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 75,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "schneeball.schnee_aufsammeln",
+   "datei": "audio/schneeball/schnee_aufsammeln.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 280,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "schneeball.hinfallen",
+   "datei": "audio/schneeball/hinfallen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 360,
+   "lautstaerke": 0.7
+  },
+  {
+   "id": "schneeball.aufstehen",
+   "datei": "audio/schneeball/aufstehen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 280,
+   "lautstaerke": 0.7
+  },
+  {
+   "id": "schneeball.schutz_ende",
+   "datei": "audio/schneeball/schutz_ende.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 200,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "schneeball.eis_rutschen",
+   "datei": "audio/schneeball/eis_rutschen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 600,
+   "lautstaerke": 0.45
+  },
+  {
+   "id": "schneeball.riesenball_rollen_schleife",
+   "datei": "audio/schneeball/riesenball_rollen_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 1000,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.schneemann_treffer",
+   "datei": "audio/schneeball/schneemann_treffer.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 150,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.schneemann_kaputt",
+   "datei": "audio/schneeball/schneemann_kaputt.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 780,
+   "lautstaerke": 1.0
+  },
+  {
+   "id": "schneeball.schneemann_aufbau",
+   "datei": "audio/schneeball/schneemann_aufbau.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1180,
+   "lautstaerke": 0.79
+  },
+  {
+   "id": "schneeball.eiszapfenmuetze_bruch",
+   "datei": "audio/schneeball/eiszapfenmuetze_bruch.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 389,
+   "lautstaerke": 0.6
+  },
+  {
+   "id": "schneeball.pickup",
+   "datei": "audio/schneeball/pickup.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 565,
+   "lautstaerke": 0.71
+  },
+  {
+   "id": "schneeball.munition_leer",
+   "datei": "audio/schneeball/munition_leer.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 90,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "schneeball.munition_voll",
+   "datei": "audio/schneeball/munition_voll.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 110,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "schneeball.countdown_tick",
+   "datei": "audio/schneeball/countdown_tick.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 140,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.countdown_los",
+   "datei": "audio/schneeball/countdown_los.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 500,
+   "lautstaerke": 0.66
+  },
+  {
+   "id": "schneeball.zeit_um_pfiff",
+   "datei": "audio/schneeball/zeit_um_pfiff.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 900,
+   "lautstaerke": 0.25
+  },
+  {
+   "id": "schneeball.punkte_plus",
+   "datei": "audio/schneeball/punkte_plus.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 460,
+   "lautstaerke": 0.41
+  },
+  {
+   "id": "schneeball.punkte_minus",
+   "datei": "audio/schneeball/punkte_minus.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 390,
+   "lautstaerke": 0.27
+  },
+  {
+   "id": "schneeball.schadenfroh_lachen",
+   "datei": "audio/schneeball/schadenfroh_lachen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 510,
+   "lautstaerke": 0.58
+  },
+  {
+   "id": "schneeball.musik_schneeball",
+   "datei": "audio/schneeball/musik_schneeball.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 54857,
+   "lautstaerke": 0.6
+  },
+  {
+   "id": "schneeball.musik_schneeball_finale",
+   "datei": "audio/schneeball/musik_schneeball_finale.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 22857,
+   "lautstaerke": 0.6
+  },
+  {
+   "id": "schneeball.jingle_runde_start",
+   "datei": "audio/schneeball/jingle_runde_start.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 1964,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "schneeball.jingle_runde_ende",
+   "datei": "audio/schneeball/jingle_runde_ende.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 2245,
+   "lautstaerke": 0.8
+  }
+ ]
+}

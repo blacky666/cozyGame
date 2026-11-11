@@ -31,7 +31,7 @@ describe('migrate', () => {
   it('has the specified defaults', () => {
     const p = defaultProfile('A');
     expect(p.look).toEqual({ outfit: 'tunika', hair: 'kurz', hairColor: 0, skin: 0, hat: 'bommelmuetze', glasses: null, back: null, emotes: ['winken', 'lachen'], prank: null });
-    expect(p.settings).toEqual({ music: 0.6, sfx: 0.8 });
+    expect(p.settings).toEqual({ music: 0.6, sfx: 0.8, muted: false });
   });
 });
 

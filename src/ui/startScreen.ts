@@ -1,5 +1,7 @@
 import { CONFIG } from '../config';
 import { normalizeRoomCode } from '../net/roomCode';
+import { sound } from '../audio/sound';
+import { LOBBY_MUSIC, uiSound } from '../audio/uiSounds';
 import { versionLabel } from '../version';
 import { clear, h } from './dom';
 
@@ -14,6 +16,8 @@ export type StartHandlers = {
 
 export function showStart(root: HTMLElement, o: StartHandlers): void {
   clear(root);
+  sound.setMusic(LOBBY_MUSIC);
+  if (o.message) uiSound('fehler');
   const error = h('p', { class: 'cg-error', text: o.message ?? '' });
   const name = h('input', {
     class: 'cg-input', maxlength: CONFIG.players.maxName, value: o.name, placeholder: 'Dein Name', 'aria-label': 'Name',
@@ -25,6 +29,7 @@ export function showStart(root: HTMLElement, o: StartHandlers): void {
   const requireName = (): boolean => {
     if (name.value.trim()) return true;
     error.textContent = 'Bitte gib zuerst deinen Namen ein.';
+    uiSound('fehler');
     name.focus();
     return false;
   };
@@ -32,6 +37,7 @@ export function showStart(root: HTMLElement, o: StartHandlers): void {
     if (!requireName()) return;
     if (normalizeRoomCode(code.value) === null) {
       error.textContent = 'Ungültiger Code – z. B. KAESE-42';
+      uiSound('fehler');
       return;
     }
     o.onJoin(code.value);

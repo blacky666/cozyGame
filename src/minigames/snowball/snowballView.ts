@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import { assetsOf, byKey, pivotSprite, playerColor, swapSprite, txt } from '../../game/ui';
@@ -11,6 +12,7 @@ import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { BALL_LIFT } from './snowballBalls';
 import type { Ball, SnowFx, SnowPlayer, SnowState } from './snowballHost';
 import { SnowballHud } from './snowballHud';
+import { SnowSounds } from './snowballSounds';
 import { stepMover, type Mover } from './snowballMove';
 
 export const ARENA_FILE = 'arena-schneeball';
@@ -22,6 +24,8 @@ export const ARENA_OFFSET: { readonly x: number; readonly y: number } = { x: 5, 
 export const toMap = (x: number, y: number): { x: number; y: number } => ({ x: x - ARENA_OFFSET.x, y: y - ARENA_OFFSET.y });
 
 const SNOW_BG = 0xe8eef4;
+const PKG = 'schneeball';
+const ROLL_LOOP = `${PKG}.riesenball_rollen_schleife`;
 const HIT_ANIM_MS = 300;
 const BLINK_MS = 100;
 /** Height of the visual arc at mid-flight; it starts and ends on the true path. */
@@ -84,6 +88,12 @@ export class SnowballView implements MiniGameView<SnowState> {
   private readonly crosshair: Phaser.GameObjects.Graphics;
   /** Whether the own player can throw right now (from the last rendered state; dims the crosshair). */
   private canThrow = true;
+  /** Own ammo from the last rendered state (a click without a ball clicks empty). */
+  private ammo = 1;
+  private readonly sounds: SnowSounds;
+  private readonly onPress = (p: Phaser.Input.Pointer) => {
+    if ((p.button === 0 || p.button === 2) && this.ammo < 1) sound.play(`${PKG}.munition_leer`);
+  };
   // Prediction (clients): same scheme as Münzjagd, with the arena movement of the host.
   private readonly reconciler = new Reconciler<Mover>((m, input, dt) => stepMover(m, input, dt, this.arena, this.solids));
   private solids: Solid[];
@@ -119,6 +129,8 @@ export class SnowballView implements MiniGameView<SnowState> {
     this.crosshair = this.drawCrosshair(self ? playerColor(scene, self.slot) : '#ffffff');
     this.objects.push(this.crosshair);
     this.hud = new SnowballHud(scene, players);
+    this.sounds = new SnowSounds(selfKey, (x, y) => tileAt(this.arena, x, y) === 'j');
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPress);
   }
 
   private drawCrosshair(color: string): Phaser.GameObjects.Graphics {
@@ -231,6 +243,11 @@ export class SnowballView implements MiniGameView<SnowState> {
     }
     const me: SnowPlayer | undefined = s.players[selfKey];
     this.canThrow = !!me && me.balls >= 1 && !me.down && !me.stun && me.strongCdMs <= 0;
+    this.ammo = me?.balls ?? 1;
+    for (const c of this.sounds.update(s, now)) sound.play(c.name.includes('.') ? c.name : `${PKG}.${c.name}`, c);
+    const music = SnowSounds.music(s);
+    sound.setMusic(music && `${PKG}.${music}`);
+    sound.loop(ROLL_LOOP, SnowSounds.rolling(s));
     this.renderBalls(s.balls);
     this.renderWorld(s);
     this.renderFx(s.fx);
@@ -323,6 +340,9 @@ export class SnowballView implements MiniGameView<SnowState> {
   }
 
   destroy(): void {
+    sound.loop(ROLL_LOOP, false);
+    // On game.destroy() the InputPlugin is already gone (see MinigameScene.wirePointer).
+    if (this.scene.input?.manager) this.scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPress);
     for (const v of this.balls.values()) {
       v.ball?.destroy();
       v.shadow?.destroy();

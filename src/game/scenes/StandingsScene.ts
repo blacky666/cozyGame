@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { sound } from '../../audio/sound';
+import { rankOf } from '../../flow/scoring';
 import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import type { SceneData } from '../stageCtx';
@@ -7,6 +9,9 @@ import { assetsOf, byKey, INK, playerSymbol, txt } from '../ui';
 export const CARD_PLACEHOLDER = 'Gemeinheit-Karte (kommt in Plan 7)';
 
 const ROW_H = 32;
+/** Standings music starts after the jingle. */
+const MUSIC_AFTER_MS = 1500;
+
 const TOP = 46;
 
 /** Ranking after a round: the round points fly into the totals. */
@@ -22,6 +27,8 @@ export class StandingsScene extends Phaser.Scene {
     this.add.rectangle(0, 0, w, h, 0x2b2b3d).setOrigin(0);
     txt(this, w / 2, 20, `Zwischenstand nach Runde ${phase.round}`, 14, '#ffd27a');
 
+    sound.play('ablauf.zwischenstand');
+    this.time.delayedCall(MUSIC_AFTER_MS, () => sound.setMusic('ablauf.musik_zwischenstand_schleife'));
     const tie = (k: string) => phase.tieOrder.indexOf(k);
     const keys = Object.keys(phase.totals).sort((a, b) => phase.totals[b] - phase.totals[a] || tie(a) - tie(b));
     // Animation timing: rows appear, then the points fly over (well within standings.showMs).
@@ -49,12 +56,24 @@ export class StandingsScene extends Phaser.Scene {
         delay: flyAt + i * 150,
         duration: 600,
         ease: 'Quad.easeIn',
+        onStart: () => pts > 0 && sound.play('ablauf.punkte_fliegen'),
         onComplete: () => {
           totalText.setText(String(total));
           this.tweens.add({ targets: totalText, scale: 1.3, yoyo: true, duration: 150 });
         },
       });
     });
+
+    // Own place up or down once all points have landed.
+    const self = ctx.selfKey();
+    if (self in phase.totals) {
+      const before: Record<string, number> = {};
+      for (const k of keys) before[k] = phase.totals[k] - (phase.points[k] ?? 0);
+      const moved = rankOf(before, self) - rankOf(phase.totals, self);
+      if (phase.round > 1 && moved !== 0) {
+        this.time.delayedCall(flyAt + keys.length * 150 + 700, () => sound.play(moved > 0 ? 'ablauf.platz_hoch' : 'ablauf.platz_runter'));
+      }
+    }
 
     // Placeholder for the prank card picked by the last player (Plan 7).
     const boxY = TOP + keys.length * ROW_H + 18;

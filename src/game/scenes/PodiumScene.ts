@@ -1,10 +1,14 @@
 import Phaser from 'phaser';
+import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import type { SceneData } from '../stageCtx';
 import { assetSprite, assetsOf, button, byKey, txt } from '../ui';
 
 const GROUND = 196;
+/** Fanfare first, then cheering/crying, then the podium music. */
+const REACT_MS = 1200;
+const MUSIC_AFTER_MS = 3600;
 /** Step x positions and heights for places 1-3 (ui.podest.N sprites). */
 const STEPS: Record<number, { x: number; h: number }> = { 1: { x: 213, h: 40 }, 2: { x: 163, h: 30 }, 3: { x: 263, h: 22 } };
 
@@ -30,6 +34,15 @@ export class PodiumScene extends Phaser.Scene {
       if (step) step.setOrigin(0.5, 1);
       else this.add.rectangle(s.x, GROUND, 40, s.h, 0x8a5a3a).setOrigin(0.5, 1);
     }
+
+    sound.setMusic(null);
+    sound.play('ablauf.siegerehrung');
+    this.time.delayedCall(MUSIC_AFTER_MS, () => sound.setMusic('ablauf.musik_siegerehrung_schleife'));
+    const self = ctx.selfKey();
+    const groups = phase.ranking;
+    const reaction = groups[0]?.includes(self) ? 'ablauf.jubel'
+      : groups.length > 1 && groups[groups.length - 1].includes(self) ? 'ablauf.heulen' : null;
+    if (reaction) this.time.delayedCall(REACT_MS, () => sound.play(reaction));
 
     let place = 1;
     let besideX = 320;

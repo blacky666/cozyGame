@@ -33,6 +33,8 @@ export type Ball = {
   owner: PlayerKey;
   kind: 'normal' | 'abpraller' | 'riesenball';
   bounces: number;
+  /** Right-click throw (the view plays a heavier whoosh). */
+  strong: boolean;
 };
 export type Snowman = {
   /** Id of the arena solid. */
@@ -171,7 +173,7 @@ export function createSnowballHost(
     const speed = kind === 'riesenball' ? power.speed * c.giantSpeedFactor : power.speed;
     const b: Ball = {
       id: nextBallId++, x: sx, y: sy, vx: (dx / len) * speed, vy: (dy / len) * speed,
-      left: flight, total: flight, owner: k, kind, bounces: 0,
+      left: flight, total: flight, owner: k, kind, bounces: 0, strong,
     };
     if (kind !== 'normal') {
       p.extraLeft -= 1;

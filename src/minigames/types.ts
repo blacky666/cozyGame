@@ -51,6 +51,8 @@ export interface MiniGame<S = unknown> {
    * view draws the map). Also turns the cursor into a crosshair while the game runs.
    */
   aimOffset?: { x: number; y: number };
+  /** Sound package (public/audio/<name>/, listed in SOUND_PACKAGES): "<name>.countdown_tick" etc. */
+  sounds?: string;
   /**
    * `opts.durationMs` overrides the game's duration (dev-only fast mode); `opts.assets` are the loaded
    * asset files (games with an arena map need them).

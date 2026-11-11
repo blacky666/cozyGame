@@ -35,3 +35,8 @@ export function finalRanking(
   }
   return groups;
 }
+
+/** 1-based rank of a player by points (ties share a rank). */
+export function rankOf(totals: Record<string, number>, key: string): number {
+  return 1 + Object.values(totals).filter((t) => t > (totals[key] ?? 0)).length;
+}

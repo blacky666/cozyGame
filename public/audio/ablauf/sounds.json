@@ -1,0 +1,173 @@
+{
+ "paket": "ablauf",
+ "toene": [
+  {
+   "id": "ablauf.titelkarte",
+   "datei": "audio/ablauf/titelkarte.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 595,
+   "lautstaerke": 0.57
+  },
+  {
+   "id": "ablauf.countdown_tick",
+   "datei": "audio/ablauf/countdown_tick.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 200,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "ablauf.countdown_los",
+   "datei": "audio/ablauf/countdown_los.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 554,
+   "lautstaerke": 0.86
+  },
+  {
+   "id": "ablauf.zeit_um",
+   "datei": "audio/ablauf/zeit_um.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 980,
+   "lautstaerke": 0.32
+  },
+  {
+   "id": "ablauf.zehn_sekunden",
+   "datei": "audio/ablauf/zehn_sekunden.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 140,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "ablauf.letzte_runde",
+   "datei": "audio/ablauf/letzte_runde.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 2268,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "ablauf.zwischenstand",
+   "datei": "audio/ablauf/zwischenstand.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 1485,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "ablauf.punkte_fliegen",
+   "datei": [
+    "audio/ablauf/punkte_fliegen_1.mp3",
+    "audio/ablauf/punkte_fliegen_2.mp3",
+    "audio/ablauf/punkte_fliegen_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 448,
+   "lautstaerke": 0.24
+  },
+  {
+   "id": "ablauf.platz_hoch",
+   "datei": "audio/ablauf/platz_hoch.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 410,
+   "lautstaerke": 0.54
+  },
+  {
+   "id": "ablauf.platz_runter",
+   "datei": "audio/ablauf/platz_runter.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 620,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "ablauf.siegerehrung",
+   "datei": "audio/ablauf/siegerehrung.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 3574,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "ablauf.jubel",
+   "datei": "audio/ablauf/jubel.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1380,
+   "lautstaerke": 0.73
+  },
+  {
+   "id": "ablauf.heulen",
+   "datei": "audio/ablauf/heulen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1500,
+   "lautstaerke": 0.4
+  },
+  {
+   "id": "ablauf.xp_klimpern",
+   "datei": [
+    "audio/ablauf/xp_klimpern_1.mp3",
+    "audio/ablauf/xp_klimpern_2.mp3",
+    "audio/ablauf/xp_klimpern_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 120,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "ablauf.level_up",
+   "datei": "audio/ablauf/level_up.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 2219,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "ablauf.freischaltung",
+   "datei": "audio/ablauf/freischaltung.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 930,
+   "lautstaerke": 0.77
+  },
+  {
+   "id": "ablauf.ueberraschung",
+   "datei": "audio/ablauf/ueberraschung.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1480,
+   "lautstaerke": 0.88
+  },
+  {
+   "id": "ablauf.gesichert",
+   "datei": "audio/ablauf/gesichert.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 430,
+   "lautstaerke": 0.3
+  },
+  {
+   "id": "ablauf.musik_zwischenstand_schleife",
+   "datei": "audio/ablauf/musik_zwischenstand_schleife.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 22857,
+   "lautstaerke": 0.6
+  },
+  {
+   "id": "ablauf.musik_siegerehrung_schleife",
+   "datei": "audio/ablauf/musik_siegerehrung_schleife.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 32000,
+   "lautstaerke": 0.6
+  }
+ ]
+}
