@@ -116,6 +116,9 @@ interface GameConfig {
     /** Pickups spawn at least this far from every living player (px), after at most pickupTries tries. */
     pickupClearPx: number;
     pickupTries: number;
+    /** Potato ids are random in 1..idRange (creation order stays hidden); idTries retries on a collision. */
+    idRange: number;
+    idTries: number;
     /** The round ends after this long at the latest (living players share first place). */
     safetyMs: number;
     /** Two players: bangs per round (best of), the first to lose a majority is out. */
@@ -188,7 +191,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     noBackMs: 1000, noBackFxMs: 500,
     fuseMinMs: 12000, fuseMaxMs: 20000, heatSteps: [0.5, 0.75, 0.9], heatJitter: 0.08, boomPauseMs: 1800,
     shortFuseMs: 3000, fakeFuseMinMs: 6000, fakeFuseMaxMs: 10000, slowMs: 2000, slowFactor: 0.6,
-    leaderFactor: 0.95, pickupSpawnMs: 7000, maxPickups: 2, pickupTouchPx: 12, pickupClearPx: 24, pickupTries: 20, safetyMs: 180000, bestOf: 3, fxKeepMs: 500,
+    leaderFactor: 0.95, pickupSpawnMs: 7000, maxPickups: 2, pickupTouchPx: 12, pickupClearPx: 24, pickupTries: 20, idRange: 1000000, idTries: 10, safetyMs: 180000, bestOf: 3, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },

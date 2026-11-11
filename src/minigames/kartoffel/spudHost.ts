@@ -139,7 +139,6 @@ export function createSpudHost(
   const out: PlayerKey[] = [];
   let bang = 0;
   let elapsedMs = 0;
-  let nextPotatoId = 1;
   let nextFxId = 1;
 
   const addFx = (kind: SpudFx['kind'], x: number, y: number, who: PlayerKey | null) => {
@@ -161,9 +160,20 @@ export function createSpudHost(
       return prev;
     });
   };
-  const newPotato = (holder: PlayerKey, fuseMs: number, fake: boolean): HostPotato => ({
-    id: nextPotatoId++, holder, heat: 0, noBackFrom: null, noBackMs: 0,
-    fuseMs, burnMs: 0, fake, steps: jitteredSteps(), blockFxAtMs: -Infinity,
+  /** Random id (never reveals creation order, so a fake cannot be told from the real one by id). */
+  const newPotatoId = (): number => {
+    for (let i = 0; i < c.idTries; i++) {
+      const id = 1 + Math.floor(rand() * c.idRange);
+      if (!potatoes.some((o) => o.id === id)) return id;
+    }
+    // Degenerate rand (e.g. constant): fall back to an id above every live one.
+    return Math.max(0, ...potatoes.map((o) => o.id)) + 1;
+  };
+  const newPotato = (
+    holder: PlayerKey, fuseMs: number, fake: boolean, burnMs = 0, steps = jitteredSteps(),
+  ): HostPotato => ({
+    id: newPotatoId(), holder, heat: 0, noBackFrom: null, noBackMs: 0,
+    fuseMs, burnMs, fake, steps, blockFxAtMs: -Infinity,
   });
   /** The leader flag carries the speed factor: only while the leader holds no potato. */
   const refreshLeaders = () => {
@@ -198,8 +208,14 @@ export function createSpudHost(
   const applyPickup = (pk: SpudPickup, k: PlayerKey) => {
     addFx('pickup', pk.x, pk.y, k);
     if (pk.kind === 'fake') {
-      const fuseMs = c.fakeFuseMinMs + rand() * (c.fakeFuseMaxMs - c.fakeFuseMinMs);
-      potatoes.push(newPotato(k, fuseMs, true));
+      // The fake starts at the real potato's burnt fraction (same glow), with its own 6-10 s left.
+      const left = c.fakeFuseMinMs + rand() * (c.fakeFuseMaxMs - c.fakeFuseMinMs);
+      const real = potatoes.find((o) => !o.fake);
+      const frac = real ? Math.min(real.burnMs / real.fuseMs, 1 - EPS) : 0;
+      const fuseMs = left / (1 - frac);
+      const fake = newPotato(k, fuseMs, true, frac * fuseMs, real?.steps);
+      fake.heat = heatOf(fake);
+      potatoes.push(fake);
       return;
     }
     for (const pot of potatoes) {
@@ -370,9 +386,11 @@ export function createSpudHost(
       return {
         phase,
         players: ps,
-        potatoes: potatoes.map(({ id, holder, heat, noBackFrom, noBackMs }) => ({
-          id, holder, heat, noBackFrom, noBackMs: Math.ceil(noBackMs),
-        })),
+        potatoes: potatoes
+          .map(({ id, holder, heat, noBackFrom, noBackMs }) => ({
+            id, holder, heat, noBackFrom, noBackMs: Math.ceil(noBackMs),
+          }))
+          .sort((a, b) => a.id - b.id),
         pickups: pickups.map((pk) => ({ ...pk })),
         fx: fx.map(({ id, kind, x, y, who }) => ({ id, kind, x, y, who })),
         out: [...out],
