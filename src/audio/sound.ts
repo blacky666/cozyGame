@@ -39,8 +39,6 @@ class SoundManager {
   private sfxBus: GainNode | null = null;
   private readonly defs = new Map<string, SoundDef>();
   private readonly buffers = new Map<string, AudioBuffer>();
-  /** Music files as downloaded (MP3, small); decoded only when played. */
-  private readonly compressed = new Map<string, ArrayBuffer>();
   /** Decoded music, oldest first (Map keeps insertion order). */
   private readonly musicCache = new Map<string, AudioBuffer>();
   private startingMusic: string | null = null;
@@ -109,18 +107,15 @@ class SoundManager {
         if (!res.ok) return;
         const defs = parseManifest(await res.json(), (m) => console.warn(`cozygame audio: ${m}`));
         for (const d of defs) this.defs.set(d.id, d);
-        // Music stays compressed until played (decoded it takes ~20 MB per minute). It is played
-        // through Web Audio all the same: only a decoded buffer loops without a gap at the seam.
-        const musicFiles = new Set(defs.filter((d) => d.kind === 'musik').flatMap((d) => d.files));
-        const files = [...new Set(defs.flatMap((d) => d.files))];
+        // Music is not fetched here: each track has ~10 variants (~1.3 MB each), so only the one
+        // that starts playing is downloaded (see musicBuffer).
+        const files = [...new Set(defs.filter((d) => d.kind !== 'musik').flatMap((d) => d.files))];
         await Promise.all(
           files.map(async (f) => {
             try {
               const r = await fetch(`${base}${f}`);
               if (!r.ok) return;
-              const data = await r.arrayBuffer();
-              if (musicFiles.has(f)) this.compressed.set(f, data);
-              else this.buffers.set(f, await ctx.decodeAudioData(data));
+              this.buffers.set(f, await ctx.decodeAudioData(await r.arrayBuffer()));
             } catch (e) {
               console.warn(`cozygame audio: ${f} unavailable`, e);
             }
@@ -138,7 +133,8 @@ class SoundManager {
 
   has(id: string): boolean {
     const d = this.defs.get(id);
-    return !!d && d.files.some((f) => this.buffers.has(f) || this.compressed.has(f));
+    // Music is fetched on demand, so a known music id counts as available.
+    return !!d && (d.kind === 'musik' || d.files.some((f) => this.buffers.has(f)));
   }
 
   private source(ctx: AudioContext, d: SoundDef): AudioBufferSourceNode | null {
@@ -231,7 +227,7 @@ class SoundManager {
     try { m.src.stop(t + MUSIC_FADE_S + 0.05); } catch { /* already stopped */ }
   }
 
-  /** Decoded track (from the cache, else decoded now; the cache keeps MUSIC_CACHE tracks). */
+  /** Decoded track (from the cache, else downloaded and decoded now; the cache keeps MUSIC_CACHE tracks). */
   private async musicBuffer(ctx: AudioContext, file: string): Promise<AudioBuffer | null> {
     const hit = this.musicCache.get(file);
     if (hit) {
@@ -239,10 +235,9 @@ class SoundManager {
       this.musicCache.set(file, hit);
       return hit;
     }
-    const data = this.compressed.get(file);
-    if (!data) return null;
-    // decodeAudioData detaches its input: decode a copy, the compressed file stays for later.
-    const buf = await ctx.decodeAudioData(data.slice(0));
+    const res = await fetch(`${import.meta.env.BASE_URL}${file}`);
+    if (!res.ok) return null;
+    const buf = await ctx.decodeAudioData(await res.arrayBuffer());
     this.musicCache.set(file, buf);
     while (this.musicCache.size > MUSIC_CACHE) this.musicCache.delete(this.musicCache.keys().next().value!);
     return buf;
@@ -253,7 +248,10 @@ class SoundManager {
     const d = this.defs.get(id);
     if (!ctx || !d || !this.musicBus || this.startingMusic === id) return;
     this.startingMusic = id;
-    void this.musicBuffer(ctx, d.files[0])
+    // A different variant each time this music starts (never the one heard last).
+    const i = pickVariant(d.files.length, this.lastVariant.get(id) ?? -1, Math.random);
+    this.lastVariant.set(id, i);
+    void this.musicBuffer(ctx, d.files[i])
       .then((buf) => {
         // Switched again (or already playing) while decoding.
         if (!buf || this.wantMusic !== id || this.music?.id === id) return;

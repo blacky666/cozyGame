@@ -83,10 +83,21 @@
   },
   {
    "id": "ui.musik_lobby_schleife",
-   "datei": "audio/ui/musik_lobby_schleife.mp3",
+   "datei": [
+    "audio/ui/musik_lobby_schleife_01.mp3",
+    "audio/ui/musik_lobby_schleife_02.mp3",
+    "audio/ui/musik_lobby_schleife_03.mp3",
+    "audio/ui/musik_lobby_schleife_04.mp3",
+    "audio/ui/musik_lobby_schleife_05.mp3",
+    "audio/ui/musik_lobby_schleife_06.mp3",
+    "audio/ui/musik_lobby_schleife_07.mp3",
+    "audio/ui/musik_lobby_schleife_08.mp3",
+    "audio/ui/musik_lobby_schleife_09.mp3",
+    "audio/ui/musik_lobby_schleife_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 57600,
+   "dauer_ms": 92308,
    "lautstaerke": 0.6
   }
  ]

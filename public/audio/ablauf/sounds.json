@@ -155,18 +155,40 @@
   },
   {
    "id": "ablauf.musik_zwischenstand_schleife",
-   "datei": "audio/ablauf/musik_zwischenstand_schleife.mp3",
+   "datei": [
+    "audio/ablauf/musik_zwischenstand_schleife_01.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_02.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_03.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_04.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_05.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_06.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_07.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_08.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_09.mp3",
+    "audio/ablauf/musik_zwischenstand_schleife_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 22857,
+   "dauer_ms": 87273,
    "lautstaerke": 0.6
   },
   {
    "id": "ablauf.musik_siegerehrung_schleife",
-   "datei": "audio/ablauf/musik_siegerehrung_schleife.mp3",
+   "datei": [
+    "audio/ablauf/musik_siegerehrung_schleife_01.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_02.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_03.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_04.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_05.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_06.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_07.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_08.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_09.mp3",
+    "audio/ablauf/musik_siegerehrung_schleife_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 32000,
+   "dauer_ms": 87273,
    "lautstaerke": 0.6
   }
  ]

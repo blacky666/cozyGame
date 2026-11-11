@@ -223,18 +223,40 @@
   },
   {
    "id": "schneeball.musik_schneeball",
-   "datei": "audio/schneeball/musik_schneeball.mp3",
+   "datei": [
+    "audio/schneeball/musik_schneeball_01.mp3",
+    "audio/schneeball/musik_schneeball_02.mp3",
+    "audio/schneeball/musik_schneeball_03.mp3",
+    "audio/schneeball/musik_schneeball_04.mp3",
+    "audio/schneeball/musik_schneeball_05.mp3",
+    "audio/schneeball/musik_schneeball_06.mp3",
+    "audio/schneeball/musik_schneeball_07.mp3",
+    "audio/schneeball/musik_schneeball_08.mp3",
+    "audio/schneeball/musik_schneeball_09.mp3",
+    "audio/schneeball/musik_schneeball_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 54857,
+   "dauer_ms": 88615,
    "lautstaerke": 0.6
   },
   {
    "id": "schneeball.musik_schneeball_finale",
-   "datei": "audio/schneeball/musik_schneeball_finale.mp3",
+   "datei": [
+    "audio/schneeball/musik_schneeball_finale_01.mp3",
+    "audio/schneeball/musik_schneeball_finale_02.mp3",
+    "audio/schneeball/musik_schneeball_finale_03.mp3",
+    "audio/schneeball/musik_schneeball_finale_04.mp3",
+    "audio/schneeball/musik_schneeball_finale_05.mp3",
+    "audio/schneeball/musik_schneeball_finale_06.mp3",
+    "audio/schneeball/musik_schneeball_finale_07.mp3",
+    "audio/schneeball/musik_schneeball_finale_08.mp3",
+    "audio/schneeball/musik_schneeball_finale_09.mp3",
+    "audio/schneeball/musik_schneeball_finale_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 22857,
+   "dauer_ms": 48608,
    "lautstaerke": 0.6
   },
   {

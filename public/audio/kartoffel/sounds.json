@@ -131,18 +131,40 @@
   },
   {
    "id": "kartoffel.musik_schleife",
-   "datei": "audio/kartoffel/musik_schleife.mp3",
+   "datei": [
+    "audio/kartoffel/musik_schleife_01.mp3",
+    "audio/kartoffel/musik_schleife_02.mp3",
+    "audio/kartoffel/musik_schleife_03.mp3",
+    "audio/kartoffel/musik_schleife_04.mp3",
+    "audio/kartoffel/musik_schleife_05.mp3",
+    "audio/kartoffel/musik_schleife_06.mp3",
+    "audio/kartoffel/musik_schleife_07.mp3",
+    "audio/kartoffel/musik_schleife_08.mp3",
+    "audio/kartoffel/musik_schleife_09.mp3",
+    "audio/kartoffel/musik_schleife_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 66207,
+   "dauer_ms": 87273,
    "lautstaerke": 0.6
   },
   {
    "id": "kartoffel.musik_finale_schleife",
-   "datei": "audio/kartoffel/musik_finale_schleife.mp3",
+   "datei": [
+    "audio/kartoffel/musik_finale_schleife_01.mp3",
+    "audio/kartoffel/musik_finale_schleife_02.mp3",
+    "audio/kartoffel/musik_finale_schleife_03.mp3",
+    "audio/kartoffel/musik_finale_schleife_04.mp3",
+    "audio/kartoffel/musik_finale_schleife_05.mp3",
+    "audio/kartoffel/musik_finale_schleife_06.mp3",
+    "audio/kartoffel/musik_finale_schleife_07.mp3",
+    "audio/kartoffel/musik_finale_schleife_08.mp3",
+    "audio/kartoffel/musik_finale_schleife_09.mp3",
+    "audio/kartoffel/musik_finale_schleife_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 34286,
+   "dauer_ms": 51200,
    "lautstaerke": 0.6
   }
  ]
