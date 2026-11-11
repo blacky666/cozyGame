@@ -5,6 +5,11 @@ import { buildArena, moveCircle, segmentHit, tileAt } from './arena';
 
 const file = JSON.parse(readFileSync('public/assets/arena-schneeball.json', 'utf8')) as AssetFile;
 const a = buildArena(file, 'schneeball.map');
+const hitsRect = (s: { x: number; y: number; w: number; h: number }, x: number, y: number, r: number) => {
+  const dx = x - Math.max(s.x, Math.min(x, s.x + s.w));
+  const dy = y - Math.max(s.y, Math.min(y, s.y + s.h));
+  return dx * dx + dy * dy < r * r;
+};
 const wall = a.solids.find((s) => s.id === 'wall11,8')!;
 
 describe('arena', () => {
@@ -46,5 +51,40 @@ describe('arena', () => {
     expect(hit!.solid?.id).toBe('wall11,8');
     expect(segmentHit(a, 200, 150, 210, 150, 2)).toBeNull();
     expect(segmentHit(a, 30, 150, -50, 150, 2, [])!.solid).toBeNull();
+  });
+
+  it('ignores NaN and Infinity movement without hanging', () => {
+    const r = moveCircle(a, 100, 150, NaN, Infinity, 5);
+    expect(r).toEqual({ x: 100, y: 150, hitX: false, hitY: false });
+    const bad = moveCircle(a, NaN, 10, 1, 1, 5);
+    expect(bad.hitX).toBe(false);
+    expect(segmentHit(a, 0, 0, NaN, 5, 2)).toBeNull();
+    expect(segmentHit(a, 0, 0, Infinity, 5, 2)).toBeNull();
+  });
+  it('pushes a circle out of a solid it starts inside', () => {
+    const r = 5;
+    const cx = wall.x + wall.w / 2;
+    const cy = wall.y + wall.h / 2;
+    const res = moveCircle(a, cx, cy, 0, 0, r);
+    expect(a.solids.some((s) => hitsRect(s, res.x, res.y, r))).toBe(false);
+    expect(Math.hypot(res.x - cx, res.y - cy)).toBeLessThanOrEqual(wall.w / 2 + r + 1);
+  });
+  it('ends free after a diagonal move into a wall corner', () => {
+    const r = 5;
+    const res = moveCircle(a, wall.x - 10, wall.y - 10, 30, 30, r);
+    expect(a.solids.some((s) => hitsRect(s, res.x, res.y, r))).toBe(false);
+  });
+  it('does not tunnel through a thin solid in one big step', () => {
+    const lantern = a.solids.find((s) => s.sprite === 'schnee.solid.laterne')!;
+    const r = 2;
+    const y = lantern.y + lantern.h / 2;
+    const res = moveCircle(a, lantern.x - 20, y, 40 + lantern.w, 0, r, [lantern]);
+    expect(res.x).toBeLessThanOrEqual(lantern.x - r + 1e-6);
+    expect(res.hitX).toBe(true);
+  });
+  it('segmentHit returns a free t', () => {
+    const hit = segmentHit(a, wall.x - 40, wall.y + 7, wall.x + 5, wall.y + 7, 2)!;
+    const x = wall.x - 40 + 45 * hit.t;
+    expect(hitsRect(wall, x, wall.y + 7, 2)).toBe(false);
   });
 });

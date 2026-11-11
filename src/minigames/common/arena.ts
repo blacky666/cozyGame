@@ -78,9 +78,44 @@ function sweepAxis(a: Arena, solids: Solid[], x: number, y: number, d: number, r
   return [pos, false];
 }
 
+/** Push a circle out of overlapping solids (minimum translation), then clamp to the map. */
+function depenetrate(a: Arena, solids: Solid[], x: number, y: number, r: number): [number, number] {
+  for (let it = 0; it < 4; it++) {
+    const s = blocked(solids, x, y, r);
+    if (!s) break;
+    const cx = Math.max(s.x, Math.min(x, s.x + s.w));
+    const cy = Math.max(s.y, Math.min(y, s.y + s.h));
+    const dx = x - cx;
+    const dy = y - cy;
+    const d = Math.hypot(dx, dy);
+    if (d > 0) {
+      x += (dx / d) * (r - d + 1e-6);
+      y += (dy / d) * (r - d + 1e-6);
+    } else {
+      // centre inside the rect: leave through the nearest side
+      const opts: [number, number, number][] = [
+        [x - s.x, -(x - s.x) - r - 1e-6, 0],
+        [s.x + s.w - x, s.x + s.w - x + r + 1e-6, 0],
+        [y - s.y, 0, -(y - s.y) - r - 1e-6],
+        [s.y + s.h - y, 0, s.y + s.h - y + r + 1e-6],
+      ];
+      const best = opts.reduce((m, o) => (o[0] < m[0] ? o : m));
+      x += best[1];
+      y += best[2];
+    }
+    x = Math.max(r, Math.min(a.w - r, x));
+    y = Math.max(r, Math.min(a.h - r, y));
+  }
+  return [Math.max(r, Math.min(a.w - r, x)), Math.max(r, Math.min(a.h - r, y))];
+}
+
 export function moveCircle(
   a: Arena, x: number, y: number, dx: number, dy: number, r: number, solids: Solid[] = a.solids,
 ): { x: number; y: number; hitX: boolean; hitY: boolean } {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { x, y, hitX: false, hitY: false };
+  if (!Number.isFinite(dx)) dx = 0;
+  if (!Number.isFinite(dy)) dy = 0;
+  [x, y] = depenetrate(a, solids, x, y, r);
   const [nx, hitX] = sweepAxis(a, solids, x, y, dx, r, 'x');
   const [ny, hitY] = sweepAxis(a, solids, nx, y, dy, r, 'y');
   return { x: nx, y: ny, hitX, hitY };
@@ -89,6 +124,7 @@ export function moveCircle(
 export function segmentHit(
   a: Arena, x0: number, y0: number, x1: number, y1: number, r: number, solids: Solid[] = a.solids,
 ): { t: number; solid: Solid | null; normal: 'x' | 'y' } | null {
+  if (![x0, y0, x1, y1].every(Number.isFinite)) return null;
   const len = Math.hypot(x1 - x0, y1 - y0);
   const n = Math.max(1, Math.ceil(len)); // <= 1 px per sample
   const at = (t: number): [number, number] => [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t];
@@ -117,7 +153,7 @@ export function segmentHit(
     let normal: 'x' | 'y';
     if (xOut || yOut) normal = xOut ? 'x' : 'y';
     else normal = blocked(solids, ox, fy, r) ? 'x' : 'y';
-    return { t: bad, solid: xOut || yOut ? null : solid, normal };
+    return { t: good, solid: xOut || yOut ? null : solid, normal };
   }
   return null;
 }
