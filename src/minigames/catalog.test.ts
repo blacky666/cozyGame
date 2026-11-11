@@ -12,13 +12,13 @@ describe('game catalog', () => {
   });
 
   it('keeps known ids in catalog order; empty means all', () => {
-    expect(cleanSelection(['muenzjagd', 'gibtsnicht', 'schneeball'])).toEqual(['schneeball', 'muenzjagd']);
-    expect(cleanSelection(['gibtsnicht'])).toEqual(['schneeball', 'muenzjagd']);
+    expect(cleanSelection(['kartoffel', 'gibtsnicht', 'muenzjagd', 'schneeball'])).toEqual(['schneeball', 'kartoffel']);
+    expect(cleanSelection(['gibtsnicht'])).toEqual(['schneeball', 'kartoffel']);
   });
 
   it('loads the stored choice, falls back to all', () => {
-    expect(loadSelection(store('["muenzjagd"]'))).toEqual(['muenzjagd']);
-    expect(loadSelection(store('{oops'))).toEqual(['schneeball', 'muenzjagd']);
-    expect(loadSelection(store(null))).toEqual(['schneeball', 'muenzjagd']);
+    expect(loadSelection(store('["kartoffel"]'))).toEqual(['kartoffel']);
+    expect(loadSelection(store('{oops'))).toEqual(['schneeball', 'kartoffel']);
+    expect(loadSelection(store(null))).toEqual(['schneeball', 'kartoffel']);
   });
 });

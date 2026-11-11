@@ -4,7 +4,7 @@
  */
 export const GAME_CATALOG: ReadonlyArray<{ id: string; title: string }> = [
   { id: 'schneeball', title: 'Schneeball-Schlacht' },
-  { id: 'muenzjagd', title: 'Münzjagd' },
+  { id: 'kartoffel', title: 'Heiße Kartoffel' },
 ];
 
 export const GAMES_KEY = 'cozygame.games';
