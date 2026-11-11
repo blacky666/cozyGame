@@ -1,14 +1,15 @@
 import { CONFIG } from '../../config';
 import type { InputState } from '../../net/protocol';
 import type { PlayerKey } from '../types';
+import { Edge } from './edges';
 
 /** Facing as used by Character ('side' = right). Kept here so host code never imports Phaser. */
 export type Facing = 'down' | 'up' | 'side' | 'left';
 
 /** Per-player shove bookkeeping on the host (all times in ms, counting down). */
 export type ShoveSlot = {
-  /** Highest shove counter already handled (inputs only ever count up). */
-  seen: number;
+  /** Turns the shove counter into new presses (re-bases when the counter drops). */
+  edge: Edge;
   cooldownMs: number;
   /** > 0 while being pushed away: no steering, sliding along dirX/dirY. */
   stunMs: number;
@@ -29,7 +30,7 @@ const TOUCH_PX = 4;
 const CONE_COS = 0.25;
 
 export function newShoveSlot(): ShoveSlot {
-  return { seen: 0, cooldownMs: 0, stunMs: 0, immuneMs: 0, swingMs: 0, dirX: 0, dirY: 0 };
+  return { edge: new Edge(), cooldownMs: 0, stunMs: 0, immuneMs: 0, swingMs: 0, dirX: 0, dirY: 0 };
 }
 
 /**
@@ -47,9 +48,7 @@ export function resolveShoves(
   const hits: ShoveHit[] = [];
   for (const k of keys) {
     const s = slots[k];
-    const n = inputs[k]?.shoves ?? 0;
-    if (n <= s.seen) continue;
-    s.seen = n;
+    if (s.edge.take(inputs[k]?.shoves ?? 0) === 0) continue;
     if (s.cooldownMs > 0 || s.stunMs > 0) continue;
     s.cooldownMs = c.cooldownMs;
     s.swingMs = c.swingMs;

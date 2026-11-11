@@ -7,7 +7,6 @@ import { playerKey, type PlayerKey } from '../minigames/types';
 import { DEFAULT_TIMING, EveningHost, type EveningTiming } from './eveningHost';
 import { createKeyboard } from './keyboard';
 import { createPlayerCache } from './playerCache';
-import { neutralInput } from '../net/protocol';
 import { Stage } from './phaserGame';
 import type { StageTiming } from './stageCtx';
 
@@ -77,12 +76,13 @@ export function runHostEvening(session: HostSession, rounds: number, onLobby: ()
 
 /** Client: render phases from the host. Returns the stage (driven by startEvening.ts). */
 export function runClientEvening(session: ClientSession, backToStart: () => void): Stage {
+  // Focus lost / tab hidden: send released keys at once (the host also expires stale input); counters stay.
+  const keyboard = createKeyboard({ onIdle: () => session.sendInput(keyboard.state()) });
   const stage: Stage = new Stage({
     isHost: false,
     players: createPlayerCache(() => session.roster),
     selfKey: () => keyFor(session.roster, session.playerId),
-    // Focus lost / tab hidden: stop our player at once (the host also expires stale input).
-    keyboard: createKeyboard({ onIdle: () => session.sendInput(neutralInput()) }),
+    keyboard,
     timing: timings().stage,
     sendInput: (s) => session.sendInput(s),
     backToStart: () => {

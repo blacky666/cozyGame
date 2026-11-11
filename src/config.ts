@@ -35,6 +35,7 @@ interface GameConfig {
   intro: { ruleMs: number; countdownMs: number };
   standings: { showMs: number };
   sandbox: { durationMs: number; speed: number; spawnMs: number; coinSize: number; pickupRadius: number; maxCoins: number };
+  snowball: { maxChargeMs: number };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -82,6 +83,7 @@ export const CONFIG = deepFreeze<GameConfig>({
   standings: { showMs: 8000 },
   // Placeholder minigame "Münzjagd" (speed in px/s, sizes in px).
   sandbox: { durationMs: 30000, speed: 60, spawnMs: 1500, coinSize: 8, pickupRadius: 9, maxCoins: 12 },
+  snowball: { maxChargeMs: 1000 },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
 });

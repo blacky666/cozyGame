@@ -285,6 +285,20 @@ describe('session', () => {
     expect(host.input(ct.selfId)).toEqual(up);
   });
 
+  it('a stale remote input releases buttons but keeps the action counters', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    let now = 1000;
+    const host = createHost(ht, prof('Host'), { now: () => now });
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    await flush();
+    client.sendInput({ ...neutralInput(), up: true, shoves: 3, primaryTaps: 2, primaryCharge: 0.4 });
+    await flush();
+    now += CONFIG.net.inputStaleMs + 1;
+    expect(host.input(ct.selfId)).toEqual({ ...neutralInput(), shoves: 3, primaryTaps: 2, primaryCharge: 0.4 });
+  });
+
   it('host close() sends bye and the client reports the host lost immediately', async () => {
     const hub = createLocalHub();
     const ht = hub.join();

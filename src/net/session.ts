@@ -147,7 +147,10 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       const s = inputs.get(id);
       if (!s) return neutralInput();
       // Remote input that stopped arriving (lost packets, frozen tab) must not keep a player running.
-      if (!local.has(id) && now() - (inputAt.get(id) ?? 0) > CONFIG.net.inputStaleMs) return neutralInput();
+      if (!local.has(id) && now() - (inputAt.get(id) ?? 0) > CONFIG.net.inputStaleMs) {
+        // Buttons are released, but the action counters stay so the host's edges do not re-fire.
+        return { ...neutralInput(), shoves: s.shoves, primaryTaps: s.primaryTaps, primaryCharge: s.primaryCharge };
+      }
       return s;
     },
     broadcast(ph, payload) {

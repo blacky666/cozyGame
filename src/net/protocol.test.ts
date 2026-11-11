@@ -13,4 +13,10 @@ describe('parseInputState', () => {
       expect(parseInputState({ ...neutralInput(), shoves: bad })).toBeNull();
     }
   });
+  it('keeps primaryTaps and clamps primaryCharge into 0..1', () => {
+    expect(parseInputState({ ...neutralInput(), primaryTaps: 4, primaryCharge: 0.5 })).toMatchObject({ primaryTaps: 4, primaryCharge: 0.5 });
+    expect(parseInputState({ ...neutralInput(), primaryCharge: 7 })?.primaryCharge).toBe(1);
+    expect(parseInputState({ ...neutralInput(), primaryTaps: -1 })).toBeNull();
+    expect(parseInputState({ ...neutralInput(), primaryCharge: NaN })).toBeNull();
+  });
 });

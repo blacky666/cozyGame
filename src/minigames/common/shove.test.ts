@@ -65,11 +65,16 @@ describe('shove', () => {
     expect(resolveShoves(keys, bodies, slots, { p0: shoves(3) })).toHaveLength(1);
   });
 
-  it('ignores a neutral input (counter 0) after real presses', () => {
+  it('re-bases on a counter drop instead of shoving', () => {
     const { keys, slots, bodies } = setup({ p0: body(100, 100, 'side'), p1: body(110, 100) });
     resolveShoves(keys, bodies, slots, { p0: shoves(5) });
-    resolveShoves(keys, bodies, slots, { p0: neutralInput() });
-    expect(slots.p0.seen).toBe(5);
+    // A counter drop (reconnect) re-bases without firing, then new presses count again.
+    expect(resolveShoves(keys, bodies, slots, { p0: neutralInput() })).toEqual([]);
+    expect(slots.p0.cooldownMs).toBe(CONFIG.shove.cooldownMs); // untouched by the drop
+    slots.p0.cooldownMs = 0;
+    // The new press fires again (the target is still immune, so it only spends the cooldown).
+    resolveShoves(keys, bodies, slots, { p0: shoves(1) });
+    expect(slots.p0.cooldownMs).toBe(CONFIG.shove.cooldownMs);
   });
 
   it('a stunned player cannot shove; of two mutual shoves the first key wins', () => {
