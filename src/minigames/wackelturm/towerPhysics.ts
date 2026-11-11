@@ -196,9 +196,23 @@ export function stepWorld(w: TowerWorld, dtMs: number): void {
       w.windMs -= c.stepMs;
       if (w.windMs < STEP_EPS) w.windMs = 0;
     }
+    holdAwake(w);
     Engine.update(w.engine, c.stepMs);
   }
   if (w.acc < 0) w.acc = 0;
+}
+
+/**
+ * Matter's sleep test (speed² + angularSpeed² < sleepMotion for sleepThreshold steps) lets a body that tips
+ * slowly off an edge fall asleep at a tilt, frozen and counted as resting. Resetting the counter of every
+ * awake body that misses our own atRest thresholds means a body only sleeps after atRest has held
+ * continuously for sleepThreshold steps. Called right before Engine.update, which runs Sleeping.update.
+ */
+function holdAwake(w: TowerWorld): void {
+  for (const b of w.engine.world.bodies) {
+    // sleepCounter is Matter's internal step count below the motion threshold (not in the typings).
+    if (!b.isStatic && !b.isSleeping && !atRest(b)) (b as Matter.Body & { sleepCounter: number }).sleepCounter = 0;
+  }
 }
 
 /** True while the block barely moves. */

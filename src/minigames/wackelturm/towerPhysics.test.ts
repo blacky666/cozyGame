@@ -247,4 +247,25 @@ describe('towerPhysics', () => {
     spawnBlock(w, 'kurz', plot.centre + 30, layout.surfaceY - 40, 0);
     expect(a.isSleeping || b.isSleeping).toBe(false);
   });
+
+  it('a lang tipping slowly off a marginal overhang falls instead of falling asleep at a tilt', () => {
+    // A dynamic 32×80 support on the foundation; the lang's centre of mass d px past its right edge.
+    for (const d of [0.2, 0.5]) {
+      const w = createTowerWorld(layout, 0);
+      const plot = layout.plots[0];
+      const support = Matter.Bodies.rectangle(plot.centre, layout.surfaceY - 40, 32, 80, {
+        friction: C.friction, frictionStatic: C.frictionStatic, restitution: C.restitution, density: C.density, slop: C.slop,
+      });
+      Matter.Composite.add(w.engine.world, support);
+      const top = spawnBlock(w, 'lang', plot.centre + 16 + d, layout.surfaceY - 80 - 8, 0);
+      let tiltedAsleep = false;
+      for (let i = 0; i < 600; i++) {
+        stepWorld(w, C.stepMs);
+        if (top.isSleeping && Math.abs(Math.sin(top.angle)) > 0.05) tiltedAsleep = true;
+      }
+      expect(tiltedAsleep, `d ${d}`).toBe(false);
+      // Fallen: off the support (removed by the host) or lying on the foundation, not perched up there.
+      expect(top.position.y, `d ${d}`).toBeGreaterThan(layout.surfaceY - 40);
+    }
+  });
 });
