@@ -1,6 +1,6 @@
 import { CONFIG } from '../../config';
 import { buildArena } from '../common/arena';
-import type { MiniGame, PlayerKey } from '../types';
+import type { BotView, MiniGame, PlayerKey } from '../types';
 import { createSnowballHost, type Ball, type SnowPlayer, type SnowState } from './snowballHost';
 import { ARENA_FILE, ARENA_MAP, ARENA_OFFSET, SnowballView } from './snowballView';
 
@@ -19,6 +19,28 @@ export function lerpSnow(a: SnowState, b: SnowState, t: number): SnowState {
   return { ...b, players, balls };
 }
 
+/** Keep this far from the nearest opponent while shooting. */
+const BOT_DISTANCE = 60;
+
+/** Bots reload while standing still; with ammo they hold a distance from the nearest opponent and aim at it. */
+export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
+  const me = s.players[key];
+  if (!me) return null;
+  const self = { x: me.x, y: me.y };
+  if (me.balls < 1) return { self, targets: [], idle: true };
+  let near: SnowPlayer | null = null;
+  let nearD = Infinity;
+  for (const [k, p] of Object.entries(s.players)) {
+    if (k === key) continue;
+    const d = Math.hypot(p.x - me.x, p.y - me.y);
+    if (d < nearD) { near = p; nearD = d; }
+  }
+  if (!near) return { self, targets: [], idle: true };
+  const d = nearD || 1;
+  const target = { x: near.x - ((near.x - me.x) / d) * BOT_DISTANCE, y: near.y - ((near.y - me.y) / d) * BOT_DISTANCE };
+  return { self, targets: [target], aim: { x: near.x, y: near.y } };
+}
+
 export const snowball: MiniGame<SnowState> = {
   id: 'schneeball',
   title: 'Schneeball-Schlacht',
@@ -33,4 +55,5 @@ export const snowball: MiniGame<SnowState> = {
   },
   createView: (scene, players, selfKey) => new SnowballView(scene, players, selfKey),
   lerp: lerpSnow,
+  botView: snowballBotView,
 };

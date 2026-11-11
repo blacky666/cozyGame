@@ -12,8 +12,16 @@ export const playerKey = (slot: 0 | 1 | 2 | 3): PlayerKey => 'p' + slot;
 /** What a minigame knows about a player. `remote`: a real remote peer (false for the host's own player and bots). */
 export type GamePlayer = { key: PlayerKey; slot: 0 | 1 | 2 | 3; name: string; look: Look; remote: boolean };
 
-/** Minimal world view handed to dev bots (see src/dev/bots.ts). */
-export type BotView = { self: { x: number; y: number }; targets: { x: number; y: number }[] };
+/**
+ * Minimal world view handed to dev bots (see src/dev/bots.ts). `aim`: point to aim and throw at (same
+ * coordinates as the simulation); `idle`: stand still (e.g. reloading).
+ */
+export type BotView = {
+  self: { x: number; y: number };
+  targets: { x: number; y: number }[];
+  aim?: { x: number; y: number };
+  idle?: boolean;
+};
 
 export interface MiniGameHost<S> {
   /** dt in seconds. */

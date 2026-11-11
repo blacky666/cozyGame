@@ -2,7 +2,7 @@
 
 Eine Online-Minispiel-Party für 2 bis 4 Freunde im Browser. Albern, schadenfroh, gemütlich.
 
-> **Status:** Fundament steht (Räume, Lobby, Abendablauf, Spielstand-Sicherung) – die Minispiele folgen.
+> **Status:** Fundament steht (Räume, Lobby, Abendablauf, Spielstand-Sicherung); Münzjagd und Schneeball-Schlacht sind spielbar – weitere Minispiele folgen.
 > Online: https://blacky666.github.io/cozyGame/
 
 ## Idee

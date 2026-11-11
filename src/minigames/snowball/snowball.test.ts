@@ -537,3 +537,17 @@ describe('schneeball definition', () => {
     expect(s.snowmen.length).toBeGreaterThan(0);
   });
 });
+
+describe('snowball botView', () => {
+  it('idles without balls and otherwise keeps 60 px from the nearest opponent', () => {
+    const g = createSnowballHost(gp(['p0', 'p1']), mulberry32(1), arena);
+    const st = g.snapshot();
+    expect(snowball.botView?.(st, 'p0')).toMatchObject({ aim: { x: st.players.p1.x, y: st.players.p1.y } });
+    st.players.p0.balls = 0;
+    expect(snowball.botView?.(st, 'p0')).toEqual({ self: { x: st.players.p0.x, y: st.players.p0.y }, targets: [], idle: true });
+    st.players.p0.balls = 3;
+    const v = snowball.botView?.(st, 'p0');
+    const t = v?.targets[0] ?? { x: 0, y: 0 };
+    expect(Math.hypot(t.x - st.players.p1.x, t.y - st.players.p1.y)).toBeCloseTo(60, 5);
+  });
+});

@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
 import { createHost } from '../net/session';
 import { createLocalHub } from '../net/transport';
 import { defaultProfile } from '../save/profile';
 import { addDevBots, createBotInputs } from './bots';
+import { mulberry32 } from '../flow/rng';
+import type { AssetFile } from '../gfx/assetTypes';
+import { neutralInput, type InputState } from '../net/protocol';
+import { buildArena } from '../minigames/common/arena';
+import { playerKey, type GamePlayer } from '../minigames/types';
+import { createSnowballHost } from '../minigames/snowball/snowballHost';
+import { snowball } from '../minigames/snowball/snowball';
+
+// The snowball definition imports Phaser views, which need a browser.
+vi.mock('phaser', () => ({ default: { GameObjects: { Container: class {} } } }));
 
 describe('addDevBots', () => {
   it('adds named, always-ready bot players', () => {
@@ -40,5 +51,64 @@ describe('createBotInputs', () => {
     expect(run(1)).toEqual(run(1));
     const moves = run(1).filter((s) => /true/.test(s));
     expect(moves.length).toBeGreaterThan(0);
+  });
+});
+
+describe('snowball bots', () => {
+  it('a bot aims at the given target and throws now and then', () => {
+    const bot = createBotInputs(3);
+    let last = neutralInput();
+    for (let i = 0; i < 200; i++) {
+      last = bot({ self: { x: 100, y: 100 }, targets: [{ x: 160, y: 100 }], aim: { x: 220, y: 90 } });
+    }
+    expect(last.primaryTaps).toBeGreaterThan(0);
+    expect(last.aimX).toBe(220);
+    expect(last.aimY).toBe(90);
+    expect(last.primaryCharge).toBeGreaterThanOrEqual(0);
+    expect(last.primaryCharge).toBeLessThanOrEqual(1);
+  });
+
+  it('a bot without balls stands still', () => {
+    const bot = createBotInputs(5);
+    for (let i = 0; i < 100; i++) {
+      const s = bot({ self: { x: 100, y: 100 }, targets: [], idle: true });
+      expect(s.up || s.down || s.left || s.right).toBe(false);
+      expect(s.primaryTaps).toBe(0);
+    }
+  });
+
+  it('a 4-bot round of schneeball finishes with scores > 0 and no NaN anywhere in the state', () => {
+    const file = JSON.parse(readFileSync('public/assets/arena-schneeball.json', 'utf8')) as AssetFile;
+    const arena = buildArena(file, 'schneeball.map');
+    const players: GamePlayer[] = ([0, 1, 2, 3] as const).map((slot) => ({
+      key: playerKey(slot), slot, name: 'b' + slot, look: {} as GamePlayer['look'], remote: false,
+    }));
+    const host = createSnowballHost(players, mulberry32(11), arena, 120_000);
+    const brains = players.map((p) => createBotInputs(1 + p.slot * 7919));
+    const inputs: Record<string, InputState> = {};
+    for (const p of players) inputs[p.key] = neutralInput();
+    for (let t = 0; t < 120 * 30 + 2; t++) {
+      const state = host.snapshot();
+      players.forEach((p, i) => {
+        const view = snowball.botView?.(state, p.key);
+        if (view) inputs[p.key] = brains[i](view);
+      });
+      host.tick(1 / 30, inputs);
+    }
+    const end = host.snapshot();
+    expect(host.result()).not.toBeNull();
+    expect(Object.values(end.players).some((p) => p.score > 0)).toBe(true);
+    for (const p of Object.values(end.players)) {
+      expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
+    }
+    for (const b of end.balls) expect(Number.isFinite(b.x) && Number.isFinite(b.y)).toBe(true);
+    // Every number anywhere in the state is finite (NaN would serialize to null).
+    const bad: string[] = [];
+    const walk = (v: unknown, path: string) => {
+      if (typeof v === 'number') { if (!Number.isFinite(v)) bad.push(path); }
+      else if (v && typeof v === 'object') for (const [k, c] of Object.entries(v)) walk(c, path + '.' + k);
+    };
+    walk(end, 'state');
+    expect(bad).toEqual([]);
   });
 });
