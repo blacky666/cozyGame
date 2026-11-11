@@ -14,7 +14,7 @@ import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { speedOf, type Potato, type SpudFx, type SpudPickup, type SpudState } from './spudHost';
 import { SpudHud } from './spudHud';
 import { SpudSounds } from './spudSounds';
-import { stepWalker } from './spudMove';
+import { guessSprint, NO_SPRINT_GUESS, stepWalker, type SprintGuess } from './spudMove';
 
 const PKG = 'kartoffel';
 const TICK_LOOPS = ['ticken_langsam_schleife', 'ticken_mittel_schleife', 'ticken_schnell_schleife'].map((n) => `${PKG}.${n}`);
@@ -94,6 +94,8 @@ export class SpudView implements MiniGameView<SpudState> {
   private lastLatest: SpudState | null = null;
   private lastSentSeq = 0;
   private pred: Mover | null = null;
+  /** Own sprint started locally on the click, until the host state shows it. */
+  private sprint: SprintGuess = NO_SPRINT_GUESS;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -129,7 +131,9 @@ export class SpudView implements MiniGameView<SpudState> {
     if (!latest || !server) return;
     const fresh = latest !== this.lastLatest;
     this.lastLatest = latest;
-    this.speed = speedOf(server);
+    this.sprint = guessSprint(this.sprint, input.primaryTaps, server, dt * 1000);
+    // The predicted speed composes like speedOf, with the local sprint guess in place of the host's.
+    this.speed = speedOf({ ...server, sprintMs: Math.max(server.sprintMs, this.sprint.leftMs) });
     const base: Mover = { x: server.x, y: server.y, vx: server.vx, vy: server.vy, dir: server.dir };
     // Stunned: the host slides us, input does nothing. Done: the host no longer moves anybody.
     // (Ghosts and the pause between bangs walk on the host, so they are predicted.)

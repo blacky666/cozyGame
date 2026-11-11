@@ -21,3 +21,27 @@ export function stepWalker(m: Mover, input: InputState, dt: number, arena: Arena
   const r = moveCircle(arena, m.x, m.y, vx * dt, vy * dt, CONFIG.kartoffel.bodyRadius);
   return { x: r.x, y: r.y, vx: r.hitX ? 0 : vx, vy: r.hitY ? 0 : vy, dir };
 }
+
+/** Client-side guess of the own sprint, before the host state confirms it. */
+export type SprintGuess = { taps: number | null; leftMs: number };
+export const NO_SPRINT_GUESS: SprintGuess = { taps: null, leftMs: 0 };
+
+/**
+ * Sprint prediction step (mirrors the host's sprint tap): a rising `primaryTaps` counter starts a
+ * local sprint of sprintMs when the latest own state allows it (no cooldown, not stunned, no ghost).
+ * The guess runs down by `dtMs` and ends once the own state shows the sprint (the host took over)
+ * or its time runs out. A dropping counter (new connection) only re-bases.
+ */
+export function guessSprint(
+  g: SprintGuess,
+  taps: number,
+  own: { sprintMs: number; sprintCdMs: number; stun: boolean; ghost: boolean },
+  dtMs: number,
+): SprintGuess {
+  const rose = g.taps !== null && taps > g.taps;
+  if (own.sprintMs > 0) return { taps, leftMs: 0 };
+  if (rose && g.leftMs <= 0 && own.sprintCdMs <= 0 && !own.stun && !own.ghost) {
+    return { taps, leftMs: CONFIG.kartoffel.sprintMs };
+  }
+  return { taps, leftMs: Math.max(0, g.leftMs - dtMs) };
+}
