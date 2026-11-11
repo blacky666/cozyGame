@@ -434,7 +434,7 @@ describe('Wackel-Turm host', () => {
     const d = driver(['p0', 'p1', 'p2'], { rand: always('kurz') });
     // Identical goal-high towers put to sleep at once: they never move, so both rest, are placed and hold
     // the goal in the same ticks, independent of how two worlds would settle.
-    const n = C.goalPx / 16;
+    const n = Math.ceil(C.goalPx / 16);
     for (const k of ['p1', 'p2']) {
       stack(d, k, Number(k.slice(1)), 'lang', n);
       for (const b of d.world(k).engine.world.bodies) if (!b.isStatic) Matter.Sleeping.set(b, true);
@@ -446,24 +446,27 @@ describe('Wackel-Turm host', () => {
     // it, and that tick already counts toward goalHoldMs.
     expect(ticks).toBe(1 + ticksFor(C.restHoldMs) + ticksFor(C.goalHoldMs) - 1);
     expect(d.snap().winner).toBe('p1');
-    expect(d.snap().players.p2.heightPx).toBe(C.goalPx);
+    expect(d.snap().players.p2.heightPx).toBe(16 * n);
+    expect(16 * n).toBeGreaterThanOrEqual(C.goalPx);
     expect(d.g.result()).toEqual([['p1', 'p2'], ['p0']]);
   });
 
   it('seesaw: a block rocking over the goal line after an impact neither wins nor counts for the height', () => {
     const d = driver(['p0'], { rand: always('kurz') });
     const cx = P0.centre;
-    // 9 flat lang plus a 10th 12 px off-centre (the seesaw): its rested top stays just under goalPx.
-    stack(d, 'p0', 0, 'lang', 9);
-    const seesaw = spawnBlock(d.world('p0'), 'lang', cx + 12, layout.surfaceY - 8 - 16 * 9, 0);
+    // L flat lang plus one more 12 px off-centre (the seesaw): its rested top stays just under goalPx.
+    const L = Math.floor(C.goalPx / 16) - 1;
+    stack(d, 'p0', 0, 'lang', L);
+    const seesaw = spawnBlock(d.world('p0'), 'lang', cx + 12, layout.surfaceY - 8 - 16 * L, 0);
     d.tick(150);
-    expect(d.snap().players.p0.placed).toBe(10);
+    expect(d.snap().players.p0.placed).toBe(L + 1);
     expect(d.snap().players.p0.heightPx).toBeLessThan(C.goalPx);
     // A lang dropped onto the overhanging end makes it rock; its corner swings above the goal line.
-    spawnBlock(d.world('p0'), 'lang', cx + 38, layout.surfaceY - 16 * 10 - 40, 0);
+    spawnBlock(d.world('p0'), 'lang', cx + 38, layout.surfaceY - 16 * (L + 1) - 40, 0);
     let rockedOverGoal = 0;
     let heightOverGoal = 0;
-    for (let i = 0; i < 150; i++) {
+    // Watched until the impact block itself could be placed (it may come to rest on top, a real height).
+    for (let i = 0; i < ticksFor(C.restHoldMs) - 1; i++) {
       d.tick();
       const s = d.snap();
       if (s.players.p0.heightPx >= C.goalPx) heightOverGoal++;
@@ -548,6 +551,13 @@ describe('Wackel-Turm host', () => {
     const avg = (performance.now() - t0) / 60;
     console.log(`[wackelturm] tick cost 4 × 40 bodies: ${avg.toFixed(2)} ms`);
     expect(avg).toBeLessThan(8);
+    // Worst case: a Windstoß on every tower keeps all 160 bodies awake.
+    for (const k of ['p0', 'p1', 'p2', 'p3']) d.world(k).windMs = C.windMs;
+    const t1 = performance.now();
+    d.tick(30);
+    const windAvg = (performance.now() - t1) / 30;
+    console.log(`[wackelturm] tick cost 4 × 40 bodies in wind: ${windAvg.toFixed(2)} ms`);
+    expect(windAvg).toBeLessThan(8);
   });
 
   describe('Ärger-Aktionen', () => {
@@ -684,12 +694,63 @@ describe('Wackel-Turm host', () => {
       expect(FIES_KINDS).toContain(dropReady(d, 'p1'));
     });
 
-    it('the round end clears every armed action', () => {
-      const d = driver(['p0', 'p1'], { rand: always('kurz'), durationMs: 6000 });
+    it('Windstoß immunity: a hit tower cannot be blown again for windImmuneMs; a blocked try keeps the charge', () => {
+      const d = driver(['p0', 'p1', 'p2'], { rand: always('kurz') });
+      charge(d, 'p0', 0, 2);
+      charge(d, 'p2', 2);
+      expect(d.snap().players.p1.windImmuneMs).toBe(0);
+      arm(d, 'p0', 'wind');
+      click(d, 'p0', 1);
+      expect(d.snap().players.p0.charges).toBe(1);
+      const imm = d.snap().players.p1.windImmuneMs;
+      expect(imm).toBeGreaterThan(C.windImmuneMs - 100);
+      expect(imm).toBeLessThanOrEqual(C.windImmuneMs);
+      // Blocked: another player's Windstoß on p1 cancels and keeps the charge.
+      d.tick(ticksFor(C.windMs) + 5);
+      arm(d, 'p2', 'wind');
+      click(d, 'p2', 1);
+      expect(d.snap().players.p2).toMatchObject({ armed: null, charges: 1 });
+      expect(d.world('p1').windMs).toBe(0);
+      expect(d.snap().fx.filter((f) => f.kind === 'wind')).toHaveLength(0);
+      // A Fieser Klotz still works on an immune tower.
+      arm(d, 'p2', 'fies');
+      click(d, 'p2', 1);
+      expect(d.snap().players.p2.charges).toBe(0);
+      // After the immunity, p1 can be blown again.
+      d.tick(ticksFor(C.windImmuneMs));
+      expect(d.snap().players.p1.windImmuneMs).toBe(0);
+      arm(d, 'p0', 'wind');
+      click(d, 'p0', 1);
+      expect(d.snap().players.p0.charges).toBe(0);
+      expect(d.world('p1').windMs).toBeGreaterThan(0);
+    });
+
+    it('no Ärger-Aktion in the last aergerLockMs: arming clears, right click does nothing, left click drops', () => {
+      const dur = 20000;
+      const d = driver(['p0', 'p1'], { rand: always('kurz'), durationMs: dur });
       charge(d, 'p0', 0);
       arm(d, 'p0', 'wind');
       expect(d.snap().players.p0.armed).toBe('wind');
-      d.tick(ticksFor(6000));
+      while (d.snap().timeLeftMs > C.aergerLockMs) d.tick();
+      d.tick();
+      expect(d.snap().players.p0.armed).toBeNull();
+      rightClick(d, 'p0');
+      expect(d.snap().players.p0.armed).toBeNull();
+      expect(d.snap().players.p0.charges).toBe(1);
+      d.tick(ticksFor(C.dropCooldownMs) + 1);
+      expect(d.snap().players.p0.hang).not.toBeNull();
+      click(d, 'p0', 1);
+      expect(d.snap().players.p0.hang).toBeNull();
+      expect(d.snap().players.p0.charges).toBe(1);
+      expect(d.world('p1').windMs).toBe(0);
+    });
+
+    it('the round end clears every armed action', () => {
+      const d = driver(['p0', 'p1'], { rand: always('kurz'), durationMs: 12000 });
+      charge(d, 'p0', 0);
+      arm(d, 'p0', 'wind');
+      expect(d.snap().players.p0.armed).toBe('wind');
+      d.tick(ticksFor(12000));
       expect(d.g.result()).not.toBeNull();
       expect(d.snap().players.p0.armed).toBeNull();
     });

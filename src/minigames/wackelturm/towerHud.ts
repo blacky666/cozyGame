@@ -13,6 +13,9 @@ export const BAND_H = 16;
 const NAME_Y = 23;
 const HEIGHT_Y = 34;
 const ARMED_Y = 45;
+/** Below the armed card: the Windstoß immunity of a column. */
+const IMMUNE_Y = 56;
+const IMMUNE_COLOR = '#bfe6ff';
 const PAD = 4;
 const SYMBOL_W = 8;
 const PIP = 5;
@@ -28,6 +31,9 @@ const hex = (c: string) => {
   return Number.isFinite(n) ? n : 0xffffff;
 };
 
+/** "windfest 7 s": a column that cannot get another Windstoß yet. */
+export const immuneLabel = (ms: number): string => `windfest ${Math.ceil(ms / 1000)} s`;
+
 /** "4,2 m" for a height in px. */
 export const metres = (px: number): string => `${(px / PX_PER_M).toFixed(1).replace('.', ',')} m`;
 
@@ -37,13 +43,15 @@ type Column = {
   name: Phaser.GameObjects.Text;
   height: Phaser.GameObjects.Text;
   pips: Phaser.GameObjects.Graphics;
+  immune: Phaser.GameObjects.Text;
   color: number;
   pipsFor: number;
 };
 
 /**
  * Wackel-Turm HUD on the main camera: the time in the top band; per column the player's symbol and
- * name, the tower height in metres and the charge pips; the own armed card blinks in the own column;
+ * name, the tower height in metres and the charge pips, and "windfest" while it is immune to the Windstoß;
+ * the own armed card blinks in the own column;
  * while armed a frame marks the column under the mouse.
  */
 export class TowerHud {
@@ -86,8 +94,9 @@ export class TowerHud {
       fitText(name, w - (PAD * 2 + SYMBOL_W + 3));
       const height = txt(scene, left + PAD, HEIGHT_Y, metres(0), 10).setOrigin(0, 0.5).setDepth(HUD_DEPTH + 1);
       const pips = scene.add.graphics().setDepth(HUD_DEPTH + 1);
-      this.objects.push(name, height, pips, ...(sym ? [sym] : []));
-      this.columns.set(key, { left, w, name, height, pips, color: hex(playerColor(scene, p.slot)), pipsFor: -1 });
+      const immune = txt(scene, left + w / 2, IMMUNE_Y, '', 10, IMMUNE_COLOR).setDepth(HUD_DEPTH + 1).setVisible(false);
+      this.objects.push(name, height, pips, immune, ...(sym ? [sym] : []));
+      this.columns.set(key, { left, w, name, height, pips, immune, color: hex(playerColor(scene, p.slot)), pipsFor: -1 });
       if (key === selfKey) this.armed.setX(left + w / 2);
     });
   }
@@ -98,6 +107,7 @@ export class TowerHud {
       const p = s.players[key];
       if (!p) continue;
       col.height.setText(metres(p.heightPx));
+      col.immune.setText(p.windImmuneMs > 0 ? immuneLabel(p.windImmuneMs) : '').setVisible(p.windImmuneMs > 0);
       if (p.charges !== col.pipsFor) {
         col.pipsFor = p.charges;
         drawPips(col, p.charges);

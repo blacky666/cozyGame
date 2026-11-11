@@ -28,7 +28,7 @@ const gp = (keys: string[]): GamePlayer[] =>
 
 const player = (plot: number, extra: Partial<TowerPlayer> = {}): TowerPlayer => ({
   plot, craneX: layout.plots[plot].centre, hangTop: layout.hangTopStart, hang: { kind: 'kurz', rot: 0 }, cdMs: 0,
-  heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, blocks: [], ...extra,
+  heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, blocks: [], ...extra,
 });
 const state = (players: Record<string, TowerPlayer>, extra: Partial<TowerState> = {}): TowerState => ({
   timeLeftMs: 60000, durationMs: C.durationMs, goalPx: C.goalPx, players, fx: [], winner: null, ...extra,
@@ -117,6 +117,28 @@ describe('wackelturm botView', () => {
     // The leader never is the bot itself: p0 (highest) aims at p2.
     s.players.p0.armed = 'wind';
     expect(towerBotView(s, 'p0', layout)).toMatchObject({ aim: { x: layout.plots[2].centre }, fire: 'primary' });
+  });
+
+  it('bot skips wind-immune towers and never arms in the last aergerLockMs', () => {
+    const s = state({
+      p0: player(0, { heightPx: 100, windImmuneMs: 5000 }),
+      p1: player(1, { heightPx: 40, charges: 1, armed: 'wind' }),
+      p2: player(2, { heightPx: 70 }),
+    });
+    // The leader p0 is immune: the bot blows the next highest.
+    expect(towerBotView(s, 'p1', layout)).toMatchObject({ aim: { x: layout.plots[2].centre }, fire: 'primary' });
+    // Everyone else immune: no target, cancel; unarmed it does not arm.
+    s.players.p2.windImmuneMs = 1;
+    expect(towerBotView(s, 'p1', layout)).toMatchObject({ fire: 'secondary' });
+    expect(towerBotView(s, 'p1', layout)?.aim).toBeUndefined();
+    s.players.p1.armed = null;
+    expect(towerBotView(s, 'p1', layout)?.fire).not.toBe('secondary');
+    // Lock: targets free again, but the round is in its last aergerLockMs.
+    s.players.p0.windImmuneMs = 0;
+    s.players.p2.windImmuneMs = 0;
+    expect(towerBotView(s, 'p1', layout)).toMatchObject({ fire: 'secondary' });
+    s.timeLeftMs = C.aergerLockMs;
+    expect(towerBotView(s, 'p1', layout)?.fire).not.toBe('secondary');
   });
 
   it('flatRot picks the widest base, ties to the lowest rotation', () => {

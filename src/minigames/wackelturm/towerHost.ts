@@ -32,6 +32,8 @@ export type TowerPlayer = {
   /** Windstoß on this tower (mirrors the world). */
   windMs: number;
   windDir: -1 | 1;
+  /** > 0: this tower was blown recently and cannot get another Windstoß yet (ms left). */
+  windImmuneMs: number;
   /** Flat [id, kindIndex, round(x × 10), round(y × 10), round(angle × 100)] per block; x/y is the pivot. */
   blocks: number[];
 };
@@ -211,7 +213,7 @@ export function createTowerHost(
     };
     players[gp.key] = {
       plot: i, craneX: layout.plots[i].left + layout.hookOffsetX, hangTop: layout.hangTopStart, hang: null, cdMs: 0,
-      heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, blocks: [],
+      heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, blocks: [],
     };
   });
   for (const k of keys) {
@@ -237,21 +239,26 @@ export function createTowerHost(
   };
 
   const cycleArmed = (p: TowerPlayer): ArmedAction | null => {
+    if (locked()) return null;
     if (p.armed === 'wind') return 'fies';
     if (p.armed === 'fies') return null;
     return p.charges > 0 ? 'wind' : null;
   };
 
-  /** Left click while armed: another player's column fires (one charge), anything else cancels. */
+  /**
+   * Left click while armed: another player's column fires (one charge), anything else cancels. A Windstoß
+   * on a tower still immune from the last one cancels as well and keeps the charge.
+   */
   const fire = (k: PlayerKey, aimX: number) => {
     const p = players[k];
     const action = p.armed;
     p.armed = null;
     const col = columnAt(layout, aimX);
     const target = col === null ? undefined : keys[col];
-    if (!action || target === undefined || target === k || p.charges <= 0) return;
-    p.charges--;
+    if (!action || target === undefined || target === k || p.charges <= 0 || locked()) return;
     const t = players[target];
+    if (action === 'wind' && t.windImmuneMs > 0) return;
+    p.charges--;
     const x = plotOf(target).centre;
     if (action === 'wind') {
       const w = slots[target].world;
@@ -259,6 +266,7 @@ export function createTowerHost(
       w.windDir = rand() < WIND_LEFT_BELOW ? -1 : 1;
       t.windMs = Math.ceil(w.windMs);
       t.windDir = w.windDir;
+      t.windImmuneMs = c.windImmuneMs;
       addFx('wind', target, x, layout.surfaceY - t.heightPx, { by: k });
       return;
     }
@@ -396,6 +404,8 @@ export function createTowerHost(
   };
 
   const over = () => winner !== null || elapsedMs >= durationMs - EPS;
+  /** The last aergerLockMs of the round: no Ärger-Aktion. */
+  const locked = () => durationMs - elapsedMs <= c.aergerLockMs + EPS;
 
   return {
     tick(dt, inputs) {
@@ -407,6 +417,8 @@ export function createTowerHost(
       for (const k of keys) {
         players[k].cdMs = countDown(players[k].cdMs, ms);
         slots[k].wobbleMs = countDown(slots[k].wobbleMs, ms);
+        players[k].windImmuneMs = countDown(players[k].windImmuneMs, ms);
+        if (locked()) players[k].armed = null;
       }
 
       // 1–4. Input edges, rotation, crane, drop. An absent player's edges start fresh, so counters
@@ -461,6 +473,7 @@ export function createTowerHost(
           hangTop: Math.round(p.hangTop * CRANE_SCALE) / CRANE_SCALE,
           hang: p.hang ? { ...p.hang } : null,
           cdMs: Math.ceil(p.cdMs - EPS),
+          windImmuneMs: Math.max(0, Math.ceil(p.windImmuneMs - EPS)),
           blocks: encodeBlocks(slots[k]),
         };
       }

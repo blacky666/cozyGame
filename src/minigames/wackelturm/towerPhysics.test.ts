@@ -168,6 +168,58 @@ describe('towerPhysics', () => {
     }
   });
 
+  describe('Windstoß balance (one gust)', () => {
+    /**
+     * Builds n blocks of kind on plot 0, each shifted dx from the one below: spawned in place, or dropped
+     * 30 px above the current top every 700 ms. Returns the tower top (px above the foundation) before and
+     * after one gust in dir, counting only blocks still over the plot.
+     */
+    function gust(kind: Kind, n: number, rot: Rot, dx: number, dir: -1 | 1, mode: 'spawn' | 'drop') {
+      const plot = layout.plots[0];
+      const w = createTowerWorld(layout, 0);
+      const bodies: Matter.Body[] = [];
+      const top = () => {
+        const on = bodies.filter((b) => Math.abs(b.position.x - plot.centre) < plot.w / 2 + 16 && b.position.y < layout.surfaceY);
+        return Math.round(layout.surfaceY - Math.min(layout.surfaceY, ...on.map((b) => b.bounds.min.y)));
+      };
+      const h = shapeSize(kind, rot).h;
+      for (let i = 0; i < n; i++) {
+        if (mode === 'spawn') bodies.push(spawnBlock(w, kind, plot.centre + dx * i, layout.surfaceY - h / 2 - h * i, rot));
+        else {
+          bodies.push(spawnBlock(w, kind, plot.centre + dx * i, layout.surfaceY - top() - h / 2 - 30, rot));
+          run(w, 700);
+        }
+      }
+      run(w, 3000);
+      const before = top();
+      w.windMs = C.windMs;
+      w.windDir = dir;
+      run(w, C.windMs + 3500);
+      return { before, after: top() };
+    }
+
+    it('an 11-layer flat lang tower survives a gust from either side (spawned or dropped)', () => {
+      for (const mode of ['spawn', 'drop'] as const) {
+        for (const dir of [-1, 1] as const) {
+          const { before, after } = gust('lang', 11, 0, 0, dir, mode);
+          expect(before, `${mode} ${dir}`).toBeGreaterThanOrEqual(11 * 16 - 10);
+          expect(after, `${mode} ${dir}`).toBeGreaterThanOrEqual(0.9 * before);
+        }
+      }
+    });
+
+    it('a one-cell-wide column and a clearly overhanging tower do not survive a gust', () => {
+      for (const dir of [-1, 1] as const) {
+        const col = gust('quader', 6, 1, 0, dir, 'spawn');
+        expect(col.before, `column ${dir}`).toBeGreaterThanOrEqual(6 * 32 - 8);
+        expect(col.after, `column ${dir}`).toBeLessThan(col.before / 2);
+        const over = gust('lang', 8, 0, 4, dir, 'drop');
+        expect(over.before, `overhang ${dir}`).toBeGreaterThanOrEqual(8 * 16 - 8);
+        expect(over.after, `overhang ${dir}`).toBeLessThan(over.before / 2);
+      }
+    });
+  });
+
   it('a lang dropped with its centre beyond the foundation edge falls off', () => {
     const w = createTowerWorld(layout, 0);
     const plot = layout.plots[0];

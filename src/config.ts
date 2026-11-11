@@ -211,7 +211,9 @@ interface GameConfig {
     craneClearPx: number;
     /**
      * Matter solver iterations per sub-step. Matter's defaults (6 / 4) let tall stacks sink and drift apart:
-     * 12 flat lang blocks fell over within 4 s.
+     * 12 flat lang blocks fell over within 4 s. With 8 velocity iterations an awake stack still shears
+     * layer against layer (always towards +x), so an 11-layer lang tower fell in any rightward gust down to
+     * windAccel 60; 16 removes the shear (a test pins the Windstoß balance).
      */
     positionIterations: number;
     velocityIterations: number;
@@ -231,8 +233,8 @@ interface GameConfig {
     /**
      * Goal height above the foundation (px). The asset's crane marker sits only 107 px (~6.7 cells) above
      * the foundation, too easy for two minutes. readLayout still reports the asset's goalY/goalPx, but the
-     * host uses this value and the view draws the goal marker at surfaceY - goalPx. 10 cells for now;
-     * calibrated in the playtest.
+     * host uses this value and the view draws the goal marker at surfaceY - goalPx. 150: ten flat lang
+     * (about 155 px after sinking) reach it.
      */
     goalPx: number;
     /** The block reaching goalPx must be at rest and stay at or above goalPx this long before the round ends. */
@@ -243,6 +245,10 @@ interface GameConfig {
     /** Windstoß: duration (ms) and push (px/s², force = mass * windAccel / 1e6 per step). */
     windMs: number;
     windAccel: number;
+    /** A tower hit by a Windstoß cannot be hit by another one for this long (a blocked attempt keeps the charge). */
+    windImmuneMs: number;
+    /** No Ärger-Aktion can be armed or fired in the last aergerLockMs of the round; arming clears. */
+    aergerLockMs: number;
     /** Wobble sound: a block faster than wobbleSpeed (px/step), at most once per wobbleGapMs. */
     wobbleSpeed: number;
     wobbleGapMs: number;
@@ -337,12 +343,12 @@ export const CONFIG = deepFreeze<GameConfig>({
   wackelturm: {
     durationMs: 120000, restHoldMs: 2000, settleTolPx: 2, settleTolRad: 0.05, hoeheStepPx: 4, stepMs: 1000 / 60, gravityY: 1,
     friction: 0.6, frictionStatic: 0.9, restitution: 0.02, density: 0.001,
-    restSpeed: 0.08, restAngSpeed: 0.004, maxStepsPerTick: 20, positionIterations: 12, velocityIterations: 8,
+    restSpeed: 0.08, restAngSpeed: 0.004, maxStepsPerTick: 20, positionIterations: 12, velocityIterations: 16,
     sleepMotion: 0.03, slop: 0.02,
     craneSpeed: 64, craneRiseSpeed: 48, craneClearPx: 64, dropCooldownMs: 600, fallMarginPx: 16,
-    // 10 cells; overrides the asset marker (107 px), see the interface comment. Calibrated in the playtest.
-    goalPx: 160, goalHoldMs: 400,
-    chargeEvery: 3, chargeCap: 2, windMs: 1500, windAccel: 250,
+    // Overrides the asset marker (107 px), see the interface comment. Calibrated in the playtest.
+    goalPx: 150, goalHoldMs: 400,
+    chargeEvery: 3, chargeCap: 2, windMs: 1500, windAccel: 120, windImmuneMs: 8000, aergerLockMs: 5000,
     wobbleSpeed: 0.6, wobbleGapMs: 400, collapseDropPx: 32, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.

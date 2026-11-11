@@ -73,7 +73,7 @@ export function flatRot(kind: Kind): Rot {
 
 /**
  * Tower bots: with a charge they arm the Windstoß (right click) and click the leader's plot (the
- * highest other tower); otherwise they turn the hanging block flat, move the crane over the plot
+ * highest other tower that is not wind-immune; never in the last aergerLockMs); otherwise they turn the hanging block flat, move the crane over the plot
  * centre (−16 / 0 / +16 px in turn) and drop. Idle once the time is up.
  */
 export function towerBotView(s: TowerState, key: PlayerKey, layout: TowerLayout): BotView | null {
@@ -91,18 +91,18 @@ export function towerBotView(s: TowerState, key: PlayerKey, layout: TowerLayout)
   }
   const targets = [{ x, y: self.y }];
 
+  // Bots only use the Windstoß: towers still immune from the last one are no target.
+  const victims = Object.entries(s.players).filter(([k, p]) => k !== key && p.windImmuneMs <= 0).map(([, p]) => p);
   if (me.armed !== null) {
     let leader: TowerPlayer | null = null;
-    for (const [k, p] of Object.entries(s.players)) {
-      if (k !== key && (!leader || p.heightPx > leader.heightPx)) leader = p;
-    }
+    for (const p of victims) if (!leader || p.heightPx > leader.heightPx) leader = p;
     const at = leader ? layout.plots[leader.plot] : undefined;
     // Nobody to target: cycle the armed action back to none.
     if (!at) return { self, targets, fire: 'secondary' };
     return { self, targets, aim: { x: at.centre, y: 0 }, fire: 'primary' };
   }
-  const hasTarget = Object.keys(s.players).some((k) => k !== key);
-  if (me.charges > 0 && hasTarget) return { self, targets, fire: 'secondary' };
+  const canArm = s.timeLeftMs > CONFIG.wackelturm.aergerLockMs;
+  if (me.charges > 0 && canArm && victims.length > 0) return { self, targets, fire: 'secondary' };
   if (!me.hang || flat === null) return { self, targets };
   if (me.hang.rot !== flat) return { self, targets, turn: 'cw' };
   if (Math.abs(me.craneX - x) <= BOT_NEAR) return { self, targets, fire: 'primary' };
