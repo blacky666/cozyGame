@@ -200,7 +200,7 @@ export function createPaintHost(
 
   /** True from finaleAt(durationMs) before the end: bigger Klecks, finale bomb. */
   const inFinale = () => durationMs - elapsedMs <= finaleAt(durationMs) + EPS;
-  const paintR = (kind: Blob['kind']) => (kind === 'bombe' ? c.bombPaintR : inFinale() ? c.klecksPaintR * 2 : c.klecksPaintR);
+  const paintR = (kind: Blob['kind']) => (kind === 'bombe' ? c.bombPaintR : inFinale() ? c.klecksPaintR * c.finaleKlecksFactor : c.klecksPaintR);
   const pick = <T>(list: readonly T[]): T => list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
 
   /** One new pickup on a free paintable tile far from every present player, or none after pickupTries tries. */

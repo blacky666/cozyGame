@@ -145,6 +145,8 @@ interface GameConfig {
     /** Paint disc radii on landing: normal blob and bomb (px). */
     klecksPaintR: number;
     bombPaintR: number;
+    /** In the finale a Klecks paints a disc of klecksPaintR times this. */
+    finaleKlecksFactor: number;
     /** A hit blob slows the victim by slowFactor for slowMs. */
     slowMs: number;
     slowFactor: number;
@@ -244,7 +246,7 @@ export const CONFIG = deepFreeze<GameConfig>({
   farbkrieg: {
     durationMs: 90000, walkSpeed: 64, bodyRadius: 5,
     klecksCooldownMs: 1500, blobSpeed: 180, blobRange: 140, blobRadius: 2, blobHitPx: 8,
-    klecksPaintR: 24, bombPaintR: 48, slowMs: 500, slowFactor: 0.5,
+    klecksPaintR: 24, bombPaintR: 48, finaleKlecksFactor: 2, slowMs: 500, slowFactor: 0.5,
     moppMs: 4000, rollMs: 4000, rollFactor: 1.5,
     pickupSpawnMs: 8000, maxPickups: 2, pickupTouchPx: 10, pickupClearPx: 24, pickupTries: 20,
     finaleMs: 15000, finaleFallMs: 2000, finalePaintR: 64, fxKeepMs: 500,

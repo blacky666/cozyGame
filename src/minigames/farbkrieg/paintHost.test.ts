@@ -580,9 +580,9 @@ describe('Farbkrieg finale', () => {
       d.tick();
       land = d.snap().fx.find((f) => f.kind === 'platsch') ?? null;
     }
-    expect(land).toEqual(expect.objectContaining({ r: F.klecksPaintR * 2 }));
+    expect(land).toEqual(expect.objectContaining({ r: F.klecksPaintR * F.finaleKlecksFactor }));
     const s = d.snap();
-    const disc = discTiles(land!.x, land!.y, F.klecksPaintR * 2 - 0.5);
+    const disc = discTiles(land!.x, land!.y, F.klecksPaintR * F.finaleKlecksFactor - 0.5);
     expect(disc.length).toBeGreaterThan(20);
     for (const i of disc) expect(s.grid[i]).toBe('1');
   });
@@ -672,7 +672,24 @@ describe('Farbkrieg finale', () => {
       }
     }
     expect(d.g.result()).not.toBeNull();
-    expect(kinds.filter((k) => k === 'finale').length).toBeLessThanOrEqual(1);
+    // The fall (2 s) outlasts the 0.5 s finale of this short round: the bomb never lands.
+    expect(kinds.filter((k) => k === 'finale').length).toBe(0);
+    expect(kinds.filter((k) => k === 'finale_fall').length).toBe(1);
+  });
+
+  it('with the normal duration the finale fx appears exactly once', () => {
+    const d = driver(['p0', 'p1']);
+    const kinds: string[] = [];
+    const seen = new Set<number>();
+    while (d.g.result() === null) {
+      d.tick();
+      for (const f of d.snap().fx) {
+        if (seen.has(f.id)) continue;
+        seen.add(f.id);
+        kinds.push(f.kind);
+      }
+    }
+    expect(kinds.filter((k) => k === 'finale').length).toBe(1);
     expect(kinds.filter((k) => k === 'finale_fall').length).toBe(1);
   });
 });
