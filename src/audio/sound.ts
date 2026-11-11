@@ -23,7 +23,9 @@ export function pickVariant(count: number, last: number, rand: () => number): nu
   return i >= last ? i + 1 : i;
 }
 
-type Music = { id: string; el: HTMLAudioElement; node: MediaElementAudioSourceNode; gain: GainNode };
+type Music = { id: string; src: AudioBufferSourceNode; gain: GainNode };
+/** Decoded music tracks kept in memory (current + previous; ~20 MB per minute each). */
+const MUSIC_CACHE = 2;
 
 /**
  * Web Audio sound manager: packages from public/audio/<paket>/sounds.json, a music bus and an
@@ -37,6 +39,11 @@ class SoundManager {
   private sfxBus: GainNode | null = null;
   private readonly defs = new Map<string, SoundDef>();
   private readonly buffers = new Map<string, AudioBuffer>();
+  /** Music files as downloaded (MP3, small); decoded only when played. */
+  private readonly compressed = new Map<string, ArrayBuffer>();
+  /** Decoded music, oldest first (Map keeps insertion order). */
+  private readonly musicCache = new Map<string, AudioBuffer>();
+  private startingMusic: string | null = null;
   private readonly packages = new Map<string, Promise<void>>();
   private readonly lastAt = new Map<string, number>();
   private readonly lastVariant = new Map<string, number>();
@@ -102,14 +109,18 @@ class SoundManager {
         if (!res.ok) return;
         const defs = parseManifest(await res.json(), (m) => console.warn(`cozygame audio: ${m}`));
         for (const d of defs) this.defs.set(d.id, d);
-        // Music streams through an <audio> element (decoded it would take ~20 MB per minute).
-        const files = [...new Set(defs.filter((d) => d.kind !== 'musik').flatMap((d) => d.files))];
+        // Music stays compressed until played (decoded it takes ~20 MB per minute). It is played
+        // through Web Audio all the same: only a decoded buffer loops without a gap at the seam.
+        const musicFiles = new Set(defs.filter((d) => d.kind === 'musik').flatMap((d) => d.files));
+        const files = [...new Set(defs.flatMap((d) => d.files))];
         await Promise.all(
           files.map(async (f) => {
             try {
               const r = await fetch(`${base}${f}`);
               if (!r.ok) return;
-              this.buffers.set(f, await ctx.decodeAudioData(await r.arrayBuffer()));
+              const data = await r.arrayBuffer();
+              if (musicFiles.has(f)) this.compressed.set(f, data);
+              else this.buffers.set(f, await ctx.decodeAudioData(data));
             } catch (e) {
               console.warn(`cozygame audio: ${f} unavailable`, e);
             }
@@ -127,7 +138,7 @@ class SoundManager {
 
   has(id: string): boolean {
     const d = this.defs.get(id);
-    return !!d && (d.kind === 'musik' || d.files.some((f) => this.buffers.has(f)));
+    return !!d && d.files.some((f) => this.buffers.has(f) || this.compressed.has(f));
   }
 
   private source(ctx: AudioContext, d: SoundDef): AudioBufferSourceNode | null {
@@ -217,27 +228,55 @@ class SoundManager {
     m.gain.gain.cancelScheduledValues(t);
     m.gain.gain.setValueAtTime(m.gain.gain.value, t);
     m.gain.gain.linearRampToValueAtTime(0, t + MUSIC_FADE_S);
-    setTimeout(() => {
-      m.el.pause();
-      m.node.disconnect();
-      m.el.removeAttribute('src');
-    }, (MUSIC_FADE_S + 0.05) * 1000);
+    try { m.src.stop(t + MUSIC_FADE_S + 0.05); } catch { /* already stopped */ }
+  }
+
+  /** Decoded track (from the cache, else decoded now; the cache keeps MUSIC_CACHE tracks). */
+  private async musicBuffer(ctx: AudioContext, file: string): Promise<AudioBuffer | null> {
+    const hit = this.musicCache.get(file);
+    if (hit) {
+      this.musicCache.delete(file);
+      this.musicCache.set(file, hit);
+      return hit;
+    }
+    const data = this.compressed.get(file);
+    if (!data) return null;
+    // decodeAudioData detaches its input: decode a copy, the compressed file stays for later.
+    const buf = await ctx.decodeAudioData(data.slice(0));
+    this.musicCache.set(file, buf);
+    while (this.musicCache.size > MUSIC_CACHE) this.musicCache.delete(this.musicCache.keys().next().value!);
+    return buf;
   }
 
   private startMusic(id: string): void {
     const ctx = this.running();
     const d = this.defs.get(id);
-    if (!ctx || !d || !this.musicBus) return;
-    const el = new Audio(`${import.meta.env.BASE_URL}${d.files[0]}`);
-    el.loop = true;
-    const node = ctx.createMediaElementSource(el);
+    if (!ctx || !d || !this.musicBus || this.startingMusic === id) return;
+    this.startingMusic = id;
+    void this.musicBuffer(ctx, d.files[0])
+      .then((buf) => {
+        // Switched again (or already playing) while decoding.
+        if (!buf || this.wantMusic !== id || this.music?.id === id) return;
+        this.playMusic(ctx, id, d.volume, buf);
+      })
+      .catch((e) => console.warn(`cozygame audio: music ${id} unavailable`, e))
+      .finally(() => {
+        if (this.startingMusic === id) this.startingMusic = null;
+      });
+  }
+
+  private playMusic(ctx: AudioContext, id: string, volume: number, buf: AudioBuffer): void {
+    this.fadeOutMusic();
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
     const gain = ctx.createGain();
     const t = ctx.currentTime;
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(d.volume, t + MUSIC_FADE_S);
-    node.connect(gain).connect(this.musicBus);
-    void el.play().catch(() => {});
-    this.music = { id, el, node, gain };
+    gain.gain.linearRampToValueAtTime(volume, t + MUSIC_FADE_S);
+    src.connect(gain).connect(this.musicBus!);
+    src.start();
+    this.music = { id, src, gain };
   }
 
   settings(): SoundSettings {
