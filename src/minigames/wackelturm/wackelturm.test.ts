@@ -28,7 +28,7 @@ const gp = (keys: string[]): GamePlayer[] =>
 
 const player = (plot: number, extra: Partial<TowerPlayer> = {}): TowerPlayer => ({
   plot, craneX: layout.plots[plot].centre, hangTop: layout.hangTopStart, hang: { kind: 'kurz', rot: 0 }, cdMs: 0,
-  heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, blocks: [], ...extra,
+  heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, present: true, blocks: [], ...extra,
 });
 const state = (players: Record<string, TowerPlayer>, extra: Partial<TowerState> = {}): TowerState => ({
   timeLeftMs: 60000, durationMs: C.durationMs, goalPx: C.goalPx, players, fx: [], winner: null, ...extra,
@@ -138,6 +138,19 @@ describe('wackelturm botView', () => {
     s.players.p2.windImmuneMs = 0;
     expect(towerBotView(s, 'p1', layout)).toMatchObject({ fire: 'secondary' });
     s.timeLeftMs = C.aergerLockMs;
+    expect(towerBotView(s, 'p1', layout)?.fire).not.toBe('secondary');
+  });
+
+  it('bot never targets an absent player', () => {
+    const s = state({
+      p0: player(0, { heightPx: 100, present: false }),
+      p1: player(1, { heightPx: 40, charges: 1, armed: 'wind' }),
+      p2: player(2, { heightPx: 70 }),
+    });
+    expect(towerBotView(s, 'p1', layout)).toMatchObject({ aim: { x: layout.plots[2].centre }, fire: 'primary' });
+    s.players.p2.present = false;
+    expect(towerBotView(s, 'p1', layout)).toMatchObject({ fire: 'secondary' });
+    s.players.p1.armed = null;
     expect(towerBotView(s, 'p1', layout)?.fire).not.toBe('secondary');
   });
 

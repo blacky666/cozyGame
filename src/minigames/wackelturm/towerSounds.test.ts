@@ -7,7 +7,7 @@ import { TowerSounds } from './towerSounds';
 const C = CONFIG.wackelturm;
 const player = (o: Partial<TowerPlayer> = {}): TowerPlayer => ({
   plot: 0, craneX: 100, hangTop: 50, hang: { kind: 'kurz', rot: 0 }, cdMs: 0, heightPx: 0, bestPx: 0, placed: 0,
-  charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, blocks: [], ...o,
+  charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, present: true, blocks: [], ...o,
 });
 const state = (o: Partial<TowerState> = {}): TowerState => ({
   timeLeftMs: 100000, durationMs: C.durationMs, goalPx: C.goalPx,

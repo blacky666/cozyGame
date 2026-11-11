@@ -532,9 +532,13 @@ describe('Wackel-Turm host', () => {
     expect(p().heightPx).toBe(16);
     expect(p().craneX).toBe(x0);
     expect(blocks(d.snap(), 'p1')).toHaveLength(1);
+    // The snapshot marks who sent no input in the last tick.
+    expect(p().present).toBe(false);
+    expect(d.snap().players.p0.present).toBe(true);
     // Returns with counters pressed while away: they do not fire.
     d.join('p1', { drops: 4, primaryTaps: 2, turnsCw: 3 });
     d.tick();
+    expect(p().present).toBe(true);
     expect(blocks(d.snap(), 'p1')).toHaveLength(1);
     expect(p().hang).toEqual({ kind: 'kurz', rot: 0 });
     d.press('p1', 'turnsCw');

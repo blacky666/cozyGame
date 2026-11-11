@@ -73,7 +73,7 @@ export function flatRot(kind: Kind): Rot {
 
 /**
  * Tower bots: with a charge they arm the Windstoß (right click) and click the leader's plot (the
- * highest other tower that is not wind-immune; never in the last aergerLockMs); otherwise they turn the hanging block flat, move the crane over the plot
+ * highest other present tower that is not wind-immune; never in the last aergerLockMs); otherwise they turn the hanging block flat, move the crane over the plot
  * centre (−16 / 0 / +16 px in turn) and drop. Idle once the time is up.
  */
 export function towerBotView(s: TowerState, key: PlayerKey, layout: TowerLayout): BotView | null {
@@ -91,8 +91,8 @@ export function towerBotView(s: TowerState, key: PlayerKey, layout: TowerLayout)
   }
   const targets = [{ x, y: self.y }];
 
-  // Bots only use the Windstoß: towers still immune from the last one are no target.
-  const victims = Object.entries(s.players).filter(([k, p]) => k !== key && p.windImmuneMs <= 0).map(([, p]) => p);
+  // Bots only use the Windstoß: absent players and towers still immune from the last one are no target.
+  const victims = Object.entries(s.players).filter(([k, p]) => k !== key && p.present && p.windImmuneMs <= 0).map(([, p]) => p);
   if (me.armed !== null) {
     let leader: TowerPlayer | null = null;
     for (const p of victims) if (!leader || p.heightPx > leader.heightPx) leader = p;

@@ -34,6 +34,8 @@ export type TowerPlayer = {
   windDir: -1 | 1;
   /** > 0: this tower was blown recently and cannot get another Windstoß yet (ms left). */
   windImmuneMs: number;
+  /** Sent input in the last tick (false: away; the HUD greys the column, bots leave it alone). */
+  present: boolean;
   /** Flat [id, kindIndex, round(x × 10), round(y × 10), round(angle × 100)] per block; x/y is the pivot. */
   blocks: number[];
 };
@@ -255,7 +257,7 @@ export function createTowerHost(
     };
     players[gp.key] = {
       plot: i, craneX: layout.plots[i].left + layout.hookOffsetX, hangTop: layout.hangTopStart, hang: null, cdMs: 0,
-      heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, blocks: [],
+      heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, present: true, blocks: [],
     };
   });
   for (const k of keys) {
@@ -467,6 +469,7 @@ export function createTowerHost(
       // pressed while away are a baseline on return, not presses.
       for (const k of keys) {
         const inp = inputs[k];
+        players[k].present = inp !== undefined;
         if (inp === undefined) {
           slots[k].edges = newEdges();
           players[k].armed = null;
