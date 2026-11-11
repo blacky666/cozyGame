@@ -1,0 +1,149 @@
+{
+ "paket": "kartoffel",
+ "toene": [
+  {
+   "id": "kartoffel.ticken_langsam_schleife",
+   "datei": "audio/kartoffel/ticken_langsam_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 1000,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "kartoffel.ticken_mittel_schleife",
+   "datei": "audio/kartoffel/ticken_mittel_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 1200,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "kartoffel.ticken_schnell_schleife",
+   "datei": "audio/kartoffel/ticken_schnell_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 600,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "kartoffel.zischen_schleife",
+   "datei": "audio/kartoffel/zischen_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 2000,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "kartoffel.uebergabe",
+   "datei": [
+    "audio/kartoffel/uebergabe_1.mp3",
+    "audio/kartoffel/uebergabe_2.mp3",
+    "audio/kartoffel/uebergabe_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 270,
+   "lautstaerke": 0.38
+  },
+  {
+   "id": "kartoffel.kein_zurueck",
+   "datei": "audio/kartoffel/kein_zurueck.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 190,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "kartoffel.knall",
+   "datei": "audio/kartoffel/knall.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1021,
+   "lautstaerke": 1.0
+  },
+  {
+   "id": "kartoffel.geist_werden",
+   "datei": "audio/kartoffel/geist_werden.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1384,
+   "lautstaerke": 0.56
+  },
+  {
+   "id": "kartoffel.sprint",
+   "datei": "audio/kartoffel/sprint.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 313,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "kartoffel.fake_kartoffel_konfetti",
+   "datei": "audio/kartoffel/fake_kartoffel_konfetti.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 949,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "kartoffel.kurze_lunte",
+   "datei": "audio/kartoffel/kurze_lunte.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 600,
+   "lautstaerke": 0.64
+  },
+  {
+   "id": "kartoffel.giesskanne",
+   "datei": "audio/kartoffel/giesskanne.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 598,
+   "lautstaerke": 0.78
+  },
+  {
+   "id": "kartoffel.pickup",
+   "datei": "audio/kartoffel/pickup.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 400,
+   "lautstaerke": 0.61
+  },
+  {
+   "id": "kartoffel.schritt_erde",
+   "datei": [
+    "audio/kartoffel/schritt_erde_1.mp3",
+    "audio/kartoffel/schritt_erde_2.mp3",
+    "audio/kartoffel/schritt_erde_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 80,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "kartoffel.letzter_uebrig",
+   "datei": "audio/kartoffel/letzter_uebrig.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 1927,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "kartoffel.musik_schleife",
+   "datei": "audio/kartoffel/musik_schleife.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 66207,
+   "lautstaerke": 0.6
+  },
+  {
+   "id": "kartoffel.musik_finale_schleife",
+   "datei": "audio/kartoffel/musik_finale_schleife.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 34286,
+   "lautstaerke": 0.6
+  }
+ ]
+}

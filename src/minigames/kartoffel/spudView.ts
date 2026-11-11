@@ -3,6 +3,7 @@ import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import { findSprite } from '../../gfx/layerPlan';
 import { assetsOf, byKey, pivotSprite, swapSprite, txt } from '../../game/ui';
+import { sound } from '../../audio/sound';
 import { Reconciler } from '../../net/reconcile';
 import { buildArena, type Arena } from '../common/arena';
 import { drawArena } from '../common/arenaView';
@@ -12,7 +13,12 @@ import type { Mover } from '../snowball/snowballMove';
 import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { speedOf, type Potato, type SpudFx, type SpudPickup, type SpudState } from './spudHost';
 import { SpudHud } from './spudHud';
+import { SpudSounds } from './spudSounds';
 import { stepWalker } from './spudMove';
+
+const PKG = 'kartoffel';
+const TICK_LOOPS = ['ticken_langsam_schleife', 'ticken_mittel_schleife', 'ticken_schnell_schleife'].map((n) => `${PKG}.${n}`);
+const HISS_LOOP = `${PKG}.zischen_schleife`;
 
 export const ARENA_FILE = 'arena-kartoffel';
 export const ARENA_MAP = 'kartoffel.map';
@@ -77,6 +83,7 @@ export class SpudView implements MiniGameView<SpudState> {
   private readonly fxLive = new Set<Phaser.GameObjects.Sprite>();
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
   private readonly hud: SpudHud;
+  private readonly sounds: SpudSounds;
   /** Shove cooldown ring under the own figure. */
   private readonly ring: Phaser.GameObjects.Graphics;
   // Prediction (clients): the host's walking step at the speed of the latest own state.
@@ -109,6 +116,7 @@ export class SpudView implements MiniGameView<SpudState> {
     this.ring = scene.add.graphics();
     this.objects.push(this.ring);
     this.hud = new SpudHud(scene, players);
+    this.sounds = new SpudSounds(selfKey);
   }
 
   predict(input: InputState, dt: number, latest: SpudState | null, ackSeq: number, sentSeq: number): void {
@@ -162,8 +170,20 @@ export class SpudView implements MiniGameView<SpudState> {
     this.renderPotatoes(s.potatoes);
     this.renderSigns(s.potatoes, now);
     this.renderPickups(s.pickups);
-    // Task 5: the sound tracker (like SnowSounds) hooks in here.
+    this.renderSound(s, now);
     this.hud.update(s, selfKey);
+  }
+
+  private renderSound(s: SpudState, now: number): void {
+    for (const c of this.sounds.update(s, now)) sound.play(c.name.includes('.') ? c.name : `${PKG}.${c.name}`, c);
+    const music = SpudSounds.music(s);
+    sound.setMusic(music && `${PKG}.${music}`);
+    // One tick loop at a time: switch by stopping the others.
+    const tick = SpudSounds.ticking(s);
+    const want = tick && `${PKG}.${tick}`;
+    for (const id of TICK_LOOPS) if (id !== want) sound.loop(id, false);
+    if (want) sound.loop(want, true);
+    sound.loop(HISS_LOOP, SpudSounds.hissing(s));
   }
 
   private renderAvatars(s: SpudState, selfKey: PlayerKey, now: number): void {
@@ -314,7 +334,7 @@ export class SpudView implements MiniGameView<SpudState> {
   }
 
   destroy(): void {
-    // Task 5: stop the sound loops here.
+    for (const id of [...TICK_LOOPS, HISS_LOOP]) sound.loop(id, false);
     for (const v of this.potatoes.values()) {
       v.bomb?.destroy();
       v.fuse?.destroy();
