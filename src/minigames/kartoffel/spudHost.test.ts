@@ -384,17 +384,34 @@ describe('Heiße Kartoffel host', () => {
     expect(up.vy).toBe(0);
   });
 
-  it('absent players are neither touched nor given a new potato', () => {
+  it('absent players are never dealt a potato while a present one exists, but catch it by touch', () => {
+    // rand 0.99 picks the last candidate: p2 if absent players counted.
     const d = driver(['p0', 'p1', 'p2'], { rand: () => 0.99, absent: ['p2'] });
     expect(d.holder()).toBe('p1');
-    const never = () => expect(d.snap().potatoes.every((p) => p.holder !== 'p2')).toBe(true);
-    d.approach('p1', 'p2', 8, never);
-    d.untilBang(never);
+    d.untilBang();
     expect(d.snap().out).toEqual(['p1']);
     d.tick(Math.ceil(K.boomPauseMs / TICK_MS));
+    // Dealt again: the present p0, not the absent (living) p2.
     expect(d.holder()).toBe('p0');
-    d.untilBang(never);
+    // By touch the absent p2 catches it like anyone else, keeps it (it cannot pass) and bursts.
+    d.approach('p0', 'p2', 8);
+    expect(d.holder()).toBe('p2');
+    d.untilBang(() => { if (d.snap().bang === 1) expect(d.holder()).toBe('p2'); });
+    expect(d.snap().out).toEqual(['p1', 'p2']);
     expect(d.snap().phase).toBe('done');
+    expect(d.g.result()).toEqual([['p0'], ['p2'], ['p1']]);
+  });
+
+  it('two players, one absent the whole round: the present one walking to it does not lose', () => {
+    const d = driver(['p0', 'p1'], { rand: () => 0, absent: ['p1'] });
+    let n = 0;
+    while (d.snap().phase !== 'done' && n++ < 5000) {
+      if (d.holder() === 'p0') d.approach('p0', 'p1', 8);
+      d.tick();
+    }
+    expect(d.snap().phase).toBe('done');
+    expect(d.g.result()?.[0]).not.toEqual(['p1']);
+    expect(d.g.result()).toEqual([['p0'], ['p1']]);
   });
 
   it('absent holder still bursts', () => {
@@ -476,6 +493,51 @@ describe('Heiße Kartoffel host', () => {
         const s = d.snap();
         if (s.bang > 0 || s.pickups.some((p) => p.id === pk.id)) continue;
         if (run(d, who, s, realId, seed)) applicable++;
+      }
+      expect(applicable).toBeGreaterThan(0);
+    };
+
+    /** Walk the nearest non-holder onto pickup `id`; false if it was not taken by them before a bang. */
+    const take = (d: ReturnType<typeof driver>, id: number): string | null => {
+      const s0 = d.snap();
+      const pk = s0.pickups.find((p) => p.id === id)!;
+      const holders = new Set(s0.potatoes.map((p) => p.holder));
+      const who = FOUR.filter((k) => !holders.has(k)).sort((a, b) =>
+        Math.hypot(s0.players[a].x - pk.x, s0.players[a].y - pk.y) - Math.hypot(s0.players[b].x - pk.x, s0.players[b].y - pk.y))[0];
+      if (!who) return null;
+      for (let n = 0; n < 600 && d.snap().pickups.some((p) => p.id === id); n++) {
+        const me = d.snap().players[who];
+        if (Math.abs(me.y - pk.y) > 1.1) d.set(who, me.y < pk.y ? { down: true } : { up: true });
+        else d.set(who, me.x < pk.x ? { right: true } : { left: true });
+        d.tick();
+        if (d.snap().bang > 0) break;
+      }
+      d.set(who, {});
+      const s = d.snap();
+      return s.bang === 0 && !s.pickups.some((p) => p.id === id) ? who : null;
+    };
+    /**
+     * Seed search: a fake potato is taken, then (while the fake is still in play and before any bang)
+     * a pickup of `second` is taken. `run` gets the driver right after that and returns whether the
+     * scenario was usable; at least one seed must be.
+     */
+    const afterFake = (second: 'kurze_lunte' | 'giesskanne', run: (d: ReturnType<typeof driver>, atMs: number) => boolean, maxSeed = 600, wanted = 3): void => {
+      let applicable = 0;
+      for (let seed = 1; seed <= maxSeed && applicable < wanted; seed++) {
+        const d = driver(FOUR, { rand: mulberry32(seed) });
+        const wait = (kind: string) => {
+          let n = 0;
+          while (!d.snap().pickups.some((p) => p.kind === kind) && d.snap().bang === 0 && n++ < 900) d.tick();
+          return d.snap().bang === 0 ? d.snap().pickups.find((p) => p.kind === kind) : undefined;
+        };
+        const fk = wait('fake');
+        if (!fk || !take(d, fk.id) || d.snap().potatoes.length !== 2) continue;
+        let n = 0;
+        while (!d.snap().pickups.some((p) => p.kind === second) && d.snap().potatoes.length === 2 && d.snap().bang === 0 && n++ < 900) d.tick();
+        const pk = d.snap().pickups.find((p) => p.kind === second);
+        if (!pk || d.snap().potatoes.length !== 2 || d.snap().bang > 0) continue;
+        if (!take(d, pk.id) || d.snap().potatoes.length !== 2) continue;
+        if (run(d, d.snap().elapsedMs)) applicable++;
       }
       expect(applicable).toBeGreaterThan(0);
     };
@@ -612,7 +674,7 @@ describe('Heiße Kartoffel host', () => {
       });
     });
 
-    it('watering can slows the current real holder for 2 s', () => {
+    it('watering can slows the current holder for 2 s', () => {
       collected('giesskanne', (d, who) => {
         const s = d.snap();
         const h = s.potatoes[0].holder;
@@ -627,6 +689,36 @@ describe('Heiße Kartoffel host', () => {
         d.tick(Math.ceil(K.slowMs / TICK_MS));
         expect(d.snap().players[h].slowMs).toBe(0);
         return who !== h;
+      });
+    });
+
+    it('short fuse cuts the fake too: both potatoes glow alike and the fake never outlives the real', () => {
+      afterFake('kurze_lunte', (d, atMs) => {
+        // One kurze_lunte fx per live potato (the fake is not skipped).
+        expect(d.snap().fx.filter((f) => f.kind === 'kurze_lunte').length).toBe(2);
+        let last = d.snap();
+        while (d.snap().bang === 0) { last = d.snap(); d.tick(); }
+        // Only scenarios where the real potato had >= shortFuseMs left (so its cut fuse is exactly shortFuseMs).
+        if (d.snap().elapsedMs - atMs < K.shortFuseMs - 2 * TICK_MS) return false;
+        // Only scenarios where the fake is still in play on the tick before the bang (it had >= shortFuseMs left too).
+        if (last.potatoes.length !== 2) return false;
+        // Both were cut to the same remaining time: the fake glows at full heat alongside the real one.
+        for (const p of last.potatoes) expect(p.heat).toBe(3);
+        return true;
+      });
+    });
+
+    it('watering can slows every potato holder, the fake one too', () => {
+      afterFake('giesskanne', (d) => {
+        const s = d.snap();
+        const holders = [...new Set(s.potatoes.map((p) => p.holder))];
+        if (holders.length !== 2) return false;
+        expect(s.fx.filter((f) => f.kind === 'giesskanne').map((f) => f.who).sort()).toEqual([...holders].sort());
+        for (const k of FOUR) {
+          if (holders.includes(k)) expect(s.players[k].slowMs).toBeGreaterThan(0);
+          else expect(s.players[k].slowMs).toBe(0);
+        }
+        return true;
       });
     });
 

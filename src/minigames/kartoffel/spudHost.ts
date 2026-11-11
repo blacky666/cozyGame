@@ -218,8 +218,8 @@ export function createSpudHost(
       potatoes.push(fake);
       return;
     }
+    // Both extras hit every live potato alike, the fake included, so neither reveals the real one.
     for (const pot of potatoes) {
-      if (pot.fake) continue;
       if (pk.kind === 'kurze_lunte') {
         pot.fuseMs = Math.min(pot.fuseMs, pot.burnMs + c.shortFuseMs);
         addFx('kurze_lunte', pk.x, pk.y, pot.holder);
@@ -259,7 +259,7 @@ export function createSpudHost(
       fx = fx.filter((f) => elapsedMs - f.atMs < c.fxKeepMs);
       if (phase === 'pause') pauseMs = countDown(pauseMs, ms);
       const present = (k: PlayerKey) => inputs[k] !== undefined;
-      /** Can act and be touched: living and present this tick. */
+      /** Can act (shove, sprint, pick up, pass) and be shoved: living and present this tick. */
       const active = keys.filter((k) => !players[k].ghost && present(k));
 
       // 1. Shoves (living players with input). Ghost presses are consumed, never queued.
@@ -323,8 +323,11 @@ export function createSpudHost(
         }
       }
 
-      // 5. Passes by touch: each potato at most once per tick, to the nearest touching living
-      // player with input. The giver cannot get it back while noBackMs runs. Shoves never pass.
+      // 5. Passes by touch: each potato at most once per tick, from a present holder to the nearest
+      // touching living player, present or not (an absent figure stands still and catches it like
+      // anyone else, so a disconnect never wins the round). The giver cannot get it back while
+      // noBackMs runs. Shoves never pass.
+      const alive = living();
       for (const pot of potatoes) {
         pot.noBackMs = countDown(pot.noBackMs, ms);
         if (!present(pot.holder)) continue;
@@ -332,7 +335,7 @@ export function createSpudHost(
         let best: PlayerKey | null = null;
         let bestD = Infinity;
         let blocked = false;
-        for (const k of active) {
+        for (const k of alive) {
           if (k === pot.holder) continue;
           const d = Math.hypot(players[k].x - h.x, players[k].y - h.y);
           if (d > c.touchPx) continue;
