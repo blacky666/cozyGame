@@ -65,6 +65,21 @@ describe('schneeball spawns', () => {
 });
 
 describe('schneeball host', () => {
+  it('a disconnected player (no input) cannot be hit', () => {
+    const d = driver(['p0', 'p2']);
+    p2ToMiddle(d);
+    const before = d.snap().players.p2.score;
+    const p0 = d.snap().players.p0;
+    const p2 = d.snap().players.p2;
+    // p2 drops out: its key is no longer part of the inputs record.
+    delete d.inputs.p2;
+    d.tap('p0', p2.x, p2.y);
+    d.tick(10);
+    expect(d.snap().players.p2.score).toBe(before);
+    expect(d.snap().players.p0.score).toBe(p0.score);
+    expect(d.snap().players.p2.invulnMs).toBe(0);
+  });
+
   it('walks at 60 px/s on snow and keeps sliding on the pond after releasing the keys', () => {
     const d = driver(['p0', 'p2']);
     const y0 = d.snap().players.p2.y;

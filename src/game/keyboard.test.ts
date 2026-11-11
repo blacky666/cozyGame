@@ -45,6 +45,7 @@ describe('createKeyboard', () => {
     const win = new FakeTarget();
     const doc = new FakeTarget();
     const kb = createKeyboard({ win, doc });
+    kb.setCounting(true);
     expect(kb.state().shoves).toBe(0);
     win.dispatchEvent(key('keydown', 'Space'));
     win.dispatchEvent(Object.assign(key('keydown', 'Space'), { repeat: true }));
@@ -55,6 +56,20 @@ describe('createKeyboard', () => {
     expect(kb.state().shoves).toBe(2);
     win.dispatchEvent(new Event('blur'));
     expect(kb.state().shoves).toBe(2);
+    kb.destroy();
+  });
+
+  it('does not count Space while counting is off', () => {
+    const win = new FakeTarget();
+    const doc = new FakeTarget();
+    const kb = createKeyboard({ win, doc });
+    kb.setCounting(false);
+    win.dispatchEvent(key('keydown', 'Space'));
+    win.dispatchEvent(key('keyup', 'Space'));
+    expect(kb.state().shoves).toBe(0);
+    kb.setCounting(true);
+    win.dispatchEvent(key('keydown', 'Space'));
+    expect(kb.state().shoves).toBe(1);
     kb.destroy();
   });
 });

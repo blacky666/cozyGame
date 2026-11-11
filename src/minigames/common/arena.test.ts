@@ -19,6 +19,11 @@ describe('arena', () => {
     expect(a.solids.filter((s) => s.kind === 'wall').length).toBe(a.raster.join('').split('w').length - 1);
     expect(a.solids.some((s) => s.sprite.startsWith('schnee.deco'))).toBe(false);
   });
+  it('gives every snowman solid the hitbox of the intact (heil) sprite', () => {
+    const snowmen = a.solids.filter((s) => s.sprite.startsWith('schnee.solid.schneemann.'));
+    expect(snowmen.length).toBeGreaterThan(0);
+    for (const s of snowmen) expect([s.w, s.h]).toEqual([12, 12]);
+  });
   it('finds the pond', () => {
     expect(tileAt(a, 15 * 16 + 8, 5 * 16 + 8)).toBe('j');
     expect(tileAt(a, -1, 5)).toBe('#');

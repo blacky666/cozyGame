@@ -50,7 +50,13 @@ export class MinigameScene extends Phaser.Scene {
       return;
     }
     this.view = this.def.createView(this, this.gamePlayers(), ctx.selfKey());
-    const unwire = this.wirePointer();
+    const unwirePointer = this.wirePointer();
+    // Action counters only grow while this scene runs (not during intro/standings).
+    ctx.keyboard.setCounting(true);
+    const unwire = () => {
+      ctx.keyboard.setCounting(false);
+      unwirePointer();
+    };
     if (!ctx.isHost) {
       ctx.onSnap((tick, p, at) => {
         if (p.round !== this.round) return;

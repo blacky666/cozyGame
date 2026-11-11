@@ -22,6 +22,8 @@ export function inputFromKeys(down: ReadonlySet<string>, shoves = 0): InputState
 
 export interface KeyboardInput {
   state(): InputState;
+  /** Presses only grow the shove counter while on (a running minigame); movement keys are unaffected. */
+  setCounting(on: boolean): void;
   destroy(): void;
 }
 
@@ -39,11 +41,12 @@ export function createKeyboard(o: KeyboardOptions = {}): KeyboardInput {
   const doc = o.doc ?? document;
   const down = new Set<string>();
   let shoves = 0;
+  let counting = false;
   const onDown = (e: Event) => {
     const { code, repeat } = e as KeyboardEvent;
     if (!ALL.has(code)) return;
     // Count fresh presses only: holding the key (auto-repeat) is one shove.
-    if (code === SHOVE_KEY && !repeat && !down.has(code)) shoves++;
+    if (counting && code === SHOVE_KEY && !repeat && !down.has(code)) shoves++;
     down.add(code);
     e.preventDefault();
   };
@@ -61,6 +64,9 @@ export function createKeyboard(o: KeyboardOptions = {}): KeyboardInput {
   doc.addEventListener('visibilitychange', onVisibility);
   return {
     state: () => inputFromKeys(down, shoves),
+    setCounting(on) {
+      counting = on;
+    },
     destroy() {
       win.removeEventListener('keydown', onDown);
       win.removeEventListener('keyup', onUp);

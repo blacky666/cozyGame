@@ -6,6 +6,8 @@ export type Arena = { w: number; h: number; tile: number; raster: string[]; soli
 
 const WALL_HITBOX: [number, number, number, number] = [1, 1, 14, 14];
 const STEP = 2;
+const SNOWMAN_PREFIX = 'schnee.solid.schneemann.';
+const SNOWMAN_INTACT = 'schnee.solid.schneemann.heil';
 
 export function buildArena(file: AssetFile, mapName: string): Arena {
   const map = file.maps?.[mapName];
@@ -13,7 +15,9 @@ export function buildArena(file: AssetFile, mapName: string): Arena {
   const { tile, raster } = map;
   const solids: Solid[] = [];
   map.objects.forEach((o, i) => {
-    const hb = file.sprites[o.sprite]?.hitbox;
+    // Snowmen all start intact on the host (and the view shows that sprite): the map example's state must not matter.
+    const sprite = o.sprite.startsWith(SNOWMAN_PREFIX) ? SNOWMAN_INTACT : o.sprite;
+    const hb = file.sprites[sprite]?.hitbox ?? file.sprites[o.sprite]?.hitbox;
     if (!hb) return;
     solids.push({ id: `obj${i}`, sprite: o.sprite, kind: 'object', x: o.x + hb[0], y: o.y + hb[1], w: hb[2], h: hb[3] });
   });

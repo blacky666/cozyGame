@@ -237,7 +237,8 @@ export function createSnowballHost(
       let solids = solidsNow();
 
       // 1. Shoves; the slide goes through the arena collision.
-      resolveShoves(keys, players, shove, inputs);
+      // Only players with an input this tick (= connected) take part: absent ones can neither shove nor be shoved.
+      resolveShoves(keys.filter((k) => inputs[k]), players, shove, inputs);
       // 2. Movement.
       for (const k of keys) {
         const p = players[k];
@@ -306,7 +307,7 @@ export function createSnowballHost(
       const kept: Ball[] = [];
       for (const b of balls) {
         const rewind = remote[b.owner] ?? false;
-        const targets = keys.map((k) => seenAt(k, rewind));
+        const targets = keys.filter((k) => inputs[k]).map((k) => seenAt(k, rewind));
         const skip = ignore.get(b.id);
         const fromX = b.x;
         const fromY = b.y;
