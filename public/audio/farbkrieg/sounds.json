@@ -1,0 +1,117 @@
+{
+ "paket": "farbkrieg",
+ "toene": [
+  {
+   "id": "farbkrieg.malen_schleife",
+   "datei": "audio/farbkrieg/malen_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 1000,
+   "lautstaerke": 0.2
+  },
+  {
+   "id": "farbkrieg.klecks_wurf",
+   "datei": [
+    "audio/farbkrieg/klecks_wurf_1.mp3",
+    "audio/farbkrieg/klecks_wurf_2.mp3",
+    "audio/farbkrieg/klecks_wurf_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 299,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "farbkrieg.klecks_platsch",
+   "datei": [
+    "audio/farbkrieg/klecks_platsch_1.mp3",
+    "audio/farbkrieg/klecks_platsch_2.mp3",
+    "audio/farbkrieg/klecks_platsch_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 380,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "farbkrieg.getuencht",
+   "datei": "audio/farbkrieg/getuencht.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 440,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "farbkrieg.farbbombe_wurf",
+   "datei": "audio/farbkrieg/farbbombe_wurf.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 400,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "farbkrieg.farbbombe_explosion",
+   "datei": "audio/farbkrieg/farbbombe_explosion.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 850,
+   "lautstaerke": 1.0
+  },
+  {
+   "id": "farbkrieg.finale_bombe_faellt",
+   "datei": "audio/farbkrieg/finale_bombe_faellt.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1849,
+   "lautstaerke": 1.0
+  },
+  {
+   "id": "farbkrieg.wischmopp_schleife",
+   "datei": "audio/farbkrieg/wischmopp_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 800,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "farbkrieg.rollschuhe_schleife",
+   "datei": "audio/farbkrieg/rollschuhe_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 1000,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "farbkrieg.pickup",
+   "datei": "audio/farbkrieg/pickup.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 420,
+   "lautstaerke": 0.52
+  },
+  {
+   "id": "farbkrieg.endspurt",
+   "datei": "audio/farbkrieg/endspurt.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 1705,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "farbkrieg.musik_schleife",
+   "datei": "audio/farbkrieg/musik_schleife.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 58182,
+   "lautstaerke": 0.6
+  },
+  {
+   "id": "farbkrieg.musik_finale_schleife",
+   "datei": "audio/farbkrieg/musik_finale_schleife.mp3",
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 18462,
+   "lautstaerke": 0.6
+  }
+ ]
+}

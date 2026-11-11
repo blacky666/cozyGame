@@ -17,14 +17,19 @@ import { createGrid } from './paintGrid';
 import { speedOf, type Blob, type PaintFx, type PaintPickup, type PaintState } from './paintHost';
 import { PaintHud } from './paintHud';
 import { PAINT_DEPTH, PaintLayer } from './paintLayer';
+import { PaintSounds } from './paintSounds';
 
 export const ARENA_FILE = 'arena-farbkrieg';
 export const ARENA_MAP = 'farbkrieg.map';
 /** Where the map is drawn: world = map + offset (the 416x208 map below the HUD band). */
 export const ARENA_OFFSET: { readonly x: number; readonly y: number } = { x: 5, y: 26 };
 
-/** Sound loops of the view (Task 5 adds them); stopped in destroy(). */
-const LOOPS: readonly string[] = [];
+const PKG = 'farbkrieg';
+const PAINT_LOOP = `${PKG}.malen_schleife`;
+const MOPP_LOOP = `${PKG}.wischmopp_schleife`;
+const ROLL_LOOP = `${PKG}.rollschuhe_schleife`;
+/** Sound loops of the view; stopped in destroy(). */
+const LOOPS: readonly string[] = [PAINT_LOOP, MOPP_LOOP, ROLL_LOOP];
 
 const WORKSHOP_BG = 0x5e3b25;
 const FX_DEPTH = 900;
@@ -79,6 +84,7 @@ export class PaintView implements MiniGameView<PaintState> {
   private readonly live = new Set<Phaser.GameObjects.Sprite>();
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
   private readonly hud: PaintHud;
+  private readonly sounds: PaintSounds;
   private readonly ring: Phaser.GameObjects.Graphics;
   private readonly crosshair: Phaser.GameObjects.Graphics;
   private canThrow = true;
@@ -124,6 +130,7 @@ export class PaintView implements MiniGameView<PaintState> {
     this.crosshair = drawCrosshair(scene, self ? playerColor(scene, self.slot) : '#ffffff');
     this.objects.push(this.ring, this.finaleShadow, this.crosshair, ...(this.finaleBomb ? [this.finaleBomb] : []));
     this.hud = new PaintHud(scene, players, grid.count);
+    this.sounds = new PaintSounds(selfKey, self?.slot);
   }
 
   private step(m: Mover, input: InputState, dt: number): Mover {
@@ -191,15 +198,20 @@ export class PaintView implements MiniGameView<PaintState> {
     this.renderBlobs(s.blobs);
     this.renderPickups(s.pickups);
     this.renderFinale(s, now);
-    this.renderSound(s);
+    this.renderSound(s, now);
     const me = s.players[selfKey];
     this.canThrow = !!me && !me.stun && (me.klecksCdMs <= 0 || me.extra !== null);
     this.hud.update(s, selfKey);
   }
 
-  /** Sound tracker hook (Task 5: cues, music and loops of the "farbkrieg" package). */
-  private renderSound(_s: PaintState): void {
-    // Nothing to play yet.
+  private renderSound(s: PaintState, now: number): void {
+    for (const c of this.sounds.update(s, now)) sound.play(c.name.includes('.') ? c.name : `${PKG}.${c.name}`, c);
+    const music = PaintSounds.music(s);
+    sound.setMusic(music && `${PKG}.${music}`);
+    sound.loop(PAINT_LOOP, this.sounds.painting(now));
+    const l = PaintSounds.loops(s, this.selfKey);
+    sound.loop(MOPP_LOOP, l.mopp);
+    sound.loop(ROLL_LOOP, l.roll);
   }
 
   private renderAvatars(s: PaintState, selfKey: PlayerKey, now: number): void {
