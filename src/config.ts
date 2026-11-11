@@ -30,6 +30,8 @@ interface GameConfig {
     inputHeartbeatMs: number;
     /** Host treats a remote input older than this as neutral. */
     inputStaleMs: number;
+    /** Host lag compensation: hits of remote throwers are tested against positions this long ago. */
+    rewindMs: number;
   };
   view: { width: number; height: number; zoom: number };
   players: { min: number; max: number; maxName: number };
@@ -37,7 +39,37 @@ interface GameConfig {
   intro: { ruleMs: number; countdownMs: number };
   standings: { showMs: number };
   sandbox: { durationMs: number; speed: number; spawnMs: number; coinSize: number; pickupRadius: number; maxCoins: number };
-  snowball: { maxChargeMs: number };
+  snowball: {
+    durationMs: number;
+    maxBalls: number;
+    reloadMs: number;
+    maxChargeMs: number;
+    /** Minimum time between two throws of one player. */
+    throwGapMs: number;
+    /** [charge 0, charge 1] pairs, linear in between (px/s and px). */
+    ballSpeed: [number, number];
+    ballRange: [number, number];
+    ballRadius: number;
+    bodyRadius: number;
+    hitRadius: number;
+    hitPoints: number;
+    hitPenalty: number;
+    invulnMs: number;
+    snowmanHits: number;
+    snowmanRebuildMs: number;
+    /** Length of the snowman's rebuild animation before it is solid again. */
+    snowmanAufbauMs: number;
+    walkSpeed: number;
+    /** Pond: acceleration (px/s^2) and friction (fraction of speed lost per second). */
+    iceAccel: number;
+    iceFriction: number;
+    spawnMs: number;
+    maxPickups: number;
+    bounces: number;
+    giantSpeedFactor: number;
+    giantHitRadius: number;
+    extraThrows: number;
+  };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -77,6 +109,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     aimSendMs: 50,
     inputHeartbeatMs: 200,
     inputStaleMs: 500,
+    rewindMs: 150,
   },
   view: { width: 426, height: 240, zoom: 3 },
   players: { min: 2, max: 4, maxName: 16 },
@@ -86,7 +119,14 @@ export const CONFIG = deepFreeze<GameConfig>({
   standings: { showMs: 8000 },
   // Placeholder minigame "Münzjagd" (speed in px/s, sizes in px).
   sandbox: { durationMs: 30000, speed: 60, spawnMs: 1500, coinSize: 8, pickupRadius: 9, maxCoins: 12 },
-  snowball: { maxChargeMs: 1000 },
+  // Schneeball-Schlacht (px, px/s, ms).
+  snowball: {
+    durationMs: 120000, maxBalls: 5, reloadMs: 600, maxChargeMs: 1000, throwGapMs: 250,
+    ballSpeed: [150, 230], ballRange: [110, 210], ballRadius: 3, bodyRadius: 5, hitRadius: 7,
+    hitPoints: 2, hitPenalty: 1, invulnMs: 1500, snowmanHits: 3, snowmanRebuildMs: 15000, snowmanAufbauMs: 500,
+    walkSpeed: 60, iceAccel: 140, iceFriction: 0.8, spawnMs: 12000, maxPickups: 2, bounces: 2,
+    giantSpeedFactor: 0.7, giantHitRadius: 11, extraThrows: 3,
+  },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
 });
