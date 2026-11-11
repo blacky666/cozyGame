@@ -22,9 +22,9 @@ const gp = (keys: string[], remote = true): GamePlayer[] =>
   });
 
 /** Test driver: keeps per-player input incl. growing tap/shove counters. */
-function driver(keys: string[], opts: { remote?: Record<string, boolean>; durationMs?: number } = {}) {
+function driver(keys: string[], opts: { remote?: Record<string, boolean>; durationMs?: number; rand?: () => number } = {}) {
   const players = gp(keys).map((p) => ({ ...p, remote: opts.remote?.[p.key] ?? true }));
-  const g = createSnowballHost(players, mulberry32(7), arena, opts.durationMs);
+  const g = createSnowballHost(players, opts.rand ?? mulberry32(7), arena, opts.durationMs);
   const inputs: Record<PlayerKey, InputState> = {};
   for (const k of keys) inputs[k] = neutralInput();
   const tick = (n = 1) => { for (let i = 0; i < n; i++) g.tick(DT, inputs); };
@@ -356,5 +356,126 @@ describe('schneeball host', () => {
     d.tap('p0', 200, 110);
     d.tick();
     expect(d.snap().balls.length).toBe(1);
+  });
+});
+
+/** First pickup: kind index (0 abpraller, 1 riesenball, 2 hat) on tile col 3 / row 8 (centre 56, 136). */
+const scripted = (kind: 0 | 1 | 2) => {
+  const queue = [(kind + 0.5) / 3, 3.5 / 26, (8 - 3 + 0.5) / 9];
+  const fallback = mulberry32(3);
+  return () => queue.shift() ?? fallback();
+};
+const SPAWN_TICKS = Math.ceil(C.spawnMs / 1000 / DT) + 1;
+
+/** Run until the first pickup exists, then walk p0 down onto it. */
+function collectWithP0(d: ReturnType<typeof driver>) {
+  d.tick(SPAWN_TICKS);
+  const pk = d.snap().pickups[0];
+  expect(pk).toMatchObject({ x: 56, y: 136 });
+  d.set('p0', { down: true });
+  for (let i = 0; i < 100 && d.snap().pickups.length > 0; i++) d.tick();
+  d.set('p0', {});
+  d.tick();
+  return pk;
+}
+
+describe('schneeball extras', () => {
+  it('spawns at most 2 pickups, never on walls, the pond or near players', () => {
+    const d = driver(['p0', 'p1', 'p2']);
+    d.tick(SPAWN_TICKS - 5);
+    expect(d.snap().pickups.length).toBe(0);
+    let seen = 0;
+    for (let i = 0; i < 60 * 30; i++) {
+      d.tick();
+      const s = d.snap();
+      seen = Math.max(seen, s.pickups.length);
+      expect(s.pickups.length).toBeLessThanOrEqual(C.maxPickups);
+      for (const pk of s.pickups) {
+        expect(['w', 'j']).not.toContain(tileAt(arena, pk.x, pk.y));
+        for (const so of arena.solids) {
+          const cx = Math.max(so.x, Math.min(pk.x, so.x + so.w));
+          const cy = Math.max(so.y, Math.min(pk.y, so.y + so.h));
+          expect(Math.hypot(pk.x - cx, pk.y - cy)).toBeGreaterThanOrEqual(6);
+        }
+        for (const p of Object.values(s.players)) expect(Math.hypot(p.x - pk.x, p.y - pk.y)).toBeGreaterThanOrEqual(24);
+      }
+    }
+    expect(seen).toBe(C.maxPickups);
+  });
+
+  it('collecting an abpraller makes the next 3 throws abpraller balls', () => {
+    const d = driver(['p0', 'p2'], { rand: scripted(0) });
+    collectWithP0(d);
+    expect(d.snap().players.p0).toMatchObject({ extra: 'abpraller', extraLeft: C.extraThrows });
+    const kinds: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      d.tap('p0', 300, d.snap().players.p0.y);
+      d.tick();
+      const bs = d.snap().balls;
+      kinds.push(bs[bs.length - 1].kind);
+      d.tick(8);
+    }
+    expect(kinds).toEqual(['abpraller', 'abpraller', 'abpraller', 'normal']);
+    expect(d.snap().players.p0).toMatchObject({ extra: null, extraLeft: 0 });
+  });
+
+  it('an abpraller ball bounces twice off walls, then breaks', () => {
+    const d = driver(['p0', 'p2'], { rand: scripted(0) });
+    collectWithP0(d);
+    const p = d.snap().players.p0;
+    d.tap('p0', p.x - 100, p.y + 100, 1); // down-left into the fence corner
+    const bounceIds = new Set<number>();
+    const zerfallIds = new Set<number>();
+    let ticks = 0;
+    do {
+      d.tick();
+      for (const f of d.snap().fx) (f.kind === 'abprall' ? bounceIds : f.kind === 'zerfall' ? zerfallIds : new Set<number>()).add(f.id);
+      ticks++;
+    } while (d.snap().balls.length > 0 && ticks < 300);
+    expect(bounceIds.size).toBe(C.bounces);
+    expect(zerfallIds.size).toBe(1);
+    expect(d.snap().balls.length).toBe(0);
+  });
+
+  it('a riesenschneeball is slower and hits from farther away', () => {
+    const run = (kind: 0 | 1) => {
+      const d = driver(['p0', 'p2'], { rand: scripted(kind) });
+      collectWithP0(d);
+      const target = d.snap().players.p2;
+      // The ball line passes about 9.5 px beside p2's chest: misses the normal 7 px circle, inside the giant's 11 px.
+      d.tap('p0', target.x + 11, target.y);
+      d.tick();
+      const b = d.snap().balls[0];
+      const speed = Math.hypot(b.vx, b.vy);
+      d.tick(40);
+      return { speed, kind: b.kind, score: d.snap().players.p0.score };
+    };
+    const abp = run(0);
+    const giant = run(1);
+    expect(abp.kind).toBe('abpraller');
+    expect(abp.score).toBe(0);
+    expect(giant.kind).toBe('riesenball');
+    expect(giant.speed).toBeCloseTo(C.ballSpeed[0] * C.giantSpeedFactor, 5);
+    expect(abp.speed).toBeCloseTo(C.ballSpeed[0], 5);
+    expect(giant.score).toBe(C.hitPoints);
+  });
+
+  it('the ice hat blocks exactly one hit', () => {
+    const d = driver(['p0', 'p2'], { rand: scripted(2) });
+    collectWithP0(d);
+    expect(d.snap().players.p0.hat).toBe(true);
+    const aimAtP0 = () => { const p = d.snap().players.p0; d.tap('p2', p.x, p.y); };
+    aimAtP0();
+    d.tick(20);
+    let s = d.snap();
+    expect(s.players.p0).toMatchObject({ hat: false, score: 0 });
+    expect(s.players.p0.invulnMs).toBeGreaterThan(0);
+    expect(s.players.p2.score).toBe(0);
+    expect(s.fx.some((f) => f.kind === 'schild_bruch')).toBe(true);
+    d.tick(Math.ceil(C.invulnMs / 1000 / DT) + 1);
+    aimAtP0();
+    d.tick(20);
+    s = d.snap();
+    expect(s.players.p2.score).toBe(C.hitPoints);
   });
 });

@@ -61,6 +61,19 @@ const FX_KEEP_MS = 500;
 const HISTORY_TICKS = 10;
 const SNOWMAN_PREFIX = 'schnee.solid.schneemann.';
 const DAMAGE: Snowman['state'][] = ['heil', 'schaden1', 'schaden2'];
+const PICKUP_KINDS: Pickup['kind'][] = ['abpraller', 'riesenball', 'eiszapfenmuetze'];
+const PICKUP_RADIUS = 6;
+const PICKUP_COLLECT_PX = 8;
+const PICKUP_PLAYER_GAP = 24;
+const PICKUP_TRIES = 20;
+/** Tile rows inside the fence (the fence spans y 48..192 of the map). */
+const PLAY_ROWS: readonly [number, number] = [3, 11];
+
+const circleHitsRect = (s: Solid, x: number, y: number, r: number): boolean => {
+  const dx = x - Math.max(s.x, Math.min(x, s.x + s.w));
+  const dy = y - Math.max(s.y, Math.min(y, s.y + s.h));
+  return dx * dx + dy * dy < r * r;
+};
 
 /** Host simulation of "Schneeball-Schlacht". dt in seconds. */
 export function createSnowballHost(
@@ -69,7 +82,6 @@ export function createSnowballHost(
   arena: Arena,
   durationMs: number = CONFIG.snowball.durationMs,
 ): MiniGameHost<SnowState> {
-  void rand; // pickups (Task 6) use it
   const c = CONFIG.snowball;
   const keys = gamePlayers.map((p) => p.key);
   const remote: Record<PlayerKey, boolean> = {};
@@ -103,6 +115,9 @@ export function createSnowballHost(
   let elapsedMs = 0;
   let nextBallId = 1;
   let nextFxId = 1;
+  let pickups: Pickup[] = [];
+  let nextPickupId = 1;
+  let spawnTimerMs = 0;
 
   /** Arena solids without broken (or rebuilding) snowmen. */
   const solidsNow = (): Solid[] =>
@@ -133,11 +148,17 @@ export function createSnowballHost(
       [dx, dy] = p.dir === 'side' ? [1, 0] : p.dir === 'left' ? [-1, 0] : p.dir === 'up' ? [0, -1] : [0, 1];
       len = 1;
     }
-    const { speed, range } = throwPower(charge);
+    const power = throwPower(charge);
+    const kind: Ball['kind'] = p.extraLeft > 0 && p.extra ? p.extra : 'normal';
+    const speed = kind === 'riesenball' ? power.speed * c.giantSpeedFactor : power.speed;
     const b: Ball = {
       id: nextBallId++, x: p.x, y: p.y - BALL_LIFT, vx: (dx / len) * speed, vy: (dy / len) * speed,
-      left: range, owner: k, kind: 'normal', bounces: 0,
+      left: power.range, owner: k, kind, bounces: 0,
     };
+    if (kind !== 'normal') {
+      p.extraLeft -= 1;
+      if (p.extraLeft <= 0) { p.extraLeft = 0; p.extra = null; }
+    }
     balls.push(b);
     const ids = spawnIgnores(b.x, b.y, b.vx, b.vy, solids);
     if (ids.length > 0) ignore.set(b.id, ids);
@@ -146,6 +167,36 @@ export function createSnowballHost(
     reloadMs[k] = 0;
     sinceThrowMs[k] = 0;
     p.throwAnimMs = c.throwGapMs;
+  };
+
+  /** Spawn one pickup on a random free tile (up to PICKUP_TRIES candidates), or skip. */
+  const spawnPickup = (solids: Solid[]) => {
+    const kind = PICKUP_KINDS[Math.min(PICKUP_KINDS.length - 1, Math.floor(rand() * PICKUP_KINDS.length))];
+    const cols = arena.raster[0]?.length ?? 0;
+    for (let i = 0; i < PICKUP_TRIES; i++) {
+      const col = Math.min(cols - 1, Math.floor(rand() * cols));
+      const row = PLAY_ROWS[0] + Math.min(PLAY_ROWS[1] - PLAY_ROWS[0], Math.floor(rand() * (PLAY_ROWS[1] - PLAY_ROWS[0] + 1)));
+      const t = arena.raster[row]?.[col];
+      if (t === undefined || t === 'w' || t === 'j') continue;
+      const x = (col + 0.5) * arena.tile;
+      const y = (row + 0.5) * arena.tile;
+      if (solids.some((s) => circleHitsRect(s, x, y, PICKUP_RADIUS))) continue;
+      if (keys.some((k) => Math.hypot(players[k].x - x, players[k].y - y) < PICKUP_PLAYER_GAP)) continue;
+      pickups.push({ id: nextPickupId++, x, y, kind });
+      return;
+    }
+  };
+
+  const collectPickups = () => {
+    for (const k of keys) {
+      const p = players[k];
+      pickups = pickups.filter((pk) => {
+        if (Math.hypot(p.x - pk.x, p.y - pk.y) > PICKUP_COLLECT_PX) return true;
+        if (pk.kind === 'eiszapfenmuetze') p.hat = true;
+        else { p.extra = pk.kind; p.extraLeft = c.extraThrows; }
+        return false;
+      });
+    }
   };
 
   const hitSnowman = (sm: Snowman) => {
@@ -212,6 +263,13 @@ export function createSnowballHost(
         h.push({ ms: elapsedMs, x: p.x, y: p.y });
         if (h.length > HISTORY_TICKS) h.shift();
       }
+      // 2b. Pickups: collect, then spawn on the timer (first one after spawnMs).
+      collectPickups();
+      spawnTimerMs += ms;
+      if (spawnTimerMs >= c.spawnMs - 1e-6) {
+        spawnTimerMs -= c.spawnMs;
+        if (pickups.length < c.maxPickups) spawnPickup(solids);
+      }
       // 3. Throws (one per tick at most; presses without ammo or too early are dropped) and 4. reload.
       for (const k of keys) {
         const p = players[k];
@@ -250,6 +308,8 @@ export function createSnowballHost(
         const rewind = remote[b.owner] ?? false;
         const targets = keys.map((k) => seenAt(k, rewind));
         const skip = ignore.get(b.id);
+        const fromX = b.x;
+        const fromY = b.y;
         const ev = advanceBall(b, sec, arena, skip ? solids.filter((s) => !skip.includes(s.id)) : solids, targets);
         if (skip) {
           const still = ev ? [] : skip.filter((id) => { const s = solids.find((o) => o.id === id); return s && ballOverlaps(s, b.x, b.y); });
@@ -259,6 +319,13 @@ export function createSnowballHost(
         if (ev.kind === 'player') {
           const v = players[ev.victim];
           if (v.invulnMs > 0) { addFx('zerfall', ev.x, ev.y); continue; }
+          if (v.hat) {
+            // The ice hat absorbs exactly one hit: no points for anyone.
+            v.hat = false;
+            v.invulnMs = c.invulnMs;
+            addFx('schild_bruch', ev.x, ev.y);
+            continue;
+          }
           const thrower = players[b.owner];
           if (thrower) thrower.score += c.hitPoints;
           v.score = Math.max(0, v.score - c.hitPenalty);
@@ -266,12 +333,23 @@ export function createSnowballHost(
           addFx('treffer', ev.x, ev.y);
           continue;
         }
-        addFx('zerfall', ev.x, ev.y);
         const sm = ev.kind === 'solid' && ev.solid ? snowmanById.get(ev.solid.id) : undefined;
         if (sm) {
           hitSnowman(sm);
           if (sm.state === 'kaputt') solids = solidsNow();
         }
+        if (ev.kind === 'solid' && b.kind === 'abpraller' && b.bounces < c.bounces) {
+          // Bounce: reflect on the hit normal, keep the remaining range minus the distance flown.
+          b.left -= Math.hypot(b.x - fromX, b.y - fromY);
+          if (b.left > 1e-6) {
+            if (ev.normal === 'x') b.vx = -b.vx; else b.vy = -b.vy;
+            b.bounces += 1;
+            addFx('abprall', ev.x, ev.y);
+            kept.push(b);
+            continue;
+          }
+        }
+        addFx('zerfall', ev.x, ev.y);
       }
       balls = kept;
     },
@@ -283,7 +361,7 @@ export function createSnowballHost(
         players: ps,
         balls: balls.map((b) => ({ ...b })),
         snowmen: snowmen.map((s) => ({ ...s })),
-        pickups: [],
+        pickups: pickups.map((pk) => ({ ...pk })),
         fx: fx.map(({ id, kind, x, y }) => ({ id, kind, x, y })),
       };
     },

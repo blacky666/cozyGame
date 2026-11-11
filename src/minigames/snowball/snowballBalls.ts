@@ -11,7 +11,7 @@ export type BallTarget = { key: PlayerKey; x: number; y: number };
 
 export type BallEvent =
   | { kind: 'player'; victim: PlayerKey; x: number; y: number }
-  | { kind: 'solid'; solid: Solid | null; x: number; y: number }
+  | { kind: 'solid'; solid: Solid | null; x: number; y: number; normal: 'x' | 'y' }
   | { kind: 'spent'; x: number; y: number };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -87,7 +87,7 @@ export function advanceBall(b: Ball, dt: number, arena: Arena, solids: Solid[], 
   }
   b.x = sx;
   b.y = sy;
-  if (wall) return { kind: 'solid', solid: wall.solid, x: b.x, y: b.y };
+  if (wall) return { kind: 'solid', solid: wall.solid, x: b.x, y: b.y, normal: wall.normal };
   b.left -= step;
   return b.left <= 1e-6 ? { kind: 'spent', x: b.x, y: b.y } : null;
 }
