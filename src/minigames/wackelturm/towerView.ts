@@ -10,6 +10,7 @@ import { columnAt, craneBounds, stepCrane, type ArmedAction, type TowerFx, type 
 import { BAND_H, TowerHud } from './towerHud';
 import { readLayout, type Plot, type TowerLayout } from './towerLayout';
 import { KINDS, shapeSize, type Kind } from './towerPhysics';
+import { TowerSounds } from './towerSounds';
 import { ARENA_FILE, CraneRig, drawBackdrop, readCrane } from './towerScene';
 
 export { ARENA_FILE };
@@ -25,8 +26,10 @@ const VIEW_H = CONFIG.view.height - VIEW_TOP;
  */
 const WORLD = { x: ARENA_OFFSET.x, y: ARENA_OFFSET.y - VIEW_TOP };
 
-/** Sound loops of the view (Task 6); stopped in destroy(). */
-const LOOPS: readonly string[] = [];
+const PKG = 'wackelturm';
+const KRAN_LOOP = `${PKG}.kran_schleife`;
+/** Sound loops of the view; stopped in destroy(). */
+const LOOPS: readonly string[] = [KRAN_LOOP];
 
 /** Depths inside the world layer (the map's z order: blocks 0.5, fence 1, goal 3, fx 4). */
 const HANG_DEPTH = -0.1;
@@ -83,6 +86,7 @@ export class TowerView implements MiniGameView<TowerState> {
   private readonly live = new Set<Phaser.GameObjects.GameObject>();
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
   private readonly hud: TowerHud;
+  private readonly sounds: TowerSounds;
   private readonly crosshair: Phaser.GameObjects.Graphics;
   private armed: ArmedAction | null = null;
   private zoom = 0;
@@ -139,6 +143,7 @@ export class TowerView implements MiniGameView<TowerState> {
     const self = players.find((p) => p.key === selfKey);
     this.crosshair = drawCrosshair(scene, self ? playerColor(scene, self.slot) : '#ffffff');
     this.objects.push(this.crosshair);
+    this.sounds = new TowerSounds(selfKey);
     this.hud = new TowerHud(scene, players, selfKey, this.layout, ARENA_OFFSET.x, VIEW_TOP, VIEW_H);
     this.frame();
   }
@@ -225,9 +230,17 @@ export class TowerView implements MiniGameView<TowerState> {
     }
     this.renderBlocks(s);
     this.renderFx(s);
-    // Sounds (Task 6): a tracker like PaintSounds plays the fx / loops of s here.
+    this.renderSound(s);
     const aim = pointerPixel(this.scene);
     this.hud.update(s, this.armed, aim ? columnAt(this.layout, aim.x - ARENA_OFFSET.x) : null);
+  }
+
+  private renderSound(s: TowerState): void {
+    const now = this.scene.time.now;
+    for (const c of this.sounds.update(s, now)) sound.play(`${PKG}.${c.name}`, c);
+    const music = TowerSounds.music(s);
+    sound.setMusic(music && `${PKG}.${music}`);
+    sound.loop(KRAN_LOOP, this.sounds.loops(now).kran && music !== null);
   }
 
   /** The hanging block below the hook: its top edge at hangTop, its pivot on the crane x. */

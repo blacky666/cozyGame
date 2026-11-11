@@ -1,0 +1,175 @@
+{
+ "paket": "wackelturm",
+ "toene": [
+  {
+   "id": "wackelturm.kran_schleife",
+   "datei": "audio/wackelturm/kran_schleife.mp3",
+   "art": "effekt",
+   "schleife": true,
+   "dauer_ms": 1000,
+   "lautstaerke": 0.22
+  },
+  {
+   "id": "wackelturm.verschieben",
+   "datei": "audio/wackelturm/verschieben.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 80,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "wackelturm.drehen",
+   "datei": "audio/wackelturm/drehen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 100,
+   "lautstaerke": 0.5
+  },
+  {
+   "id": "wackelturm.loslassen",
+   "datei": "audio/wackelturm/loslassen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 220,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "wackelturm.aufprall_holz",
+   "datei": [
+    "audio/wackelturm/aufprall_holz_1.mp3",
+    "audio/wackelturm/aufprall_holz_2.mp3",
+    "audio/wackelturm/aufprall_holz_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 200,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "wackelturm.aufprall_stein",
+   "datei": [
+    "audio/wackelturm/aufprall_stein_1.mp3",
+    "audio/wackelturm/aufprall_stein_2.mp3",
+    "audio/wackelturm/aufprall_stein_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 250,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "wackelturm.rutschen",
+   "datei": "audio/wackelturm/rutschen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 499,
+   "lautstaerke": 0.76
+  },
+  {
+   "id": "wackelturm.knarzen",
+   "datei": [
+    "audio/wackelturm/knarzen_1.mp3",
+    "audio/wackelturm/knarzen_2.mp3",
+    "audio/wackelturm/knarzen_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 621,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "wackelturm.einsturz",
+   "datei": "audio/wackelturm/einsturz.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1366,
+   "lautstaerke": 1.0
+  },
+  {
+   "id": "wackelturm.klotz_weg",
+   "datei": "audio/wackelturm/klotz_weg.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1060,
+   "lautstaerke": 0.31
+  },
+  {
+   "id": "wackelturm.hoehe_neu",
+   "datei": "audio/wackelturm/hoehe_neu.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 280,
+   "lautstaerke": 0.61
+  },
+  {
+   "id": "wackelturm.aerger_bereit",
+   "datei": "audio/wackelturm/aerger_bereit.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 420,
+   "lautstaerke": 0.55
+  },
+  {
+   "id": "wackelturm.windstoss",
+   "datei": "audio/wackelturm/windstoss.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1493,
+   "lautstaerke": 0.61
+  },
+  {
+   "id": "wackelturm.fieser_klotz",
+   "datei": "audio/wackelturm/fieser_klotz.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 550,
+   "lautstaerke": 0.57
+  },
+  {
+   "id": "wackelturm.zielhoehe",
+   "datei": "audio/wackelturm/zielhoehe.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 1873,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "wackelturm.musik_schleife",
+   "datei": [
+    "audio/wackelturm/musik_schleife_01.mp3",
+    "audio/wackelturm/musik_schleife_02.mp3",
+    "audio/wackelturm/musik_schleife_03.mp3",
+    "audio/wackelturm/musik_schleife_04.mp3",
+    "audio/wackelturm/musik_schleife_05.mp3",
+    "audio/wackelturm/musik_schleife_06.mp3",
+    "audio/wackelturm/musik_schleife_07.mp3",
+    "audio/wackelturm/musik_schleife_08.mp3",
+    "audio/wackelturm/musik_schleife_09.mp3",
+    "audio/wackelturm/musik_schleife_10.mp3"
+   ],
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 90566,
+   "lautstaerke": 0.6
+  },
+  {
+   "id": "wackelturm.musik_finale_schleife",
+   "datei": [
+    "audio/wackelturm/musik_finale_schleife_01.mp3",
+    "audio/wackelturm/musik_finale_schleife_02.mp3",
+    "audio/wackelturm/musik_finale_schleife_03.mp3",
+    "audio/wackelturm/musik_finale_schleife_04.mp3",
+    "audio/wackelturm/musik_finale_schleife_05.mp3",
+    "audio/wackelturm/musik_finale_schleife_06.mp3",
+    "audio/wackelturm/musik_finale_schleife_07.mp3",
+    "audio/wackelturm/musik_finale_schleife_08.mp3",
+    "audio/wackelturm/musik_finale_schleife_09.mp3",
+    "audio/wackelturm/musik_finale_schleife_10.mp3"
+   ],
+   "art": "musik",
+   "schleife": true,
+   "dauer_ms": 45000,
+   "lautstaerke": 0.6
+  }
+ ]
+}
