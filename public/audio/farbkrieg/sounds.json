@@ -99,18 +99,40 @@
   },
   {
    "id": "farbkrieg.musik_schleife",
-   "datei": "audio/farbkrieg/musik_schleife.mp3",
+   "datei": [
+    "audio/farbkrieg/musik_schleife_01.mp3",
+    "audio/farbkrieg/musik_schleife_02.mp3",
+    "audio/farbkrieg/musik_schleife_03.mp3",
+    "audio/farbkrieg/musik_schleife_04.mp3",
+    "audio/farbkrieg/musik_schleife_05.mp3",
+    "audio/farbkrieg/musik_schleife_06.mp3",
+    "audio/farbkrieg/musik_schleife_07.mp3",
+    "audio/farbkrieg/musik_schleife_08.mp3",
+    "audio/farbkrieg/musik_schleife_09.mp3",
+    "audio/farbkrieg/musik_schleife_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 58182,
+   "dauer_ms": 87273,
    "lautstaerke": 0.6
   },
   {
    "id": "farbkrieg.musik_finale_schleife",
-   "datei": "audio/farbkrieg/musik_finale_schleife.mp3",
+   "datei": [
+    "audio/farbkrieg/musik_finale_schleife_01.mp3",
+    "audio/farbkrieg/musik_finale_schleife_02.mp3",
+    "audio/farbkrieg/musik_finale_schleife_03.mp3",
+    "audio/farbkrieg/musik_finale_schleife_04.mp3",
+    "audio/farbkrieg/musik_finale_schleife_05.mp3",
+    "audio/farbkrieg/musik_finale_schleife_06.mp3",
+    "audio/farbkrieg/musik_finale_schleife_07.mp3",
+    "audio/farbkrieg/musik_finale_schleife_08.mp3",
+    "audio/farbkrieg/musik_finale_schleife_09.mp3",
+    "audio/farbkrieg/musik_finale_schleife_10.mp3"
+   ],
    "art": "musik",
    "schleife": true,
-   "dauer_ms": 18462,
+   "dauer_ms": 49870,
    "lautstaerke": 0.6
   }
  ]
