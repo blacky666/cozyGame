@@ -71,3 +71,6 @@
 .cg-sound-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cg-slider { accent-color: var(--primary); width: 130px; cursor: pointer; }
 .cg-sound-mute { min-height: 38px; font-size: 16px; padding: 4px 12px; }
+.cg-games { display: flex; gap: 8px 18px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.cg-game { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.cg-game input { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; margin: 0; }

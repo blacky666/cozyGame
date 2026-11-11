@@ -13,6 +13,7 @@ import { SOUND_PACKAGES } from '../audio/packages';
 import { sound } from '../audio/sound';
 import { mountSoundButton } from '../audio/soundButton';
 import { mountClickSounds, uiSound } from '../audio/uiSounds';
+import { loadSelection, saveSelection } from '../minigames/catalog';
 import { setFavicon } from './favicon';
 import { showLobby } from './lobbyScreen';
 import { showProfile } from './profileScreen';
@@ -76,6 +77,7 @@ export function startMenus(root: HTMLElement): void {
     const session = createHost(transport, profile);
     addDevBots(session, devFlags(location.search).bots);
     let rounds: number = CONFIG.rounds.default;
+    let games = loadSelection();
     let alive = true;
     // Closing/reloading the tab: say `bye` so clients notice at once (not after the WebRTC timeout).
     const onPageHide = () => session.close();
@@ -93,7 +95,12 @@ export function startMenus(root: HTMLElement): void {
         code, selfId: session.selfId, isHost: true, rounds, assets,
         onReady: (r) => session.setLocalReady(session.selfId, r),
         onRounds: (n) => (rounds = n),
-        onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, assets, root }),
+        games,
+        onGames: (ids) => {
+          games = ids;
+          saveSelection(ids);
+        },
+        onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, games, assets, root }),
         onLeave: leave,
         onKick: (id) => {
           uiSound('entfernt');

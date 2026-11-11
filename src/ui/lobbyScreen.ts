@@ -6,6 +6,7 @@ import { LOBBY_MUSIC, OWN_SOUND, rosterChange, uiSound } from '../audio/uiSounds
 import { drawCharacter } from './charPreview';
 import { clear, h } from './dom';
 import { lobbyModel } from './lobbyModel';
+import { GAME_CATALOG } from '../minigames/catalog';
 
 export type LobbyOptions = {
   code: string;
@@ -17,6 +18,9 @@ export type LobbyOptions = {
   onRounds(n: number): void;
   onStart(): void;
   onLeave(): void;
+  /** Host only: minigames in the rotation (ids) and the callback when the choice changes. */
+  games?: readonly string[];
+  onGames?(ids: string[]): void;
   /** Host only: remove another player from the lobby. */
   onKick?(playerId: string): void;
 };
@@ -52,6 +56,29 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
     rounds.append(opt);
   }
 
+  // Host: which games are in the rotation (at least one stays on).
+  let chosen = new Set(o.games ?? GAME_CATALOG.map((g) => g.id));
+  const boxes = GAME_CATALOG.map((g) => {
+    const box = h('input', { type: 'checkbox', 'aria-label': g.title });
+    box.checked = chosen.has(g.id);
+    box.addEventListener('change', () => {
+      const next = new Set(chosen);
+      if (box.checked) next.add(g.id);
+      else next.delete(g.id);
+      if (next.size === 0) {
+        box.checked = true;
+        hint.textContent = 'Mindestens ein Spiel muss dabei sein.';
+        return;
+      }
+      chosen = next;
+      o.onGames?.(GAME_CATALOG.filter((x) => chosen.has(x.id)).map((x) => x.id));
+    });
+    return h('label', { class: 'cg-game' }, box, h('span', { text: g.title }));
+  });
+  const gamesRow = o.isHost
+    ? h('div', { class: 'cg-games' }, h('span', { class: 'cg-label', text: 'Spiele:' }), ...boxes)
+    : null;
+
   root.append(
     h(
       'div',
@@ -62,6 +89,7 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
         h('p', { class: 'cg-label', text: 'Raumcode' }),
         h('div', { class: 'cg-row' }, h('div', { class: 'cg-code', text: o.code }), copy),
         slotsEl,
+        gamesRow,
         hint,
         h(
           'div',

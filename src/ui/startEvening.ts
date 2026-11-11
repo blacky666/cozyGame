@@ -17,6 +17,8 @@ export type EveningContext = {
   profile: Profile;
   isHost: boolean;
   rounds: number;
+  /** Host: ids of the minigames in the rotation (lobby choice; empty = all). */
+  games?: readonly string[];
   /** Host: asset files loaded by the menus (null when loading failed). */
   assets?: Record<string, AssetFile> | null;
   /** DOM overlay root (the lobby stays rendered inside while hidden). */
@@ -57,10 +59,16 @@ export function onStartEvening(ctx: EveningContext): void {
   void loadRuntime().then(
     ({ runHostEvening }) => {
       try {
-        runHostEvening(session, ctx.rounds, assets, () => {
-          setOverlay(ctx.root, true);
-          ctx.onLobby?.();
-        });
+        runHostEvening(
+          session,
+          ctx.rounds,
+          assets,
+          () => {
+            setOverlay(ctx.root, true);
+            ctx.onLobby?.();
+          },
+          ctx.games ?? [],
+        );
       } catch (e) {
         console.error('could not start the evening', e);
         abort(START_ABORTED);

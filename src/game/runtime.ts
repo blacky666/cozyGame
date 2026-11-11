@@ -31,11 +31,13 @@ function timings(): { host: EveningTiming; stage: StageTiming } {
   return { host, stage };
 }
 
-/** All games, or only the one from the dev flag `game=<id>` (if it exists). */
-const devGames = () => {
+/** The lobby's game choice (all when empty or unknown); the dev flag `game=<id>` overrides it. */
+const eveningGames = (chosen: readonly string[]) => {
   const only = devFlags(location.search).game;
-  const one = MINIGAMES.filter((g) => g.id === only);
-  return one.length > 0 ? one : MINIGAMES;
+  const dev = MINIGAMES.filter((g) => g.id === only);
+  if (dev.length > 0) return dev;
+  const picked = MINIGAMES.filter((g) => chosen.includes(g.id));
+  return picked.length > 0 ? picked : MINIGAMES;
 };
 
 const keyFor = (players: { id: string; slot: 0 | 1 | 2 | 3 }[], id: string | null): PlayerKey => {
@@ -52,6 +54,7 @@ export function runHostEvening(
   rounds: number,
   assets: Record<string, AssetFile>,
   onLobby: () => void,
+  games: readonly string[] = [],
 ): void {
   const keyboard = createKeyboard();
   // Written by MinigameScene, read here every tick: the host's own player throws like a client.
@@ -61,7 +64,7 @@ export function runHostEvening(
   const host = new EveningHost({
     session,
     rounds,
-    games: devGames(),
+    games: eveningGames(games),
     localInput: () => pointer.merge(keyboard.state()),
     assets,
     timing: t.host,
