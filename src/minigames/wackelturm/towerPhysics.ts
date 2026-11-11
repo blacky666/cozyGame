@@ -2,7 +2,7 @@ import Matter from 'matter-js';
 import { CONFIG } from '../../config';
 import type { Plot, TowerLayout } from './towerLayout';
 
-const { Bodies, Body, Bounds, Composite, Engine } = Matter;
+const { Bodies, Body, Bounds, Composite, Engine, Sleeping } = Matter;
 
 /** Block kinds; the snapshot sends the index into this list. */
 export const KINDS = ['quader', 'kurz', 'lang', 'l', 't', 'kugel', 'dreieck', 'wackelstein'] as const;
@@ -49,7 +49,11 @@ export function shapeSize(kind: Kind, rot: Rot): { w: number; h: number } {
 export function createTowerWorld(layout: TowerLayout, plotIndex: number): TowerWorld {
   const plot = layout.plots[plotIndex];
   if (!plot) throw new Error(`wackelturm: no plot ${plotIndex}`);
-  const engine = Engine.create({ enableSleeping: false });
+  const engine = Engine.create({
+    enableSleeping: false,
+    positionIterations: CONFIG.wackelturm.positionIterations,
+    velocityIterations: CONFIG.wackelturm.velocityIterations,
+  });
   engine.gravity.x = 0;
   engine.gravity.y = CONFIG.wackelturm.gravityY;
   const fh = CELL;
@@ -118,7 +122,7 @@ function compoundInertia(body: Matter.Body): number {
  */
 export function spawnBlock(w: TowerWorld, kind: Kind, pivotX: number, pivotY: number, rot: Rot): Matter.Body {
   const body = buildBody(kind, pivotX, pivotY);
-  body.plugin = { ...(body.plugin ?? {}), pivot: { x: pivotX - body.position.x, y: pivotY - body.position.y } };
+  body.plugin = { ...(body.plugin ?? {}), kind, pivot: { x: pivotX - body.position.x, y: pivotY - body.position.y } };
   if (rot !== 0) {
     // Rotate about the pivot: turn the body, then swing its centre of mass around the pivot.
     const a = (rot * Math.PI) / 2;
@@ -129,6 +133,19 @@ export function spawnBlock(w: TowerWorld, kind: Kind, pivotX: number, pivotY: nu
   }
   Composite.add(w.engine.world, body);
   return body;
+}
+
+/** The kind spawnBlock stored on the body. */
+export function blockKind(b: Matter.Body): Kind {
+  const kind = (b.plugin as { kind?: Kind } | undefined)?.kind;
+  if (!kind) throw new Error('wackelturm: body without a block kind');
+  return kind;
+}
+
+/** Takes a block out of the world and wakes every other body, so nothing stays floating. */
+export function removeBlock(w: TowerWorld, b: Matter.Body): void {
+  Composite.remove(w.engine.world, b);
+  for (const other of w.engine.world.bodies) Sleeping.set(other, false);
 }
 
 /** The pivot in world coordinates and the body angle. */

@@ -5,7 +5,7 @@ import { CONFIG } from '../../config';
 import type { AssetFile } from '../../gfx/assetTypes';
 import { readLayout } from './towerLayout';
 import {
-  atRest, blockPose, CELLS, createTowerWorld, FIES_KINDS, KINDS, NORMAL_KINDS, shapeSize, spawnBlock, stepWorld,
+  atRest, blockKind, blockPose, CELLS, createTowerWorld, FIES_KINDS, KINDS, NORMAL_KINDS, removeBlock, shapeSize, spawnBlock, stepWorld,
   type Kind, type Rot, type TowerWorld,
 } from './towerPhysics';
 
@@ -185,6 +185,8 @@ describe('towerPhysics', () => {
     expect(statics[0].bounds.max.x).toBeCloseTo(layout.plots[3].left + layout.plots[3].w, 9);
     expect(w.engine.gravity.y).toBe(C.gravityY);
     expect(w.engine.enableSleeping).toBe(false);
+    expect(w.engine.positionIterations).toBe(C.positionIterations);
+    expect(w.engine.velocityIterations).toBe(C.velocityIterations);
     expect(w.plot).toEqual(layout.plots[3]);
   });
 
@@ -198,5 +200,32 @@ describe('towerPhysics', () => {
       expect(b.frictionStatic).toBe(C.frictionStatic);
       expect(b.restitution).toBe(C.restitution);
     }
+  });
+
+  it('blockKind reads the kind spawnBlock stored; removeBlock takes the body out of the world', () => {
+    const w = createTowerWorld(layout, 0);
+    const a = spawnBlock(w, 'l', 50, 50, 1);
+    const b = spawnBlock(w, 'kugel', 80, 50, 0);
+    expect(blockKind(a)).toBe('l');
+    expect(blockKind(b)).toBe('kugel');
+    removeBlock(w, a);
+    expect(w.engine.world.bodies).not.toContain(a);
+    expect(w.engine.world.bodies).toContain(b);
+  });
+
+  it('a stack of 13 flat lang blocks settles, then stands still above the 12-cell goal', () => {
+    const w = createTowerWorld(layout, 0);
+    const plot = layout.plots[0];
+    const bodies = Array.from({ length: 13 }, (_, i) => spawnBlock(w, 'lang', plot.centre, layout.surfaceY - 8 - 16 * i, 0));
+    // The solver pushes the stack into a slight lean while it settles (top about 20 px off); after that it holds.
+    run(w, 4000);
+    const settled = bodies.map((b) => blockPose(b));
+    run(w, 3000);
+    bodies.forEach((b, i) => {
+      expect(Math.abs(blockPose(b).x - settled[i].x)).toBeLessThan(0.5);
+      expect(Math.abs(blockPose(b).y - settled[i].y)).toBeLessThan(0.5);
+    });
+    const top = Math.min(...bodies.map((b) => b.bounds.min.y));
+    expect(layout.surfaceY - top).toBeGreaterThanOrEqual(C.goalPx);
   });
 });
