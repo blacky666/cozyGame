@@ -9,7 +9,7 @@ import { defaultProfile } from '../../save/profile';
 import { playerKey, type GamePlayer, type PlayerKey } from '../types';
 import { readLayout } from './towerLayout';
 import { columnAt, craneBounds, createTowerHost, finaleAt, stepCrane, type TowerFx, type TowerState } from './towerHost';
-import { FIES_KINDS, KINDS, NORMAL_KINDS, shapeSize, spawnBlock, type Kind, type Rot } from './towerPhysics';
+import { atRest, FIES_KINDS, KINDS, NORMAL_KINDS, shapeSize, spawnBlock, type Kind, type Rot } from './towerPhysics';
 
 const file = JSON.parse(readFileSync('public/assets/arena-wackelturm.json', 'utf8')) as AssetFile;
 const layout = readLayout(file);
@@ -239,6 +239,104 @@ describe('Wackel-Turm host', () => {
     expect(p().placed).toBe(1);
   });
 
+  describe('height: anchored rest', () => {
+    it('blocks dropped every 700 ms on a straight stack: the height never drops, rises steadily, no einsturz', () => {
+      const d = driver(['p0'], { rand: always('quader') });
+      const log = fxLog(d);
+      const p = () => d.snap().players.p0;
+      let last = 0;
+      let maxSeen = 0;
+      let drops = 0;
+      for (let i = 0; i < 12; i++) {
+        if (p().hang && blocks(d.snap(), 'p0').length < 10) {
+          d.press('p0', 'drops');
+          drops++;
+        }
+        for (let t = 0; t < ticksFor(700); t++) {
+          log.tick();
+          // Resting bodies sink a fraction of a pixel under each new block (about 0.5 px per layer);
+          // never a real drop: at most 1 px per tick and settleTolPx below the best so far.
+          expect(p().heightPx).toBeGreaterThanOrEqual(last - 1);
+          maxSeen = Math.max(maxSeen, p().heightPx);
+          expect(p().heightPx).toBeGreaterThanOrEqual(maxSeen - C.settleTolPx);
+          last = p().heightPx;
+        }
+      }
+      log.tick(ticksFor(C.restHoldMs + 1000));
+      expect(log.of('weg')).toHaveLength(0);
+      expect(log.of('einsturz')).toHaveLength(0);
+      expect(drops).toBeGreaterThanOrEqual(8);
+      expect(p().heightPx).toBeGreaterThanOrEqual(15 * drops);
+      expect(p().placed).toBe(drops);
+      // hoehe fx: each new best at least hoeheStepPx above the one before.
+      const ys = log.of('hoehe').map((f) => layout.surfaceY - f.y);
+      expect(ys.length).toBeGreaterThan(0);
+      for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1]).toBeGreaterThanOrEqual(C.hoeheStepPx);
+    });
+
+    it('a block landed 1.5 s ago still becomes placed after a neighbour lands on it', () => {
+      const d = driver(['p0'], { rand: always('kurz') });
+      const p = () => d.snap().players.p0;
+      const a = spawnBlock(d.world('p0'), 'quader', P0.centre, layout.surfaceY - 8, 0);
+      d.tick(ticksFor(1500));
+      expect(p().placed).toBe(0);
+      // A lang lands on it off-centre: the quader is jolted (not at rest) but barely moves.
+      spawnBlock(d.world('p0'), 'lang', P0.centre + 8, layout.surfaceY - 16 - 8 - 40, 0);
+      let jolted = false;
+      for (let i = 0; i < ticksFor(C.restHoldMs - 1500 + 300); i++) {
+        d.tick();
+        if (!atRest(a)) jolted = true;
+      }
+      expect(jolted).toBe(true);
+      expect(p().placed).toBe(1);
+      expect(p().heightPx).toBe(16);
+    });
+
+    it('a real collapse lowers the height at once and fires einsturz', () => {
+      const d = driver(['p0'], { rand: always('kurz') });
+      const log = fxLog(d);
+      // Four upright quader: 128 px, below the goal.
+      stack(d, 'p0', 0, 'quader', 4, 1);
+      log.tick(ticksFor(C.restHoldMs + 1000));
+      const before = d.snap().players.p0.heightPx;
+      expect(before).toBeGreaterThanOrEqual(4 * 32 - 2);
+      expect(before).toBeLessThan(C.goalPx);
+      const bodies = d.world('p0').engine.world.bodies.filter((b) => !b.isStatic);
+      // A hard shove sideways at the top half topples it.
+      for (const b of bodies) {
+        Matter.Sleeping.set(b, false);
+        if (layout.surfaceY - b.position.y > 2 * 32) Matter.Body.setVelocity(b, { x: 6, y: 0 });
+      }
+      for (let i = 0; i < 120; i++) {
+        log.tick();
+        const realTop = layout.surfaceY - Math.min(...d.world('p0').engine.world.bodies.filter((b) => !b.isStatic).map((b) => b.bounds.min.y), layout.surfaceY);
+        expect(d.snap().players.p0.heightPx).toBeLessThanOrEqual(Math.round(realTop) + 1);
+      }
+      expect(d.snap().players.p0.heightPx).toBeLessThan(before / 2);
+      expect(log.of('einsturz').length).toBeGreaterThan(0);
+    });
+
+    it('timeout ranking uses the rested heights even if a block lands just before the end', () => {
+      const d = driver(['p0', 'p1'], { rand: always('quader'), durationMs: 8000 });
+      stack(d, 'p0', 0, 'quader', 4);
+      stack(d, 'p1', 1, 'quader', 3);
+      d.tick(ticksFor(8000 - 1000) - 1);
+      const rested = [d.snap().players.p0.heightPx, d.snap().players.p1.heightPx];
+      expect(rested[0]).toBeGreaterThanOrEqual(63);
+      expect(rested[1]).toBeGreaterThanOrEqual(47);
+      const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) <= 1);
+      // A late block falls onto the top of p0's tower and jolts it; it has no time to be placed.
+      spawnBlock(d.world('p0'), 'quader', P0.centre + 6, layout.surfaceY - 64 - 8 - 40, 0);
+      d.tick(ticksFor(1000));
+      expect(d.g.result()).not.toBeNull();
+      expect(blocks(d.snap(), 'p0')).toHaveLength(5);
+      // Within a pixel of the rested heights (resting bodies sink a fraction of a pixel under new weight).
+      expect(near([d.snap().players.p0.heightPx, d.snap().players.p1.heightPx], rested)).toBe(true);
+      expect(d.g.result()).toEqual([['p0'], ['p1']]);
+    });
+
+  });
+
   it('a block falling off the side is removed with fx weg and never counts', () => {
     const d = driver(['p0'], { rand: always('kurz') });
     const log = fxLog(d);
@@ -344,14 +442,15 @@ describe('Wackel-Turm host', () => {
     stack(d, 'p0', 0, 'kurz', 1);
     let ticks = 0;
     while (d.g.result() === null && ticks < 300) { d.tick(); ticks++; }
-    // Placed in the tick that completes restHoldMs; that tick already counts toward goalHoldMs.
-    expect(ticks).toBe(ticksFor(C.restHoldMs) + ticksFor(C.goalHoldMs) - 1);
+    // The first tick at rest only anchors the block; placed in the tick that completes restHoldMs after
+    // it, and that tick already counts toward goalHoldMs.
+    expect(ticks).toBe(1 + ticksFor(C.restHoldMs) + ticksFor(C.goalHoldMs) - 1);
     expect(d.snap().winner).toBe('p1');
     expect(d.snap().players.p2.heightPx).toBe(C.goalPx);
     expect(d.g.result()).toEqual([['p1', 'p2'], ['p0']]);
   });
 
-  it('seesaw: a block rocking over the goal line after an impact does not win while it rocks', () => {
+  it('seesaw: a block rocking over the goal line after an impact neither wins nor counts for the height', () => {
     const d = driver(['p0'], { rand: always('kurz') });
     const cx = P0.centre;
     // 9 flat lang plus a 10th 12 px off-centre (the seesaw): its rested top stays just under goalPx.
@@ -374,7 +473,8 @@ describe('Wackel-Turm host', () => {
       }
     }
     expect(rockedOverGoal).toBeGreaterThan(0);
-    expect(heightOverGoal).toBeGreaterThan(0);
+    // A placed block never counts higher than where it rested.
+    expect(heightOverGoal).toBe(0);
     expect(d.snap().winner).toBeNull();
   });
 

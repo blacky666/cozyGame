@@ -188,6 +188,15 @@ interface GameConfig {
     stepMs: number;
     /** Matter gravity y (scale stays at Matter's default 0.001). */
     gravityY: number;
+    /**
+     * Anchored rest: a block that came to rest is anchored at its pose; it counts as still (restMs grows)
+     * while its pivot stays within settleTolPx and its angle within settleTolRad of the anchor, so a jolt
+     * that does not really move it no longer resets it.
+     */
+    settleTolPx: number;
+    settleTolRad: number;
+    /** fx 'hoehe' only for a new best at least this far above the last best (px). */
+    hoeheStepPx: number;
     /** Block material. */
     friction: number;
     frictionStatic: number;
@@ -236,12 +245,6 @@ interface GameConfig {
     windAccel: number;
     /** Wobble sound: a block faster than wobbleSpeed (px/step), at most once per wobbleGapMs. */
     wobbleSpeed: number;
-    /**
-     * A placed block counts for the height only while its speed is at most wobbleSpeed and its angular speed
-     * at most wobbleAngSpeed (rad/step). 0.015 moves the end of a lang (32 px from its centre) about 0.5 px
-     * per step, just under wobbleSpeed; a rocking seesaw block (≈ 0.02) does not count.
-     */
-    wobbleAngSpeed: number;
     wobbleGapMs: number;
     /** A height drop this large in one tick gives fx 'einsturz' (px). */
     collapseDropPx: number;
@@ -332,7 +335,7 @@ export const CONFIG = deepFreeze<GameConfig>({
   },
   // Wackel-Turm (px, px/s, ms; Matter units per 1000/60 ms step where noted).
   wackelturm: {
-    durationMs: 120000, restHoldMs: 2000, stepMs: 1000 / 60, gravityY: 1,
+    durationMs: 120000, restHoldMs: 2000, settleTolPx: 2, settleTolRad: 0.05, hoeheStepPx: 4, stepMs: 1000 / 60, gravityY: 1,
     friction: 0.6, frictionStatic: 0.9, restitution: 0.02, density: 0.001,
     restSpeed: 0.08, restAngSpeed: 0.004, maxStepsPerTick: 20, positionIterations: 12, velocityIterations: 8,
     sleepMotion: 0.03, slop: 0.02,
@@ -340,7 +343,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     // 10 cells; overrides the asset marker (107 px), see the interface comment. Calibrated in the playtest.
     goalPx: 160, goalHoldMs: 400,
     chargeEvery: 3, chargeCap: 2, windMs: 1500, windAccel: 250,
-    wobbleSpeed: 0.6, wobbleAngSpeed: 0.015, wobbleGapMs: 400, collapseDropPx: 32, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
+    wobbleSpeed: 0.6, wobbleGapMs: 400, collapseDropPx: 32, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },

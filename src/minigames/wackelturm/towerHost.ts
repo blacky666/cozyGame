@@ -109,8 +109,20 @@ const countDown = (v: number, ms: number): number => (v - ms > EPS ? v - ms : 0)
 const moveToward = (v: number, target: number, step: number): number =>
   Math.abs(target - v) <= step ? target : v + Math.sign(target - v) * step;
 
-/** Per-body bookkeeping. `landed`: had a collision; `placed`: rested restHoldMs once. */
-type Meta = { id: number; kind: Kind; restMs: number; landed: boolean; placed: boolean };
+/**
+ * Per-body bookkeeping. `landed`: had a collision; `placed`: rested restHoldMs once. `anchor`: the pivot
+ * pose where the block came to rest (null while it moves); `restMs` counts the time it has stayed near it.
+ * `restTop`: top edge (bounds.min.y) where a placed block last rested; it never counts higher than that.
+ */
+type Meta = {
+  id: number;
+  kind: Kind;
+  restMs: number;
+  landed: boolean;
+  placed: boolean;
+  anchor: { x: number; y: number; a: number } | null;
+  restTop: number | null;
+};
 const EDGE_COUNTERS = ['primaryTaps', 'secondaryTaps', 'turnsCw', 'turnsCcw', 'drops'] as const;
 type Presses = Record<(typeof EDGE_COUNTERS)[number], number>;
 type Edges = Record<(typeof EDGE_COUNTERS)[number], Edge>;
@@ -277,7 +289,7 @@ export function createTowerHost(
   const track = (s: Slot, body: Matter.Body): Meta => {
     let m = s.metas.get(body);
     if (!m) {
-      m = { id: nextBlockId++, kind: blockKind(body), restMs: 0, landed: false, placed: false };
+      m = { id: nextBlockId++, kind: blockKind(body), restMs: 0, landed: false, placed: false, anchor: null, restTop: null };
       s.metas.set(body, m);
     }
     return m;
@@ -303,26 +315,51 @@ export function createTowerHost(
         addFx('weg', k, pose.x, pose.y);
         continue;
       }
-      m.restMs = atRest(body) ? m.restMs + ms : 0;
+      settle(m, body, pose, ms);
       if (m.placed && body.speed > c.wobbleSpeed && s.wobbleMs <= 0) {
         s.wobbleMs = c.wobbleGapMs;
         addFx('wackel', k, pose.x, pose.y, { slide: Math.abs(body.velocity.x) > Math.abs(body.velocity.y) });
       }
-      if (!m.placed && m.restMs >= c.restHoldMs - EPS) {
+      const still = m.restMs >= c.restHoldMs - EPS;
+      if (!m.placed && still) {
         m.placed = true;
         p.placed++;
         if (p.placed % c.chargeEvery === 0) p.charges = Math.min(c.chargeCap, p.charges + 1);
       }
+      // A placed block re-anchors its top whenever it has been still again (it may settle higher or lower)
+      // and follows at once when it sinks or falls below where it rested.
+      if (m.placed && (still || m.restTop === null || body.bounds.min.y > m.restTop)) m.restTop = body.bounds.min.y;
     }
     s.hits.clear();
   };
 
   /**
-   * Step 7: height, goal hold and crane height. The height counts placed blocks that are not wobbling
-   * (speed ≤ wobbleSpeed, angular speed ≤ wobbleAngSpeed), so a small jolt from a landing block does not
-   * flicker the height while a toppling tower drops out at once. Rounded, because resting bodies sink a
-   * fraction of a pixel into each other. The goal is stricter: a placed block at rest must reach goalPx
-   * and something must stay there for goalHoldMs (goalMs).
+   * Anchored rest: the first tick at rest anchors the pivot pose; restMs then grows while the block stays
+   * within settleTolPx / settleTolRad of the anchor, even through a jolt. A real move drops the anchor.
+   */
+  const settle = (m: Meta, body: Matter.Body, pose: { x: number; y: number; a: number }, ms: number) => {
+    const a = m.anchor;
+    if (a === null) {
+      if (atRest(body)) {
+        m.anchor = { ...pose };
+        m.restMs = 0;
+      }
+      return;
+    }
+    if (Math.hypot(pose.x - a.x, pose.y - a.y) <= c.settleTolPx && Math.abs(wrapAngle(pose.a - a.a)) <= c.settleTolRad) {
+      m.restMs += ms;
+      return;
+    }
+    m.anchor = null;
+    m.restMs = 0;
+  };
+
+  /**
+   * Step 7: height, goal hold and crane height. The height is the highest top of the placed blocks, each
+   * counted no higher than where it rested (the lower of restTop and its current top): a jolt or a rocking
+   * block never lifts it, a falling block lowers it at once, a removed block is gone. Rounded, because
+   * resting bodies sink a fraction of a pixel into each other. The goal is stricter: a placed block at rest
+   * must reach goalPx and something must stay there for goalHoldMs (goalMs).
    */
   const updateHeight = (k: PlayerKey, ms: number) => {
     const sec = ms / 1000;
@@ -335,15 +372,13 @@ export function createTowerHost(
     for (const [body, m] of s.metas) {
       if (m.landed) landedTop = Math.min(landedTop, body.bounds.min.y);
       if (!m.placed) continue;
-      if (body.speed <= c.wobbleSpeed && body.angularSpeed <= c.wobbleAngSpeed) restedTop = Math.min(restedTop, body.bounds.min.y);
+      restedTop = Math.min(restedTop, Math.max(m.restTop ?? body.bounds.min.y, body.bounds.min.y));
       if (atRest(body)) goalTop = Math.min(goalTop, body.bounds.min.y);
     }
     s.goalMs = Math.round(layout.surfaceY - goalTop) >= c.goalPx ? s.goalMs + ms : 0;
     const h = Math.max(0, Math.round(layout.surfaceY - restedTop));
-    if (h > p.bestPx) {
-      p.bestPx = h;
-      addFx('hoehe', k, plot.centre, layout.surfaceY - h);
-    }
+    if (h >= p.bestPx + c.hoeheStepPx) addFx('hoehe', k, plot.centre, layout.surfaceY - h);
+    p.bestPx = Math.max(p.bestPx, h);
     if (p.heightPx - h >= c.collapseDropPx) addFx('einsturz', k, plot.centre, layout.surfaceY - p.heightPx);
     p.heightPx = h;
     const target = Math.min(layout.hangTopStart, landedTop - c.craneClearPx);
