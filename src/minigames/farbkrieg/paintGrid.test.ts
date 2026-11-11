@@ -21,10 +21,11 @@ describe('paintGrid', () => {
     const g = createGrid(arena);
     expect([g.cols, g.rows, g.tile]).toEqual([26, 13, 16]);
     expect(g.tile).toBe(PAINT_TILE);
-    expect(g.count).toBe(239);
+    expect(g.count).toBe(235);
     for (let c = 0; c < 26; c++) for (const r of [0, 1]) expect(g.paintable[at(g, c, r)]).toBe(0);
     for (let r = 0; r < 13; r++) for (const c of [0, 25]) expect(g.paintable[at(g, c, r)]).toBe(0);
-    for (let c = 0; c < 26; c++) expect(g.paintable[at(g, c, 12)] === 1).toBe(c >= 11 && c <= 14);
+    // the bottom wall is closed: archway base and the wall pieces beside it
+    for (let c = 0; c < 26; c++) expect(g.paintable[at(g, c, 12)]).toBe(0);
   });
   it('tileIndex is null outside', () => {
     const g = createGrid(arena);
@@ -86,7 +87,7 @@ describe('paintGrid', () => {
     decodeGrid(s, h);
     expect(Array.from(h.owner)).toEqual(Array.from(g.owner));
     expect(encodeGrid(createGrid(arena))).toBe('0'.repeat(338));
-    expect(tileCounts(g).reduce((a, b) => a + b, 0)).toBe(239);
+    expect(tileCounts(g).reduce((a, b) => a + b, 0)).toBe(235);
   });
   it('rankByCount', () => {
     expect(rankByCount({ a: 5, b: 5, c: 2 })).toEqual([['a', 'b'], ['c']]);
