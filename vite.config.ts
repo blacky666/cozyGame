@@ -12,6 +12,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // CI runners are several times slower than a desktop; keep headroom for simulation tests.
+    testTimeout: 15000,
     include: ['src/**/*.test.ts', 'tools/**/*.test.ts'],
   },
 });

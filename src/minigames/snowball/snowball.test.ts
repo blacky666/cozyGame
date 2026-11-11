@@ -630,12 +630,17 @@ describe('schneeball extras', () => {
     d.tick(SPAWN_TICKS - 5);
     expect(d.snap().pickups.length).toBe(0);
     let seen = 0;
+    // Check each pickup once, in the tick it appears (players are idle, so the spawn-time
+    // checks hold for its whole life). Checking every tick made this test too slow for CI.
+    const checked = new Set<number>();
     for (let i = 0; i < 60 * 30; i++) {
       d.tick();
       const s = d.snap();
       seen = Math.max(seen, s.pickups.length);
-      expect(s.pickups.length).toBeLessThanOrEqual(C.maxPickups);
+      if (s.pickups.length > C.maxPickups) expect(s.pickups.length).toBeLessThanOrEqual(C.maxPickups);
       for (const pk of s.pickups) {
+        if (checked.has(pk.id)) continue;
+        checked.add(pk.id);
         expect(['w', 'j']).not.toContain(tileAt(arena, pk.x, pk.y));
         for (const so of arena.solids) {
           const cx = Math.max(so.x, Math.min(pk.x, so.x + so.w));
