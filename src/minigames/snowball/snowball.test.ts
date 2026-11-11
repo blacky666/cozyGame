@@ -54,6 +54,21 @@ function driver(keys: string[], opts: { remote?: Record<string, boolean>; durati
 
 /** Where a figure's body is hit: the ball path point above its feet. */
 const body = (p: { x: number; y: number }) => [p.x, p.y - BALL_LIFT] as const;
+/**
+ * Distance of the segment (x0, y0) -> (x1, y1) to the axis of a figure's hit capsule (feet − 22 to
+ * feet − 3), by dense sampling (independent of the host's search).
+ */
+function distToFigure(x0: number, y0: number, x1: number, y1: number, fx: number, fy: number): number {
+  let best = Infinity;
+  for (let i = 0; i <= 4000; i++) {
+    const t = i / 4000;
+    const px = x0 + (x1 - x0) * t;
+    const py = y0 + (y1 - y0) * t;
+    const cy = Math.min(fy - 3, Math.max(fy - 22, py));
+    best = Math.min(best, Math.hypot(px - fx, py - cy));
+  }
+  return best;
+}
 /** All fx of one kind seen while ticking n times (by id), with their positions. */
 function collectFx(d: ReturnType<typeof driver>, kind: string, n: number) {
   const seen = new Map<number, { x: number; y: number }>();
@@ -322,6 +337,60 @@ describe('schneeball host', () => {
     expect(s.players.p1.score).toBe(0);
   });
 
+  it('a crosshair on the head hits', () => {
+    const d = driver(['p0', 'p2']);
+    p2ToMiddle(d);
+    d.tap('p2', 60, 110 - 20);
+    d.tick(15);
+    expect(d.snap().players.p2.score).toBe(C.hitPoints);
+    expect(d.snap().players.p0.down).toBe(true);
+  });
+
+  it('a crosshair on the feet hits', () => {
+    const d = driver(['p0', 'p2']);
+    p2ToMiddle(d);
+    d.tap('p2', 60, 110 - 2);
+    d.tick(15);
+    expect(d.snap().players.p2.score).toBe(C.hitPoints);
+  });
+
+  it('aiming 12 px beside the figure misses', () => {
+    const d = driver(['p0', 'p2']);
+    p2ToMiddle(d);
+    // The ball lands 12 px in front of p0's figure (p0 at x 60, the thrower at x 90).
+    d.tap('p2', 60 + 12, 110 - 10);
+    d.tick(15);
+    expect(d.snap().players.p2.score).toBe(0);
+    expect(d.snap().players.p0.invulnMs).toBe(0);
+    expect(d.snap().fx.some((f) => f.kind === 'zerfall')).toBe(true);
+  });
+
+  it('a right click right after a left click still throws', () => {
+    const d = driver(['p0', 'p2']);
+    d.tap('p2', 300, 60);
+    d.tick();
+    d.strong('p2', 300, 60); // 33 ms later: inside throwGapMs, which only spaces normal throws
+    d.tick();
+    const s = d.snap();
+    expect(s.balls.length).toBe(2);
+    expect(s.players.p2.balls).toBe(C.maxBalls - 2);
+    expect(Math.hypot(s.balls[1].vx, s.balls[1].vy)).toBeCloseTo(C.strongSpeed, 5);
+  });
+
+  it('a reconnecting player fires no phantom throw', () => {
+    const d = driver(['p0', 'p2']);
+    d.tap('p0', 60, 200);
+    d.tick(15);
+    expect(d.snap().balls.length).toBe(0);
+    const saved = d.inputs.p0;
+    delete d.inputs.p0;
+    d.tick(5);
+    d.inputs.p0 = saved; // same counters as before the drop
+    d.tick();
+    expect(d.snap().balls.length).toBe(0);
+    expect(d.snap().players.p0.balls).toBe(C.maxBalls - 1);
+  });
+
   it('a hit knocks the victim down for 0.9 s: no move, no throw, no reload, not shovable', () => {
     const d = driver(['p0', 'p2']);
     p2ToMiddle(d);
@@ -360,18 +429,25 @@ describe('schneeball host', () => {
     const d = driver(['p0', 'p2']);
     p2ToMiddle(d);
     d.tap('p2', 60, 110 - BALL_LIFT);
-    d.tick(9);
+    let since = 0; // ticks since the hit
+    for (let i = 0; i < 15 && d.snap().players.p0.invulnMs === 0; i++) d.tick();
     expect(d.snap().players.p2.score).toBe(2);
-    expect(d.snap().players.p0.invulnMs).toBeGreaterThan(C.invulnMs - 300);
-    // After the knockdown, still protected: the second ball dies on the victim, no points.
-    d.tick(Math.ceil(C.downMs / 1000 / DT) + 3);
-    expect(d.snap().players.p0.down).toBe(false);
+    // Second ball thrown at 2.0 s, arriving at about 2.2 s after the hit: dies on the victim, no points.
+    d.tick(60);
+    since += 60;
     d.tap('p2', 60, 110 - BALL_LIFT);
-    d.tick(15);
+    let arrived = false;
+    for (let i = 0; i < 9; i++) {
+      d.tick();
+      since++;
+      if (d.snap().balls.length === 0) { arrived = true; break; }
+    }
+    expect(arrived).toBe(true);
+    expect(since * DT * 1000).toBeLessThan(C.invulnMs - 100);
     expect(d.snap().players.p2.score).toBe(2);
     expect(d.snap().players.p0.down).toBe(false);
-    expect(d.snap().balls.length).toBe(0);
-    d.tick(Math.ceil(C.invulnMs / 1000 / DT));
+    // At about 2.6 s the protection is over and a hit counts again.
+    d.tick(Math.round(2.6 / DT) - since);
     expect(d.snap().players.p0.invulnMs).toBe(0);
     d.tap('p2', 60, 110 - BALL_LIFT);
     d.tick(15);
@@ -435,9 +511,14 @@ describe('schneeball host', () => {
     const run = (remote: boolean) => {
       const d = driver(['p0', 'p2'], { remote: { p2: remote } });
       p2ToMiddle(d);
-      // The victim steps down out of the line just as the ball is thrown.
+      // Thrower 50 px away at (110, 110), so the ball needs about 8 ticks.
+      d.set('p2', { right: true });
+      while (d.snap().players.p2.x < 110 - 1) d.tick();
+      d.set('p2', {});
+      d.tick();
+      // The victim steps up out of the line (more than the figure's height above the path) as the ball is thrown.
       d.tap('p2', 60, 110 - BALL_LIFT);
-      d.set('p0', { down: true });
+      d.set('p0', { up: true });
       d.tick(15);
       return d.snap().players.p2.score;
     };
@@ -606,13 +687,16 @@ describe('schneeball extras', () => {
       const d = driver(['p0', 'p2'], { rand: scripted(kind) });
       collectWithP0(d);
       const [sx, sy] = body(d.snap().players.p0);
-      const [tx, ty] = body(d.snap().players.p2);
-      // The ball line passes 9.5 px beside p2's chest: misses the normal 7 px circle, inside the giant's 11 px.
+      const t = d.snap().players.p2;
+      const [tx, ty] = body(t);
+      // The path passes 10 px beside p2's figure: outside the normal reach (3 + 5), inside the giant's (3 + 5 + 4).
       const dist = Math.hypot(tx - sx, ty - sy);
       const ux = (tx - sx) / dist;
       const uy = (ty - sy) / dist;
-      const side = (9.5 * dist) / Math.sqrt(dist * dist - 9.5 * 9.5);
-      d.tap('p0', tx - uy * side, ty + ux * side);
+      let side = 0;
+      const aim = () => [tx + ux * 20 - uy * side, ty + uy * 20 + ux * side] as const;
+      while (distToFigure(sx, sy, ...aim(), t.x, t.y) < 10) side += 0.05;
+      d.tap('p0', ...aim());
       d.tick();
       const b = d.snap().balls[0];
       const speed = Math.hypot(b.vx, b.vy);
@@ -706,7 +790,7 @@ describe('snowball botView', () => {
   it('idles without balls and otherwise keeps 60 px from the nearest opponent', () => {
     const g = createSnowballHost(gp(['p0', 'p1']), mulberry32(1), arena);
     const st = g.snapshot();
-    expect(snowball.botView?.(st, 'p0')).toMatchObject({ aim: { x: st.players.p1.x, y: st.players.p1.y - BALL_LIFT } });
+    expect(snowball.botView?.(st, 'p0')).toMatchObject({ aim: { x: st.players.p1.x, y: st.players.p1.y - 12 } });
     st.players.p0.balls = 0;
     expect(snowball.botView?.(st, 'p0')).toEqual({ self: { x: st.players.p0.x, y: st.players.p0.y }, targets: [], idle: true });
     st.players.p0.balls = 3;

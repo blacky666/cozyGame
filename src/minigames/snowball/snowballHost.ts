@@ -258,7 +258,7 @@ export function createSnowballHost(
       // 1. Shoves; the slide goes through the arena collision.
       // Only players with an input this tick (= connected) take part: absent ones can neither shove nor be shoved.
       // Down players neither shove nor can be shoved; their presses are consumed, not queued.
-      for (const k of keys) if (players[k].down) shove[k].edge.take(inputs[k]?.shoves ?? 0);
+      for (const k of keys) if (players[k].down && inputs[k]) shove[k].edge.take(inputs[k].shoves);
       resolveShoves(keys.filter((k) => inputs[k] && !players[k].down), players, shove, inputs);
       // 2. Movement.
       for (const k of keys) {
@@ -301,7 +301,13 @@ export function createSnowballHost(
       // 3. Throws (one per tick at most; presses without ammo or too early are dropped) and 4. reload.
       for (const k of keys) {
         const p = players[k];
-        const inp = inputs[k] ?? neutralInput();
+        const inp = inputs[k];
+        // Disconnected (no input this tick): no edge is taken, so a reconnect fires no phantom throw.
+        if (!inp) {
+          p.reloading = false;
+          reloadMs[k] = 0;
+          continue;
+        }
         // Both edges every tick: presses are consumed, never queued.
         const normal = taps[k].take(inp.primaryTaps);
         const strong = strongTaps[k].take(inp.secondaryTaps);
@@ -312,7 +318,9 @@ export function createSnowballHost(
           continue;
         }
         // Left and right in the same tick: the strong throw wins, the normal press is dropped.
-        if ((strong > 0 || normal > 0) && p.balls >= 1 && sinceThrowMs[k] >= c.throwGapMs && p.strongCdMs <= 0) {
+        // throwGapMs only spaces normal throws; after a strong throw strongCooldownMs blocks both.
+        const ready = p.balls >= 1 && p.strongCdMs <= 0;
+        if (ready && (strong > 0 || (normal > 0 && sinceThrowMs[k] >= c.throwGapMs))) {
           throwBall(k, inp.aimX, inp.aimY, strong > 0, solids);
           continue;
         }

@@ -5,6 +5,11 @@ import type { Ball } from './snowballHost';
 
 /** Balls fly at chest height: this far above the thrower's/victim's feet. */
 export const BALL_LIFT = 8;
+/** Player hit capsule: vertical segment from feet − BODY_TOP (head) to feet − BODY_BOTTOM (feet). */
+export const BODY_TOP = 22;
+export const BODY_BOTTOM = 3;
+/** Search iterations for the first contact along a ball step (the distance is convex in t). */
+const SEARCH_STEPS = 40;
 
 /** A player a ball can hit, at the (possibly rewound) feet position to test against. */
 export type BallTarget = { key: PlayerKey; x: number; y: number };
@@ -41,6 +46,44 @@ export function spawnIgnores(x: number, y: number, vx: number, vy: number, solid
   return ids;
 }
 
+/** Distance from a point to the hit capsule's axis of a player with feet at (fx, fy). */
+export function bodyDistance(px: number, py: number, fx: number, fy: number): number {
+  const cy = Math.min(fy - BODY_BOTTOM, Math.max(fy - BODY_TOP, py));
+  return Math.hypot(px - fx, py - cy);
+}
+
+/** Hit reach of a ball: ball radius plus the capsule radius (plus the giant bonus). */
+export function hitReach(kind: Ball['kind']): number {
+  const c = CONFIG.snowball;
+  return c.ballRadius + c.bodyHitRadius + (kind === 'riesenball' ? c.giantExtraRadius : 0);
+}
+
+/**
+ * First t in 0..1 where the segment (x0, y0) -> (x1, y1) comes within `reach` of the capsule axis
+ * of a player with feet at (fx, fy), or null. The distance along a line to a segment is convex,
+ * so: minimum by ternary search, then the first crossing by bisection.
+ */
+export function firstContact(x0: number, y0: number, x1: number, y1: number, fx: number, fy: number, reach: number): number | null {
+  const d = (t: number) => bodyDistance(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, fx, fy);
+  if (d(0) <= reach) return 0;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < SEARCH_STEPS; i++) {
+    const m1 = lo + (hi - lo) / 3;
+    const m2 = hi - (hi - lo) / 3;
+    if (d(m1) <= d(m2)) hi = m2; else lo = m1;
+  }
+  const tMin = (lo + hi) / 2;
+  if (d(tMin) > reach && d(1) > reach) return null;
+  let a = 0;
+  let b = d(tMin) <= reach ? tMin : 1;
+  for (let i = 0; i < SEARCH_STEPS; i++) {
+    const m = (a + b) / 2;
+    if (d(m) <= reach) b = m; else a = m;
+  }
+  return b;
+}
+
 /** Speed (px/s) and max flight distance (px) of a left-click (normal) or right-click (strong) throw. */
 export function throwPower(strong: boolean): { speed: number; range: number } {
   const c = CONFIG.snowball;
@@ -63,19 +106,17 @@ export function advanceBall(b: Ball, dt: number, arena: Arena, solids: Solid[], 
   const sx = lerp(b.x, ex, stopT);
   const sy = lerp(b.y, ey, stopT);
 
-  // Nearest player along the free part of the path (closest approach within the hit circle).
-  const radius = b.kind === 'riesenball' ? c.giantHitRadius : c.hitRadius;
+  // First player touched along the free part of the path (incl. its end, where a ball lands):
+  // the ball reaches the vertical capsule over the whole figure.
+  const reach = hitReach(b.kind);
   const dx = sx - b.x;
   const dy = sy - b.y;
-  const len2 = dx * dx + dy * dy;
   let victim: BallTarget | null = null;
   let victimT = Infinity;
   for (const tg of targets) {
     if (tg.key === b.owner) continue;
-    const cx = tg.x;
-    const cy = tg.y - BALL_LIFT;
-    const t = len2 > 0 ? Math.min(1, Math.max(0, ((cx - b.x) * dx + (cy - b.y) * dy) / len2)) : 0;
-    if (Math.hypot(b.x + dx * t - cx, b.y + dy * t - cy) > radius || t >= victimT) continue;
+    const t = firstContact(b.x, b.y, sx, sy, tg.x, tg.y, reach);
+    if (t === null || t >= victimT) continue;
     victim = tg;
     victimT = t;
   }

@@ -32,14 +32,16 @@ const CROSSHAIR_OUTLINE = 0x3b2418;
 /** Alpha of the crosshair while the own player cannot throw. */
 const CROSSHAIR_DIM = 0.4;
 /**
- * Crosshair arms around the (empty) centre pixel, 9x9 in total: [x, y, w, h] of the arm and of its
- * 1 px outline (not covering the centre, so the aimed pixel stays visible).
+ * Crosshair, 13x13 around the pointer pixel (0, 0): four arms 5 px long and 2 px thick around an
+ * empty 3x3 centre. [x, y, w, h] of each arm and of its 1 px outline; the outline leaves the inner
+ * end open so the centre gap stays 3x3. With an even thickness inside an odd box the arms sit on
+ * pixel rows/columns 0 and 1 (half a pixel off the box centre).
  */
 const CROSSHAIR_ARMS: ReadonlyArray<readonly [readonly number[], readonly number[]]> = [
-  [[1, 0, 4, 1], [1, -1, 5, 3]],
-  [[-4, 0, 4, 1], [-5, -1, 5, 3]],
-  [[0, 1, 1, 4], [-1, 1, 3, 5]],
-  [[0, -4, 1, 4], [-1, -5, 3, 5]],
+  [[2, 0, 5, 2], [2, -1, 6, 4]],
+  [[-6, 0, 5, 2], [-7, -1, 6, 4]],
+  [[0, 2, 2, 5], [-1, 2, 4, 6]],
+  [[0, -6, 2, 5], [-1, -7, 4, 6]],
 ];
 const BALL_SPRITE: Record<Ball['kind'], string> = {
   normal: 'schnee.ball.flug',
@@ -80,6 +82,8 @@ export class SnowballView implements MiniGameView<SnowState> {
   private readonly ring: Phaser.GameObjects.Graphics;
   /** Own crosshair at the pointer (replaces the hidden system cursor). */
   private readonly crosshair: Phaser.GameObjects.Graphics;
+  /** Whether the own player can throw right now (from the last rendered state; dims the crosshair). */
+  private canThrow = true;
   // Prediction (clients): same scheme as Münzjagd, with the arena movement of the host.
   private readonly reconciler = new Reconciler<Mover>((m, input, dt) => stepMover(m, input, dt, this.arena, this.solids));
   private solids: Solid[];
@@ -127,8 +131,8 @@ export class SnowballView implements MiniGameView<SnowState> {
     return g;
   }
 
-  /** Crosshair on the pointer's world pixel; dimmed while the own player cannot throw, hidden off the canvas. */
-  private updateCrosshair(self: SnowPlayer | undefined): void {
+  /** Every frame: crosshair on the pointer's world pixel; dimmed while the own player cannot throw, hidden off the canvas. */
+  frame(): void {
     const input = this.scene.input;
     if (!input?.manager || !input.isOver) {
       this.crosshair.setVisible(false);
@@ -136,10 +140,9 @@ export class SnowballView implements MiniGameView<SnowState> {
     }
     const p = input.activePointer;
     const w = this.scene.cameras.main.getWorldPoint(p.x, p.y);
-    const blocked = !self || self.balls < 1 || self.down || self.stun || self.strongCdMs > 0;
     this.crosshair
       .setPosition(Math.floor(w.x), Math.floor(w.y))
-      .setAlpha(blocked ? CROSSHAIR_DIM : 1)
+      .setAlpha(this.canThrow ? 1 : CROSSHAIR_DIM)
       .setVisible(true);
   }
 
@@ -226,7 +229,8 @@ export class SnowballView implements MiniGameView<SnowState> {
       this.attach(a, a.hat, sp.hat, 'head', `schnee.eiszapfenmuetze.${p.dir === 'left' ? 'side' : p.dir}`, x, y, y + 0.2, alpha);
       if (key === selfKey) drawShoveRing(this.ring, x, y, sp.shoveCdMs);
     }
-    this.updateCrosshair(s.players[selfKey]);
+    const me: SnowPlayer | undefined = s.players[selfKey];
+    this.canThrow = !!me && me.balls >= 1 && !me.down && !me.stun && me.strongCdMs <= 0;
     this.renderBalls(s.balls);
     this.renderWorld(s);
     this.renderFx(s.fx);

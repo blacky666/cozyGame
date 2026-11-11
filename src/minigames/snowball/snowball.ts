@@ -1,7 +1,6 @@
 import { CONFIG } from '../../config';
 import { buildArena } from '../common/arena';
 import type { BotView, MiniGame, PlayerKey } from '../types';
-import { BALL_LIFT } from './snowballBalls';
 import { createSnowballHost, type Ball, type SnowPlayer, type SnowState } from './snowballHost';
 import { ARENA_FILE, ARENA_MAP, ARENA_OFFSET, SnowballView } from './snowballView';
 
@@ -28,9 +27,12 @@ const BOT_DISTANCE = 60;
 const BOT_BOUNDS = { minX: 16, maxX: 400, minY: 52, maxY: 188 };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** Bots aim this far above the opponent's feet: the middle of the hit capsule. */
+const BOT_AIM_LIFT = 12;
+
 /**
  * Bots reload while standing still; with ammo they hold a distance from the nearest opponent and
- * aim at its body (the ball path point above the feet, where a hit counts).
+ * aim at the middle of its figure.
  */
 export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
   const me = s.players[key];
@@ -50,7 +52,7 @@ export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
     x: clamp(near.x - ((near.x - me.x) / d) * BOT_DISTANCE, BOT_BOUNDS.minX, BOT_BOUNDS.maxX),
     y: clamp(near.y - ((near.y - me.y) / d) * BOT_DISTANCE, BOT_BOUNDS.minY, BOT_BOUNDS.maxY),
   };
-  return { self, targets: [target], aim: { x: near.x, y: near.y - BALL_LIFT } };
+  return { self, targets: [target], aim: { x: near.x, y: near.y - BOT_AIM_LIFT } };
 }
 
 export const snowball: MiniGame<SnowState> = {

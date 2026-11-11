@@ -54,7 +54,8 @@ interface GameConfig {
     strongCooldownMs: number;
     ballRadius: number;
     bodyRadius: number;
-    hitRadius: number;
+    /** Radius of the player hit capsule (a vertical segment over the whole figure). */
+    bodyHitRadius: number;
     hitPoints: number;
     hitPenalty: number;
     /** After a hit the victim lies on the ground this long (no move, no throw, not shovable). */
@@ -73,7 +74,8 @@ interface GameConfig {
     maxPickups: number;
     bounces: number;
     giantSpeedFactor: number;
-    giantHitRadius: number;
+    /** Riesenschneeball: added to the hit reach. */
+    giantExtraRadius: number;
     extraThrows: number;
   };
   shove: {
@@ -129,10 +131,10 @@ export const CONFIG = deepFreeze<GameConfig>({
   snowball: {
     durationMs: 120000, maxBalls: 5, reloadMs: 600, throwGapMs: 250,
     normalSpeed: 160, normalRange: 150, strongSpeed: 240, strongRange: 240, strongCooldownMs: 800,
-    ballRadius: 3, bodyRadius: 5, hitRadius: 7,
+    ballRadius: 3, bodyRadius: 5, bodyHitRadius: 5,
     hitPoints: 2, hitPenalty: 1, downMs: 900, invulnMs: 2500, snowmanHits: 3, snowmanRebuildMs: 15000, snowmanAufbauMs: 500,
     walkSpeed: 60, iceAccel: 140, iceFriction: 0.8, spawnMs: 12000, maxPickups: 2, bounces: 2,
-    giantSpeedFactor: 0.7, giantHitRadius: 11, extraThrows: 3,
+    giantSpeedFactor: 0.7, giantExtraRadius: 4, extraThrows: 3,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },

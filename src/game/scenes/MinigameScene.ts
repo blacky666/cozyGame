@@ -150,6 +150,7 @@ export class MinigameScene extends Phaser.Scene {
     if (!view || !this.def) return;
     const self = this.ctx.selfKey();
     this.updateAim();
+    view.frame?.();
     if (this.ctx.isHost) {
       const snap = this.ctx.hostSnapshot?.();
       if (snap && snap.round === this.round) {
