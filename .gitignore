@@ -3,3 +3,4 @@ work-files/
 node_modules/
 dist/
 .playwright-mcp/
+.claude/
