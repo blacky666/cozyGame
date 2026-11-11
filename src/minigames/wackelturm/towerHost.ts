@@ -72,6 +72,10 @@ const POS_SCALE = 10;
 const ANGLE_SCALE = 100;
 const CRANE_SCALE = 100;
 const QUARTER_TURNS = 4;
+const TAU = 2 * Math.PI;
+
+/** Angle in (−π, π]. */
+const wrapAngle = (a: number): number => a - TAU * Math.ceil((a - Math.PI) / TAU);
 
 /** The pivot x range that keeps the hanging block inside the column. */
 export function craneBounds(plot: Plot, kind: Kind, rot: Rot): { min: number; max: number } {
@@ -119,6 +123,8 @@ type Slot = {
   rising: boolean;
   /** > 0: no new wackel fx. */
   wobbleMs: number;
+  /** How long a resting placed block has stood at or above goalPx without a break. */
+  goalMs: number;
   edges: Edges;
 };
 
@@ -181,7 +187,7 @@ export function createTowerHost(
     });
     slotOf[gp.key] = gp.slot;
     slots[gp.key] = {
-      world, metas: new Map(), hits, seqIndex: 0, fiesQueue: [], rising: false, wobbleMs: 0, edges: newEdges(),
+      world, metas: new Map(), hits, seqIndex: 0, fiesQueue: [], rising: false, wobbleMs: 0, goalMs: 0, edges: newEdges(),
     };
     players[gp.key] = {
       plot: i, craneX: layout.plots[i].left + layout.hookOffsetX, hangTop: layout.hangTopStart, hang: null, cdMs: 0,
@@ -261,20 +267,27 @@ export function createTowerHost(
   };
 
   /**
-   * Step 7: height and crane height. The height counts placed blocks that are not wobbling (speed ≤
-   * wobbleSpeed), so a small jolt from a landing block does not flicker the height while a toppling
-   * tower drops out at once. Rounded, because resting bodies sink a fraction of a pixel into each other.
+   * Step 7: height, goal hold and crane height. The height counts placed blocks that are not wobbling
+   * (speed ≤ wobbleSpeed, angular speed ≤ wobbleAngSpeed), so a small jolt from a landing block does not
+   * flicker the height while a toppling tower drops out at once. Rounded, because resting bodies sink a
+   * fraction of a pixel into each other. The goal is stricter: a placed block at rest must reach goalPx
+   * and something must stay there for goalHoldMs (goalMs).
    */
-  const updateHeight = (k: PlayerKey, sec: number) => {
+  const updateHeight = (k: PlayerKey, ms: number) => {
+    const sec = ms / 1000;
     const s = slots[k];
     const p = players[k];
     const plot = plotOf(k);
     let landedTop = layout.surfaceY;
     let restedTop = layout.surfaceY;
+    let goalTop = layout.surfaceY;
     for (const [body, m] of s.metas) {
       if (m.landed) landedTop = Math.min(landedTop, body.bounds.min.y);
-      if (m.placed && body.speed <= c.wobbleSpeed) restedTop = Math.min(restedTop, body.bounds.min.y);
+      if (!m.placed) continue;
+      if (body.speed <= c.wobbleSpeed && body.angularSpeed <= c.wobbleAngSpeed) restedTop = Math.min(restedTop, body.bounds.min.y);
+      if (atRest(body)) goalTop = Math.min(goalTop, body.bounds.min.y);
     }
+    s.goalMs = Math.round(layout.surfaceY - goalTop) >= c.goalPx ? s.goalMs + ms : 0;
     const h = Math.max(0, Math.round(layout.surfaceY - restedTop));
     if (h > p.bestPx) {
       p.bestPx = h;
@@ -291,7 +304,7 @@ export function createTowerHost(
     const out: number[] = [];
     for (const [body, m] of s.metas) {
       const pose = blockPose(body);
-      out.push(m.id, KINDS.indexOf(m.kind), Math.round(pose.x * POS_SCALE), Math.round(pose.y * POS_SCALE), Math.round(pose.a * ANGLE_SCALE));
+      out.push(m.id, KINDS.indexOf(m.kind), Math.round(pose.x * POS_SCALE), Math.round(pose.y * POS_SCALE), Math.round(wrapAngle(pose.a) * ANGLE_SCALE));
     }
     return out;
   };
@@ -329,7 +342,7 @@ export function createTowerHost(
       for (const k of keys) {
         // 6. Bodies; 7. height and crane.
         updateBodies(k, ms);
-        updateHeight(k, sec);
+        updateHeight(k, ms);
         // 8. A new block after the cooldown, crane x kept and clamped.
         const p = players[k];
         if (!p.hang && p.cdMs <= 0) {
@@ -340,8 +353,8 @@ export function createTowerHost(
         p.windDir = slots[k].world.windDir;
       }
 
-      // 9. Goal: the round ends in the first tick any rested height reaches goalPx.
-      reachers = keys.filter((k) => players[k].heightPx >= c.goalPx).sort((a, b) => slotOf[a] - slotOf[b]);
+      // 9. Goal: the round ends in the first tick any resting block has held goalPx for goalHoldMs.
+      reachers = keys.filter((k) => slots[k].goalMs >= c.goalHoldMs - EPS).sort((a, b) => slotOf[a] - slotOf[b]);
       if (reachers.length > 0) {
         winner = reachers[0];
         addFx('ziel', winner, plotOf(winner).centre, layout.surfaceY - c.goalPx);

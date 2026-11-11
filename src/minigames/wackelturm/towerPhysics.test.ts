@@ -184,7 +184,9 @@ describe('towerPhysics', () => {
     expect(statics[0].bounds.min.x).toBeCloseTo(layout.plots[3].left, 9);
     expect(statics[0].bounds.max.x).toBeCloseTo(layout.plots[3].left + layout.plots[3].w, 9);
     expect(w.engine.gravity.y).toBe(C.gravityY);
-    expect(w.engine.enableSleeping).toBe(false);
+    expect(w.engine.enableSleeping).toBe(true);
+    expect((Matter.Sleeping as unknown as { _motionSleepThreshold: number })._motionSleepThreshold).toBe(C.sleepMotion);
+    expect(statics[0].slop).toBe(C.slop);
     expect(w.engine.positionIterations).toBe(C.positionIterations);
     expect(w.engine.velocityIterations).toBe(C.velocityIterations);
     expect(w.plot).toEqual(layout.plots[3]);
@@ -199,6 +201,7 @@ describe('towerPhysics', () => {
       expect(b.friction).toBe(C.friction);
       expect(b.frictionStatic).toBe(C.frictionStatic);
       expect(b.restitution).toBe(C.restitution);
+      expect(b.slop).toBe(C.slop);
     }
   });
 
@@ -213,19 +216,35 @@ describe('towerPhysics', () => {
     expect(w.engine.world.bodies).toContain(b);
   });
 
-  it('a stack of 13 flat lang blocks settles, then stands still above the 12-cell goal', () => {
+  it('a carefully stacked tower of 10 flat lang stays above 150 px for 10 s', () => {
     const w = createTowerWorld(layout, 0);
     const plot = layout.plots[0];
-    const bodies = Array.from({ length: 13 }, (_, i) => spawnBlock(w, 'lang', plot.centre, layout.surfaceY - 8 - 16 * i, 0));
-    // The solver pushes the stack into a slight lean while it settles (top about 20 px off); after that it holds.
-    run(w, 4000);
-    const settled = bodies.map((b) => blockPose(b));
+    const bodies = Array.from({ length: 10 }, (_, i) => spawnBlock(w, 'lang', plot.centre, layout.surfaceY - 8 - 16 * i, 0));
+    const height = () => layout.surfaceY - Math.min(...bodies.map((b) => b.bounds.min.y));
+    let lowest = Infinity;
+    for (let t = 0; t < 10000; t += C.stepMs) {
+      stepWorld(w, C.stepMs);
+      lowest = Math.min(lowest, height());
+    }
+    expect(lowest).toBeGreaterThan(150);
+    expect(bodies.every((b) => b.isSleeping)).toBe(true);
+  });
+
+  it('a sleeping tower is woken and pushed by wind; spawning wakes the world', () => {
+    const w = createTowerWorld(layout, 1);
+    const plot = layout.plots[1];
+    const a = spawnBlock(w, 'kurz', plot.centre, layout.surfaceY - 8, 0);
+    const b = spawnBlock(w, 'kurz', plot.centre, layout.surfaceY - 24, 0);
     run(w, 3000);
-    bodies.forEach((b, i) => {
-      expect(Math.abs(blockPose(b).x - settled[i].x)).toBeLessThan(0.5);
-      expect(Math.abs(blockPose(b).y - settled[i].y)).toBeLessThan(0.5);
-    });
-    const top = Math.min(...bodies.map((b) => b.bounds.min.y));
-    expect(layout.surfaceY - top).toBeGreaterThanOrEqual(C.goalPx);
+    expect(a.isSleeping && b.isSleeping).toBe(true);
+    const x0 = blockPose(b).x;
+    w.windMs = C.windMs;
+    w.windDir = -1;
+    run(w, 500);
+    expect(x0 - blockPose(b).x).toBeGreaterThan(1);
+    run(w, 4000);
+    expect(a.isSleeping && b.isSleeping).toBe(true);
+    spawnBlock(w, 'kurz', plot.centre + 30, layout.surfaceY - 40, 0);
+    expect(a.isSleeping || b.isSleeping).toBe(false);
   });
 });

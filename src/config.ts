@@ -202,10 +202,17 @@ interface GameConfig {
     craneClearPx: number;
     /**
      * Matter solver iterations per sub-step. Matter's defaults (6 / 4) let tall stacks sink and drift apart:
-     * 12 flat lang blocks fell over within 4 s, so the 12-cell goal was out of reach.
+     * 12 flat lang blocks fell over within 4 s.
      */
     positionIterations: number;
     velocityIterations: number;
+    /**
+     * Sleeping keeps settled stacks from creeping apart: Matter's motion threshold for sleep (set once,
+     * module-wide, in towerPhysics; Matter's default is 0.08) and the collision slop of blocks and
+     * foundation (Matter's default 0.05 let stacks sink about 0.6 px per layer).
+     */
+    sleepMotion: number;
+    slop: number;
     /** Defensive cap on physics sub-steps per stepWorld call; time beyond it is dropped (dt is already clamped to 0.25 s = 15 steps). */
     maxStepsPerTick: number;
     /** Gap after a drop before the next block hangs. */
@@ -215,9 +222,12 @@ interface GameConfig {
     /**
      * Goal height above the foundation (px). The asset's crane marker sits only 107 px (~6.7 cells) above
      * the foundation, too easy for two minutes. readLayout still reports the asset's goalY/goalPx, but the
-     * host uses this value and the view draws the goal marker at surfaceY - goalPx.
+     * host uses this value and the view draws the goal marker at surfaceY - goalPx. 10 cells for now;
+     * calibrated in the playtest.
      */
     goalPx: number;
+    /** The block reaching goalPx must be at rest and stay at or above goalPx this long before the round ends. */
+    goalHoldMs: number;
     /** One Ärger-Aktion charge per chargeEvery placed blocks, at most chargeCap. */
     chargeEvery: number;
     chargeCap: number;
@@ -226,6 +236,12 @@ interface GameConfig {
     windAccel: number;
     /** Wobble sound: a block faster than wobbleSpeed (px/step), at most once per wobbleGapMs. */
     wobbleSpeed: number;
+    /**
+     * A placed block counts for the height only while its speed is at most wobbleSpeed and its angular speed
+     * at most wobbleAngSpeed (rad/step). 0.015 moves the end of a lang (32 px from its centre) about 0.5 px
+     * per step, just under wobbleSpeed; a rocking seesaw block (≈ 0.02) does not count.
+     */
+    wobbleAngSpeed: number;
     wobbleGapMs: number;
     /** A height drop this large in one tick gives fx 'einsturz' (px). */
     collapseDropPx: number;
@@ -319,11 +335,12 @@ export const CONFIG = deepFreeze<GameConfig>({
     durationMs: 120000, restHoldMs: 2000, stepMs: 1000 / 60, gravityY: 1,
     friction: 0.6, frictionStatic: 0.9, restitution: 0.02, density: 0.001,
     restSpeed: 0.08, restAngSpeed: 0.004, maxStepsPerTick: 20, positionIterations: 12, velocityIterations: 8,
+    sleepMotion: 0.03, slop: 0.02,
     craneSpeed: 64, craneRiseSpeed: 48, craneClearPx: 64, dropCooldownMs: 600, fallMarginPx: 16,
-    // 12 cells; overrides the asset marker (107 px), see the interface comment.
-    goalPx: 192,
+    // 10 cells; overrides the asset marker (107 px), see the interface comment. Calibrated in the playtest.
+    goalPx: 160, goalHoldMs: 400,
     chargeEvery: 3, chargeCap: 2, windMs: 1500, windAccel: 250,
-    wobbleSpeed: 0.6, wobbleGapMs: 400, collapseDropPx: 32, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
+    wobbleSpeed: 0.6, wobbleAngSpeed: 0.015, wobbleGapMs: 400, collapseDropPx: 32, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },

@@ -4,6 +4,12 @@ import type { Plot, TowerLayout } from './towerLayout';
 
 const { Bodies, Body, Bounds, Composite, Engine, Sleeping } = Matter;
 
+/**
+ * Matter's motion threshold for falling asleep is a module-level internal (Sleeping._motionSleepThreshold,
+ * not in the typings) shared by every engine; the towers are the only Matter user, so it is set once here.
+ */
+(Sleeping as unknown as { _motionSleepThreshold: number })._motionSleepThreshold = CONFIG.wackelturm.sleepMotion;
+
 /** Block kinds; the snapshot sends the index into this list. */
 export const KINDS = ['quader', 'kurz', 'lang', 'l', 't', 'kugel', 'dreieck', 'wackelstein'] as const;
 export type Kind = (typeof KINDS)[number];
@@ -50,7 +56,7 @@ export function createTowerWorld(layout: TowerLayout, plotIndex: number): TowerW
   const plot = layout.plots[plotIndex];
   if (!plot) throw new Error(`wackelturm: no plot ${plotIndex}`);
   const engine = Engine.create({
-    enableSleeping: false,
+    enableSleeping: true,
     positionIterations: CONFIG.wackelturm.positionIterations,
     velocityIterations: CONFIG.wackelturm.velocityIterations,
   });
@@ -62,6 +68,7 @@ export function createTowerWorld(layout: TowerLayout, plotIndex: number): TowerW
     friction: CONFIG.wackelturm.friction,
     frictionStatic: CONFIG.wackelturm.frictionStatic,
     restitution: CONFIG.wackelturm.restitution,
+    slop: CONFIG.wackelturm.slop,
   });
   Composite.add(engine.world, foundation);
   return { engine, plot: { ...plot }, acc: 0, windMs: 0, windDir: 1 };
@@ -69,7 +76,7 @@ export function createTowerWorld(layout: TowerLayout, plotIndex: number): TowerW
 
 function material() {
   const c = CONFIG.wackelturm;
-  return { friction: c.friction, frictionStatic: c.frictionStatic, restitution: c.restitution, density: c.density };
+  return { friction: c.friction, frictionStatic: c.frictionStatic, restitution: c.restitution, density: c.density, slop: c.slop };
 }
 
 /** Builds the body at angle 0 with its pivot at (px, py). */
@@ -131,6 +138,7 @@ export function spawnBlock(w: TowerWorld, kind: Kind, pivotX: number, pivotY: nu
     Body.rotate(body, a);
     Body.setPosition(body, { x: pivotX + dx * Math.cos(a) - dy * Math.sin(a), y: pivotY + dx * Math.sin(a) + dy * Math.cos(a) });
   }
+  wakeAll(w);
   Composite.add(w.engine.world, body);
   return body;
 }
@@ -145,7 +153,12 @@ export function blockKind(b: Matter.Body): Kind {
 /** Takes a block out of the world and wakes every other body, so nothing stays floating. */
 export function removeBlock(w: TowerWorld, b: Matter.Body): void {
   Composite.remove(w.engine.world, b);
-  for (const other of w.engine.world.bodies) Sleeping.set(other, false);
+  wakeAll(w);
+}
+
+/** Wakes every block: the tower changed, or a force (wind) acts that sleeping bodies would ignore. */
+function wakeAll(w: TowerWorld): void {
+  for (const b of w.engine.world.bodies) if (!b.isStatic) Sleeping.set(b, false);
 }
 
 /** The pivot in world coordinates and the body angle. */
@@ -175,6 +188,7 @@ export function stepWorld(w: TowerWorld, dtMs: number): void {
     }
     w.acc -= c.stepMs;
     if (w.windMs > 0) {
+      wakeAll(w);
       for (const b of Composite.allBodies(w.engine.world)) {
         if (b.isStatic) continue;
         Body.applyForce(b, b.position, { x: (w.windDir * b.mass * c.windAccel) / 1e6, y: 0 });

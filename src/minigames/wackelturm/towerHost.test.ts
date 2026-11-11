@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import Matter from 'matter-js';
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../config';
 import { mulberry32 } from '../../flow/rng';
@@ -164,7 +165,8 @@ describe('Wackel-Turm host', () => {
     // The body spawns at angle rot × π/2.
     d.press('p0', 'drops');
     d.tick();
-    expect(blocks(d.snap(), 'p0')[0].a).toBeCloseTo((3 * Math.PI) / 2, 1);
+    // The snapshot sends the angle in (−π, π]: rot 3 (3π/2) goes out as −π/2.
+    expect(blocks(d.snap(), 'p0')[0].a).toBeCloseTo(-Math.PI / 2, 1);
   });
 
   it('S drops; left click drops; a second drop during the 600 ms cooldown does nothing; the next block hangs after it', () => {
@@ -303,13 +305,21 @@ describe('Wackel-Turm host', () => {
   it('goal: a tower whose rested top reaches goalPx ends the round at once with the reacher first, others ranked by height, ties shared', () => {
     const d = driver(['p0', 'p1', 'p2', 'p3'], { rand: always('kurz') });
     const log = fxLog(d);
-    stack(d, 'p0', 0, 'lang', 13);
+    stack(d, 'p0', 0, 'lang', 12);
     stack(d, 'p1', 1, 'kurz', 2);
     stack(d, 'p2', 2, 'kurz', 2);
     stack(d, 'p3', 3, 'kurz', 1);
     let ticks = 0;
-    while (d.g.result() === null && ticks < 300) { log.tick(); ticks++; }
+    let reachedAt = -1;
+    while (d.g.result() === null && ticks < 300) {
+      log.tick();
+      ticks++;
+      if (reachedAt < 0 && d.snap().players.p0.heightPx >= C.goalPx) reachedAt = ticks;
+    }
     const s = d.snap();
+    // The round ends only after the top has held goalPx for goalHoldMs.
+    expect(reachedAt).toBeGreaterThan(0);
+    expect(ticks - reachedAt).toBeGreaterThanOrEqual(ticksFor(C.goalHoldMs) - 1);
     expect(s.winner).toBe('p0');
     expect(s.players.p0.heightPx).toBeGreaterThanOrEqual(C.goalPx);
     expect(s.players.p1.heightPx).toBe(s.players.p2.heightPx);
@@ -324,14 +334,48 @@ describe('Wackel-Turm host', () => {
 
   it('two players reach the goal in the same tick: both share the first place, winner is the lower slot', () => {
     const d = driver(['p0', 'p1', 'p2'], { rand: always('kurz') });
-    // Upright lang blocks stacked straight up: the motion is purely vertical, so both towers settle alike.
-    stack(d, 'p2', 2, 'lang', 4, 1);
-    stack(d, 'p1', 1, 'lang', 4, 1);
+    // Identical goal-high towers put to sleep at once: they never move, so both rest, are placed and hold
+    // the goal in the same ticks, independent of how two worlds would settle.
+    const n = C.goalPx / 16;
+    for (const k of ['p1', 'p2']) {
+      stack(d, k, Number(k.slice(1)), 'lang', n);
+      for (const b of d.world(k).engine.world.bodies) if (!b.isStatic) Matter.Sleeping.set(b, true);
+    }
     stack(d, 'p0', 0, 'kurz', 1);
     let ticks = 0;
     while (d.g.result() === null && ticks < 300) { d.tick(); ticks++; }
+    // Placed in the tick that completes restHoldMs; that tick already counts toward goalHoldMs.
+    expect(ticks).toBe(ticksFor(C.restHoldMs) + ticksFor(C.goalHoldMs) - 1);
     expect(d.snap().winner).toBe('p1');
+    expect(d.snap().players.p2.heightPx).toBe(C.goalPx);
     expect(d.g.result()).toEqual([['p1', 'p2'], ['p0']]);
+  });
+
+  it('seesaw: a block rocking over the goal line after an impact does not win while it rocks', () => {
+    const d = driver(['p0'], { rand: always('kurz') });
+    const cx = P0.centre;
+    // 9 flat lang plus a 10th 12 px off-centre (the seesaw): its rested top stays just under goalPx.
+    stack(d, 'p0', 0, 'lang', 9);
+    const seesaw = spawnBlock(d.world('p0'), 'lang', cx + 12, layout.surfaceY - 8 - 16 * 9, 0);
+    d.tick(150);
+    expect(d.snap().players.p0.placed).toBe(10);
+    expect(d.snap().players.p0.heightPx).toBeLessThan(C.goalPx);
+    // A lang dropped onto the overhanging end makes it rock; its corner swings above the goal line.
+    spawnBlock(d.world('p0'), 'lang', cx + 38, layout.surfaceY - 16 * 10 - 40, 0);
+    let rockedOverGoal = 0;
+    let heightOverGoal = 0;
+    for (let i = 0; i < 150; i++) {
+      d.tick();
+      const s = d.snap();
+      if (s.players.p0.heightPx >= C.goalPx) heightOverGoal++;
+      if (seesaw.angularSpeed > C.restAngSpeed && layout.surfaceY - seesaw.bounds.min.y >= C.goalPx) {
+        rockedOverGoal++;
+        expect(s.winner).toBeNull();
+      }
+    }
+    expect(rockedOverGoal).toBeGreaterThan(0);
+    expect(heightOverGoal).toBeGreaterThan(0);
+    expect(d.snap().winner).toBeNull();
   });
 
   it('result is null until 120 s, non-null at exactly 120000 ms; fast mode ends at 540 ticks', () => {
