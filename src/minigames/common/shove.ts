@@ -48,6 +48,7 @@ export function resolveShoves(
   const hits: ShoveHit[] = [];
   for (const k of keys) {
     const s = slots[k];
+    // Several presses within one tick count as a single shove (the cooldown applies anyway).
     if (s.edge.take(inputs[k]?.shoves ?? 0) === 0) continue;
     if (s.cooldownMs > 0 || s.stunMs > 0) continue;
     s.cooldownMs = c.cooldownMs;

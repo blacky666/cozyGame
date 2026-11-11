@@ -10,7 +10,10 @@ const body = (x: number, y: number, dir: Facing = 'side') => ({ x, y, dir });
 function setup(b: Record<string, ReturnType<typeof body>>) {
   const keys = Object.keys(b);
   const slots: Record<string, ShoveSlot> = {};
-  for (const k of keys) slots[k] = newShoveSlot();
+  for (const k of keys) {
+    slots[k] = newShoveSlot();
+    slots[k].edge.take(0); // baseline, as after the first tick of a round
+  }
   return { keys, slots, bodies: b };
 }
 
@@ -75,6 +78,15 @@ describe('shove', () => {
     // The new press fires again (the target is still immune, so it only spends the cooldown).
     resolveShoves(keys, bodies, slots, { p0: shoves(1) });
     expect(slots.p0.cooldownMs).toBe(CONFIG.shove.cooldownMs);
+  });
+
+  it('a fresh slot whose first input already has a counter does not shove', () => {
+    const keys = ['p0', 'p1'];
+    const slots: Record<string, ShoveSlot> = { p0: newShoveSlot(), p1: newShoveSlot() };
+    const bodies = { p0: body(100, 100, 'side'), p1: body(110, 100) };
+    expect(resolveShoves(keys, bodies, slots, { p0: shoves(3) })).toEqual([]);
+    expect(slots.p0.cooldownMs).toBe(0);
+    expect(resolveShoves(keys, bodies, slots, { p0: shoves(4) })).toHaveLength(1);
   });
 
   it('a stunned player cannot shove; of two mutual shoves the first key wins', () => {
