@@ -5,14 +5,10 @@ import { neutralInput, type InputState } from '../../net/protocol';
 import { getMinigame } from '../../minigames/registry';
 import type { MiniGame, MiniGameView } from '../../minigames/types';
 import type { SceneData, StageCtx } from '../stageCtx';
+import { shouldSend } from '../inputSend';
 import { assetSprite, txt } from '../ui';
 
 const stepLerp = <S>(a: S, b: S, t: number): S => (t < 0.5 ? a : b);
-/** Equal in everything but the aim (aim-only changes are throttled separately). */
-const sameInput = (a: InputState, b: InputState) =>
-  a.up === b.up && a.down === b.down && a.left === b.left && a.right === b.right &&
-  a.primary === b.primary && a.secondary === b.secondary && a.special === b.special && a.emote === b.emote && a.shoves === b.shoves &&
-  a.primaryTaps === b.primaryTaps && a.primaryCharge === b.primaryCharge;
 
 /**
  * Renders the running minigame. Host: draws its authoritative snapshot directly (the simulation
@@ -84,12 +80,7 @@ export class MinigameScene extends Phaser.Scene {
       return;
     }
     const input = this.ctx.keyboard.state();
-    const aimMoved = input.aimX !== this.lastSent.aimX || input.aimY !== this.lastSent.aimY;
-    if (
-      !sameInput(input, this.lastSent) ||
-      (aimMoved && time - this.lastAimAt >= CONFIG.net.aimSendMs) ||
-      time - this.lastSentAt >= CONFIG.net.inputHeartbeatMs
-    ) {
+    if (shouldSend(this.lastSent, input, time, this.lastSentAt, this.lastAimAt)) {
       const seq = this.ctx.sendInput?.(input) ?? 0;
       if (seq > 0) this.lastSentSeq = seq;
       this.lastSent = input;

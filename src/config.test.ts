@@ -22,6 +22,6 @@ describe('CONFIG', () => {
 describe('CONFIG tunables (Task 9)', () => {
   it('holds sandbox and prediction/input tunables', () => {
     expect(CONFIG.sandbox).toMatchObject({ speed: 60, spawnMs: 1500, coinSize: 8, pickupRadius: 9, maxCoins: 12 });
-    expect(CONFIG.net).toMatchObject({ predictErrPx: 4, predictEase: 0.3, inputHeartbeatMs: 200, inputStaleMs: 500 });
+    expect(CONFIG.net).toMatchObject({ activeSendMs: 33, predictEase: 0.3, inputHeartbeatMs: 200, inputStaleMs: 500 });
   });
 });

@@ -34,6 +34,7 @@ export class SandboxView implements MiniGameView<SandboxState> {
   private off = { x: 0, y: 0 };
   private lastLatest: SandboxState | null = null;
   private lastSentSeq = 0;
+  private dir: Facing | null = null;
   /** What is drawn for the own figure. */
   private pred: Pred | null = null;
 
@@ -69,6 +70,8 @@ export class SandboxView implements MiniGameView<SandboxState> {
     // A lower seq means a new connection: the host restarted its ack counter.
     if (sentSeq < this.lastSentSeq) this.reconciler.clear();
     this.lastSentSeq = sentSeq;
+    // An ack beyond what we sent belongs to the previous connection.
+    const ack = ackSeq > sentSeq ? 0 : ackSeq;
     const server = latest?.players[this.selfKey];
     if (!server) return;
     const fresh = latest !== this.lastLatest;
@@ -82,18 +85,26 @@ export class SandboxView implements MiniGameView<SandboxState> {
       return;
     }
     this.reconciler.record(sentSeq, input, dt);
-    const shown = this.pred;
-    if (fresh || !this.target) {
-      const base: Pred = { x: server.x, y: server.y, dir: server.dir, moving: false };
-      this.target = this.reconciler.reconcile(base, ackSeq);
-      if (shown) this.off = { x: shown.x - this.target.x, y: shown.y - this.target.y };
+    if (!this.target) {
+      this.target = { x: server.x, y: server.y, dir: server.dir, moving: false };
     } else {
-      this.target = predStep(this.target, input, dt);
+      const advanced = predStep(this.target, input, dt);
+      if (fresh) {
+        const next = this.reconciler.reconcile({ x: server.x, y: server.y, dir: server.dir, moving: false }, ack);
+        // Carry the shown position over: a reconcile without error leaves the offset untouched.
+        this.off = { x: this.off.x + advanced.x - next.x, y: this.off.y + advanced.y - next.y };
+        this.target = next;
+      } else {
+        this.target = advanced;
+      }
     }
+    // Facing and run state come from the current input, not from the replay base.
+    const m = moveStep(this.target, input, 0);
+    this.dir = m.dir ?? this.dir ?? server.dir;
     const keep = 1 - CONFIG.net.predictEase;
     this.off = { x: this.off.x * keep, y: this.off.y * keep };
     if (Math.abs(this.off.x) < 0.01 && Math.abs(this.off.y) < 0.01) this.off = { x: 0, y: 0 };
-    this.pred = { ...this.target, x: this.target.x + this.off.x, y: this.target.y + this.off.y };
+    this.pred = { x: this.target.x + this.off.x, y: this.target.y + this.off.y, dir: this.dir, moving: m.moving };
   }
 
   render(s: SandboxState, selfKey: PlayerKey): void {

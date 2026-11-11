@@ -20,10 +20,10 @@ interface GameConfig {
     joinTimeoutMs: number;
     /** STUN servers for WebRTC. */
     stun: string[];
-    /** Client prediction: ease toward the server position when the error exceeds this (px). */
-    predictErrPx: number;
     /** Client prediction: fraction of the error corrected per frame. */
     predictEase: number;
+    /** While a direction or the primary button is held, send at least this often so one seq covers about one host tick. */
+    activeSendMs: number;
     /** Aim-only changes are sent at most this often (ms). */
     aimSendMs: number;
     /** Clients re-send unchanged input at least this often. */
@@ -72,8 +72,8 @@ export const CONFIG = deepFreeze<GameConfig>({
     appId: 'cozygame-v1',
     joinTimeoutMs: 15000,
     stun: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'],
-    predictErrPx: 4,
     predictEase: 0.3,
+    activeSendMs: 33,
     aimSendMs: 50,
     inputHeartbeatMs: 200,
     inputStaleMs: 500,
