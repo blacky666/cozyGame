@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import Matter from 'matter-js';
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../config';
 import type { AssetFile } from '../../gfx/assetTypes';
@@ -68,6 +69,33 @@ describe('towerPhysics', () => {
     expect(box('t')).toEqual([-24, -16, 24, 16]);
   });
 
+  it('multi-cell blocks have the rotational inertia of the solid shape', () => {
+    const solid = (wPx: number, hPx: number) =>
+      Matter.Bodies.rectangle(0, 0, wPx, hPx, { density: C.density }).inertia;
+    const w = createTowerWorld(layout, 0);
+    const lang = spawnBlock(w, 'lang', 60, 100, 0);
+    const quader = spawnBlock(w, 'quader', 60, 100, 1);
+    expect(Math.abs(lang.inertia / solid(64, 16) - 1)).toBeLessThan(0.05);
+    expect(Math.abs(quader.inertia / solid(32, 16) - 1)).toBeLessThan(0.05);
+    // Rotation does not change it; l and t get the parallel-axis share as well.
+    expect(spawnBlock(w, 'lang', 60, 100, 1).inertia).toBeCloseTo(lang.inertia, 6);
+    for (const k of ['l', 't'] as const) {
+      const b = spawnBlock(w, k, 60, 100, 0);
+      const naive = b.parts.slice(1).reduce((sum, p) => sum + p.inertia, 0);
+      expect(b.inertia).toBeGreaterThan(naive * 2);
+      expect(b.inverseInertia).toBeCloseTo(1 / b.inertia, 12);
+    }
+  });
+
+  it('stepWorld runs at most maxStepsPerTick sub-steps per call and drops the rest', () => {
+    const w = createTowerWorld(layout, 0);
+    const b = spawnBlock(w, 'kurz', 60, 0, 0);
+    stepWorld(w, C.stepMs * (C.maxStepsPerTick + 30));
+    expect(w.engine.timing.timestamp).toBeCloseTo(C.stepMs * C.maxStepsPerTick, 6);
+    expect(w.acc).toBe(0);
+    expect(b.position.y).toBeGreaterThan(0);
+  });
+
   it('the l and t have their centre of mass off the pivot', () => {
     const w = createTowerWorld(layout, 0);
     const l = spawnBlock(w, 'l', 60, 100, 0);
@@ -87,7 +115,6 @@ describe('towerPhysics', () => {
     }
     expect(restedAt).toBeGreaterThanOrEqual(0);
     expect(atRest(b)).toBe(true);
-    expect(blockPose(b).y - 8).toBeCloseTo(layout.surfaceY - 16, 0);
     expect(Math.abs(blockPose(b).y - 8 - (layout.surfaceY - 16))).toBeLessThanOrEqual(0.5);
   });
 

@@ -200,6 +200,8 @@ interface GameConfig {
     craneSpeed: number;
     craneRiseSpeed: number;
     craneClearPx: number;
+    /** Defensive cap on physics sub-steps per stepWorld call; time beyond it is dropped (dt is already clamped to 0.25 s = 15 steps). */
+    maxStepsPerTick: number;
     /** Gap after a drop before the next block hangs. */
     dropCooldownMs: number;
     /** A block whose centre is below surfaceY + fallMarginPx (or outside its column) is removed. */
@@ -310,7 +312,7 @@ export const CONFIG = deepFreeze<GameConfig>({
   wackelturm: {
     durationMs: 120000, restHoldMs: 2000, stepMs: 1000 / 60, gravityY: 1,
     friction: 0.6, frictionStatic: 0.9, restitution: 0.02, density: 0.001,
-    restSpeed: 0.08, restAngSpeed: 0.004,
+    restSpeed: 0.08, restAngSpeed: 0.004, maxStepsPerTick: 20,
     craneSpeed: 64, craneRiseSpeed: 48, craneClearPx: 64, dropCooldownMs: 600, fallMarginPx: 16,
     // 12 cells; overrides the asset marker (107 px), see the interface comment.
     goalPx: 192,

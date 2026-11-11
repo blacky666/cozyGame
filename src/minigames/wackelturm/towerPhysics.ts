@@ -90,7 +90,26 @@ function buildBody(kind: Kind, px: number, py: number): Matter.Body {
     }
   });
   if (parts.length === 1) return parts[0];
-  return Body.create({ ...opts, parts });
+  const body = Body.create({ ...opts, parts });
+  Body.setInertia(body, compoundInertia(body));
+  return body;
+}
+
+/** Matter's inertia scale (Body._inertiaScale, 4 in 0.20); not in the typings. */
+const INERTIA_SCALE = (Body as unknown as { _inertiaScale: number })._inertiaScale;
+
+/**
+ * Matter sums the part inertias of a compound without the parallel-axis term, so a lang of four cells would
+ * spin about 8.5x too easily. This adds part.mass x distance² for every part (in Matter's scaled units).
+ */
+function compoundInertia(body: Matter.Body): number {
+  let sum = 0;
+  for (const part of body.parts.slice(1)) {
+    const dx = part.position.x - body.position.x;
+    const dy = part.position.y - body.position.y;
+    sum += part.inertia / INERTIA_SCALE + part.mass * (dx * dx + dy * dy);
+  }
+  return INERTIA_SCALE * sum;
 }
 
 /**
@@ -123,11 +142,20 @@ export function blockPose(b: Matter.Body): { x: number; y: number; a: number } {
 /** Tolerance so that frame sums like 60 × 1000/30 still give the full number of steps. */
 const STEP_EPS = 1e-6;
 
-/** Advances the world by dtMs in fixed sub-steps; the result depends only on the total time. */
+/**
+ * Advances the world by dtMs in fixed sub-steps; the result depends only on the total time.
+ * The step count per call is bounded upstream (session.ts clamps a tick's dt to 0.25 s, at most 15 sub-steps);
+ * maxStepsPerTick is a defensive cap on top, and time beyond it is dropped.
+ */
 export function stepWorld(w: TowerWorld, dtMs: number): void {
   const c = CONFIG.wackelturm;
   w.acc += dtMs;
+  let steps = 0;
   while (w.acc >= c.stepMs - STEP_EPS) {
+    if (steps++ >= c.maxStepsPerTick) {
+      w.acc = 0;
+      break;
+    }
     w.acc -= c.stepMs;
     if (w.windMs > 0) {
       for (const b of Composite.allBodies(w.engine.world)) {
