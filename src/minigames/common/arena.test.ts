@@ -10,6 +10,7 @@ const hitsRect = (s: { x: number; y: number; w: number; h: number }, x: number, 
   const dy = y - Math.max(s.y, Math.min(y, s.y + s.h));
   return dx * dx + dy * dy < r * r;
 };
+const kartoffelFile = JSON.parse(readFileSync('public/assets/arena-kartoffel.json', 'utf8')) as AssetFile;
 const wall = a.solids.find((s) => s.id === 'wall11,8')!;
 
 describe('arena', () => {
@@ -91,5 +92,28 @@ describe('arena', () => {
     const hit = segmentHit(a, wall.x - 40, wall.y + 7, wall.x + 5, wall.y + 7, 2)!;
     const x = wall.x - 40 + 45 * hit.t;
     expect(hitsRect(wall, x, wall.y + 7, 2)).toBe(false);
+  });
+});
+
+describe('garden arena (kartoffel)', () => {
+  const g = buildArena(kartoffelFile, 'kartoffel.map', { wallChar: null });
+  it('garden: paths are walkable, the fence blocks', () => {
+    const run = moveCircle(g, 100, 104, 40, 0, 5);
+    expect(run.y).toBe(104);
+    expect(run.x).toBeCloseTo(140, 5);
+    const up = moveCircle(g, 100, 30, 0, -40, 5);
+    expect(up.y).toBeGreaterThanOrEqual(13 + 5 - 1e-6);
+    expect(up.hitY).toBe(true);
+  });
+  it('garden: no solid at the four spawn points', () => {
+    const spawns = [[72, 88], [344, 88], [72, 184], [344, 184]];
+    for (const [x, y] of spawns) expect(g.solids.some((s) => hitsRect(s, x, y, 7))).toBe(false);
+  });
+  it('adds rand-layer solids with id rand<col>,<row>', () => {
+    expect(g.solids.some((s) => s.id.startsWith('rand') && s.kind === 'wall')).toBe(true);
+  });
+  it('schneeball arena unchanged', () => {
+    expect(a.solids.length).toBe(82);
+    expect(a.solids.some((s) => s.id.startsWith('rand'))).toBe(false);
   });
 });

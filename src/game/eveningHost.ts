@@ -184,7 +184,10 @@ export class EveningHost {
       }));
     const durationMs = def.durationMs === null ? undefined : def.durationMs * this.timing.durationScale;
     this.def = def;
-    this.game = def.createHost(players, this.rand, { durationMs, assets: this.o.assets });
+    const totals = this.evening?.totalsNow() ?? {};
+    const top = Math.max(0, ...players.map((p) => totals[p.key] ?? 0));
+    const leaders = top > 0 ? players.filter((p) => (totals[p.key] ?? 0) === top).map((p) => p.key) : [];
+    this.game = def.createHost(players, this.rand, { durationMs, assets: this.o.assets, leaders });
     this.latest = this.game.snapshot();
     this.latestTick = 0;
     this.latestAt = this.now();

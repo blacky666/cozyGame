@@ -9,7 +9,12 @@ const STEP = 2;
 const SNOWMAN_PREFIX = 'schnee.solid.schneemann.';
 const SNOWMAN_INTACT = 'schnee.solid.schneemann.heil';
 
-export function buildArena(file: AssetFile, mapName: string): Arena {
+/**
+ * `wallChar`: raster character that becomes a wall solid (default 'w'; null = none, e.g. the garden
+ * where 'w' is a path). Cells of the `rand` layer with a hitbox always become wall solids (the fence).
+ */
+export function buildArena(file: AssetFile, mapName: string, opts: { wallChar?: string | null } = {}): Arena {
+  const wallChar = opts.wallChar === undefined ? 'w' : opts.wallChar;
   const map = file.maps?.[mapName];
   if (!map) throw new Error(`map not found: ${mapName}`);
   const { tile, raster } = map;
@@ -23,11 +28,18 @@ export function buildArena(file: AssetFile, mapName: string): Arena {
   });
   raster.forEach((line, row) => {
     for (let col = 0; col < line.length; col++) {
-      if (line[col] !== 'w') continue;
+      if (wallChar === null || line[col] !== wallChar) continue;
       const sprite = map.layers.flaechen[row]?.[col] ?? 'schnee.solid.wall.0';
       const hb = file.sprites[sprite]?.hitbox ?? WALL_HITBOX;
       solids.push({ id: `wall${col},${row}`, sprite, kind: 'wall', x: col * tile + hb[0], y: row * tile + hb[1], w: hb[2], h: hb[3] });
     }
+  });
+  map.layers.rand?.forEach((line, row) => {
+    line.forEach((sprite, col) => {
+      const hb = sprite ? file.sprites[sprite]?.hitbox : undefined;
+      if (!sprite || !hb) return;
+      solids.push({ id: `rand${col},${row}`, sprite, kind: 'wall', x: col * tile + hb[0], y: row * tile + hb[1], w: hb[2], h: hb[3] });
+    });
   });
   return { w: map.w * tile, h: map.h * tile, tile, raster, solids };
 }

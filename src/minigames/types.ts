@@ -60,7 +60,7 @@ export interface MiniGame<S = unknown> {
   createHost(
     players: GamePlayer[],
     rand: () => number,
-    opts?: { durationMs?: number; assets?: Record<string, AssetFile> },
+    opts?: { durationMs?: number; assets?: Record<string, AssetFile>; leaders?: PlayerKey[] },
   ): MiniGameHost<S>;
   createView(scene: Phaser.Scene, players: GamePlayer[], selfKey: PlayerKey): MiniGameView<S>;
   /** Snapshot interpolation for clients (default: step to the newer state). */

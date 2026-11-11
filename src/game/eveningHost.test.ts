@@ -34,7 +34,7 @@ const game: MiniGame<SandboxState> = {
   botView: (s, k) => (s.players[k] ? { self: s.players[k], targets: [] } : null),
 };
 
-function setup() {
+function setup(games: MiniGame[] = [game as MiniGame]) {
   const hub = createLocalHub();
   const ht = hub.join();
   const session = createHost(ht, prof('Host'));
@@ -46,7 +46,7 @@ function setup() {
   const evening = new EveningHost({
     session,
     rounds: 5,
-    games: [game as MiniGame],
+    games,
     rand: mulberry32(1),
     localInput: () => local[0] ?? neutralInput(),
     timing: { introMs: 1000, standingsMs: 1000, durationScale: 1 },
@@ -245,5 +245,26 @@ describe('EveningHost', () => {
     await flush();
     expect(snaps.length).toBeGreaterThan(0);
     expect(snaps.at(-1)?.acks).toEqual({ p0: 0, p1: 2 });
+  });
+
+  it('passes the evening leader to createHost', async () => {
+    const leaders: (string[] | undefined)[] = [];
+    const winP0: MiniGame = {
+      ...(game as MiniGame),
+      createHost: (players, rand, o) => {
+        leaders.push(o?.leaders);
+        const h = createSandboxHost(players, rand, 2000);
+        return { tick: (dt, i) => h.tick(dt, i), snapshot: () => h.snapshot(), result: () => [['p0'], ['p1']] };
+      },
+    };
+    const s = setup([winP0]);
+    createClient(s.hub.join(), prof('Gast'));
+    await flush();
+    s.evening.start();
+    s.tick(1.1); // intro -> round 1 playing (result is immediate)
+    s.tick(1.1); // standings -> intro
+    s.tick(1.1); // intro -> round 2 playing
+    expect(leaders[0]).toEqual([]);
+    expect(leaders[1]).toEqual(['p0']);
   });
 });

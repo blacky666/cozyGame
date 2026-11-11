@@ -5,7 +5,7 @@ import { assetSprite } from '../../game/ui';
 const TILE_DEPTH = -1000;
 
 /** Sprite-sheet examples placed in the map file for reference; never drawn (no hitbox, no gameplay role). */
-const EXAMPLE_SPRITES = ['schnee.ball.'];
+const EXAMPLE_SPRITES = ['schnee.ball.', 'kartoffel.bombe.'];
 
 /**
  * Draws tile layers (fixed low depth) and map objects (depth = bottom y in world).

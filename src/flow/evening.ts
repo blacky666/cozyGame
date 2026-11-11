@@ -51,6 +51,11 @@ export class Evening {
     return { kind: 'intro', round, game: this.schedule[round - 1], double: round === this.rounds };
   }
 
+  /** Current evening totals (a copy). */
+  totalsNow(): Record<string, number> {
+    return { ...this.totals };
+  }
+
   private byTieOrder(groups: string[][]): string[][] {
     const idx = (k: string) => this.tieOrder.indexOf(k);
     return groups.map((g) => [...g].sort((a, b) => idx(a) - idx(b)));
