@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import type { AssetFile } from '../../gfx/assetTypes';
 import { assetSprite } from '../../game/ui';
 
-const TILE_DEPTH = -1000;
+export const TILE_DEPTH = -1000;
 
 /** Sprite-sheet examples placed in the map file for reference; never drawn (no hitbox, no gameplay role). */
-const EXAMPLE_SPRITES = ['schnee.ball.', 'kartoffel.bombe.'];
+const EXAMPLE_SPRITES = ['schnee.ball.', 'kartoffel.bombe.', 'farbkrieg.tile.farbe_', 'farbkrieg.pickup.'];
 
 /**
  * Draws tile layers (fixed low depth) and map objects (depth = bottom y in world).

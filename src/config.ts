@@ -131,6 +131,47 @@ interface GameConfig {
     /** Bot targets stay this far inside the map edges (the fence). */
     botMarginPx: number;
   };
+  farbkrieg: {
+    durationMs: number;
+    walkSpeed: number;
+    bodyRadius: number;
+    /** Left click: min time between paint blobs. */
+    klecksCooldownMs: number;
+    /** Blob flight: speed (px/s), max range (px), radius (px) and hit distance to a player (px). */
+    blobSpeed: number;
+    blobRange: number;
+    blobRadius: number;
+    blobHitPx: number;
+    /** Paint disc radii on landing: normal blob and bomb (px). */
+    klecksPaintR: number;
+    bombPaintR: number;
+    /** A hit blob slows the victim by slowFactor for slowMs. */
+    slowMs: number;
+    slowFactor: number;
+    /** Mopp pickup: duration of the effect (ms). */
+    moppMs: number;
+    /** Roller pickup: duration (ms) and speed factor. */
+    rollMs: number;
+    rollFactor: number;
+    pickupSpawnMs: number;
+    maxPickups: number;
+    /** A living player within this feet distance of a pickup takes it (px). */
+    pickupTouchPx: number;
+    /** Pickups spawn at least this far from every living player (px), after at most pickupTries tries. */
+    pickupClearPx: number;
+    pickupTries: number;
+    /** Finale: total length (ms), time one finale blob falls (ms) and its paint radius (px). */
+    finaleMs: number;
+    finaleFallMs: number;
+    finalePaintR: number;
+    /** How long fx stay in snapshots. */
+    fxKeepMs: number;
+    /** Map size in px (26x13 tiles of 16 px; a test checks it against the map file). */
+    mapW: number;
+    mapH: number;
+    /** Bot targets stay this far inside the map edges. */
+    botMarginPx: number;
+  };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -197,6 +238,16 @@ export const CONFIG = deepFreeze<GameConfig>({
     fuseMinMs: 12000, fuseMaxMs: 20000, heatSteps: [0.5, 0.75, 0.9], heatJitter: 0.08, boomPauseMs: 1800,
     shortFuseMs: 3000, fakeFuseMinMs: 6000, fakeFuseMaxMs: 10000, slowMs: 2000, slowFactor: 0.6,
     leaderFactor: 0.95, pickupSpawnMs: 7000, maxPickups: 2, pickupTouchPx: 12, pickupClearPx: 24, pickupTries: 20, idRange: 1000000, idTries: 10, safetyMs: 180000, bestOf: 3, fxKeepMs: 500,
+    mapW: 416, mapH: 208, botMarginPx: 24,
+  },
+  // Farbkrieg (px, px/s, ms).
+  farbkrieg: {
+    durationMs: 90000, walkSpeed: 64, bodyRadius: 5,
+    klecksCooldownMs: 1500, blobSpeed: 180, blobRange: 140, blobRadius: 2, blobHitPx: 8,
+    klecksPaintR: 24, bombPaintR: 48, slowMs: 500, slowFactor: 0.5,
+    moppMs: 4000, rollMs: 4000, rollFactor: 1.5,
+    pickupSpawnMs: 8000, maxPickups: 2, pickupTouchPx: 10, pickupClearPx: 24, pickupTries: 20,
+    finaleMs: 15000, finaleFallMs: 2000, finalePaintR: 64, fxKeepMs: 500,
     mapW: 416, mapH: 208, botMarginPx: 24,
   },
   // Shove (Space) in all top-down games.

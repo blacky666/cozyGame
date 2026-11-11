@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { AssetFile } from '../../gfx/assetTypes';
 import { SPUD_SPAWNS } from '../kartoffel/spudHost';
+import { PAINT_SPAWNS } from '../farbkrieg/paintGrid';
 import { buildArena, moveCircle, segmentHit, tileAt } from './arena';
 
 const file = JSON.parse(readFileSync('public/assets/arena-schneeball.json', 'utf8')) as AssetFile;
@@ -116,5 +117,18 @@ describe('garden arena (kartoffel)', () => {
   it('schneeball arena unchanged', () => {
     expect(a.solids.length).toBe(82);
     expect(a.solids.some((s) => s.id.startsWith('rand'))).toBe(false);
+  });
+});
+
+describe('farbkrieg arena', () => {
+  const fkFile = JSON.parse(readFileSync('public/assets/arena-farbkrieg.json', 'utf8')) as AssetFile;
+  const f = buildArena(fkFile, 'farbkrieg.map');
+  it('farbkrieg: object hitboxes are the walls', () => {
+    expect(f.solids.some((s) => hitsRect(s, 100, 20, 0.5))).toBe(true);
+    const res = moveCircle(f, 100, 60, 0, -40, 5);
+    expect(res.y).toBeGreaterThanOrEqual(32 + 5 - 1e-6);
+  });
+  it('farbkrieg: spawn points are free', () => {
+    for (const [x, y] of PAINT_SPAWNS) expect(f.solids.some((s) => hitsRect(s, x, y, 7))).toBe(false);
   });
 });
