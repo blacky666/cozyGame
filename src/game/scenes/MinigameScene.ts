@@ -64,6 +64,8 @@ export class MinigameScene extends Phaser.Scene {
     los.setDepth(2000);
     this.tweens.add({ targets: los, alpha: 0, delay: 600, duration: 300, onComplete: () => los.destroy() });
 
+    // game.destroy() fires DESTROY, not SHUTDOWN: hook both, the window listener must not leak.
+    this.events.once(Phaser.Scenes.Events.DESTROY, unwire);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       unwire();
       if (!ctx.isHost) {
@@ -102,7 +104,10 @@ export class MinigameScene extends Phaser.Scene {
     window.addEventListener('blur', blur);
     canvas.addEventListener('contextmenu', noMenu);
     if (this.def?.aimOffset) this.input.setDefaultCursor('crosshair');
+    let done = false;
     return () => {
+      if (done) return;
+      done = true;
       this.input.off(Phaser.Input.Events.POINTER_DOWN, down);
       this.input.off(Phaser.Input.Events.POINTER_UP, up);
       this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, up);
@@ -116,9 +121,11 @@ export class MinigameScene extends Phaser.Scene {
   /** Aim in the game's simulation coordinates (pointer world position minus the game's offset). */
   private updateAim(): void {
     const p = this.input.activePointer;
+    // Via the camera so the aim is right after a resize without mouse movement.
+    const w = this.cameras.main.getWorldPoint(p.x, p.y);
     const off = this.def?.aimOffset ?? { x: 0, y: 0 };
-    this.ctx.pointer.aimX = p.worldX - off.x;
-    this.ctx.pointer.aimY = p.worldY - off.y;
+    this.ctx.pointer.aimX = w.x - off.x;
+    this.ctx.pointer.aimY = w.y - off.y;
   }
 
   private gamePlayers(): GamePlayer[] {
