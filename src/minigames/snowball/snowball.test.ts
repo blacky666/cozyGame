@@ -291,4 +291,70 @@ describe('schneeball host', () => {
     expect(d.snap().timeLeftMs).toBe(0);
     expect(d.g.result()).toEqual([['p2'], ['p0', 'p1', 'p3']]);
   });
+
+  /** Walk p0 to (129, 128): directly below snowman obj60, so a ball spawned at feet - 8 overlaps it. */
+  function p0BelowSnowman(d: ReturnType<typeof driver>) {
+    d.set('p0', { down: true });
+    while (d.snap().players.p0.y < 128) d.tick();
+    d.set('p0', { right: true });
+    while (d.snap().players.p0.x < 129) d.tick();
+    d.set('p0', {});
+    d.tick();
+    const p = d.snap().players.p0;
+    const sm = arena.solids.find((s) => s.id === 'obj60')!;
+    // Precondition: the spawn point overlaps the snowman's hitbox.
+    expect(p.x).toBeGreaterThan(sm.x);
+    expect(p.x).toBeLessThan(sm.x + sm.w);
+    expect(p.y - 8 - C.ballRadius).toBeLessThan(sm.y + sm.h);
+    return p;
+  }
+
+  it('a throw away from a wall the thrower stands directly below still flies', () => {
+    const d = driver(['p0', 'p1']);
+    const p = p0BelowSnowman(d);
+    d.tap('p0', p.x, p.y + 100);
+    d.tick();
+    const b = d.snap().balls[0];
+    expect(b).toBeDefined();
+    expect(b.y - (p.y - 8)).toBeGreaterThanOrEqual(3);
+    d.tick(10);
+    expect(d.snap().snowmen.find((s) => s.id === 'obj60')!).toMatchObject({ state: 'heil', hits: 0 });
+    expect(d.snap().balls.length).toBe(1);
+  });
+
+  it('a throw toward the solid the thrower stands below still breaks against it', () => {
+    const d = driver(['p0', 'p1']);
+    const p = p0BelowSnowman(d);
+    d.tap('p0', p.x, p.y - 100);
+    d.tick(9); // 0.3 s
+    expect(d.snap().balls.length).toBe(0);
+    expect(d.snap().snowmen.find((s) => s.id === 'obj60')!).toMatchObject({ state: 'schaden1', hits: 1 });
+  });
+
+  it('a shoved player cannot throw while stumbling', () => {
+    const d = driver(['p0', 'p2']);
+    p2ToMiddle(d);
+    d.set('p2', { left: true });
+    while (d.snap().players.p2.x > 72) d.tick();
+    d.set('p2', {});
+    d.tick();
+    d.inputs.p2 = { ...d.inputs.p2, shoves: d.inputs.p2.shoves + 1 };
+    d.tick();
+    expect(d.snap().players.p0.stun).toBe(true);
+    d.set('p0', { primary: true });
+    d.tap('p0', 200, 110);
+    d.tick();
+    expect(d.snap().players.p0.stun).toBe(true);
+    expect(d.snap().players.p0.charging).toBe(false);
+    expect(d.snap().balls.length).toBe(0);
+    expect(d.snap().players.p0.balls).toBe(C.maxBalls);
+    // The press during the stun is consumed, not queued for later.
+    d.set('p0', {});
+    while (d.snap().players.p0.stun) d.tick();
+    d.tick(10);
+    expect(d.snap().balls.length).toBe(0);
+    d.tap('p0', 200, 110);
+    d.tick();
+    expect(d.snap().balls.length).toBe(1);
+  });
 });

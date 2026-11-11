@@ -16,6 +16,31 @@ export type BallEvent =
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
+/** Does a ball circle at (x, y) overlap the solid? */
+export function ballOverlaps(s: Solid, x: number, y: number): boolean {
+  const r = CONFIG.snowball.ballRadius;
+  const dx = x - Math.max(s.x, Math.min(x, s.x + s.w));
+  const dy = y - Math.max(s.y, Math.min(y, s.y + s.h));
+  return dx * dx + dy * dy < r * r;
+}
+
+/**
+ * Ids of the solids a freshly spawned ball overlaps and flies away from (or along): the ball skips
+ * them until it no longer overlaps them. A throw into the overlapped solid still breaks on it.
+ */
+export function spawnIgnores(x: number, y: number, vx: number, vy: number, solids: Solid[]): string[] {
+  const ids: string[] = [];
+  for (const s of solids) {
+    if (!ballOverlaps(s, x, y)) continue;
+    let nx = x - Math.max(s.x, Math.min(x, s.x + s.w));
+    let ny = y - Math.max(s.y, Math.min(y, s.y + s.h));
+    // Centre inside the rect: push direction is from the rect's centre.
+    if (nx === 0 && ny === 0) { nx = x - (s.x + s.w / 2); ny = y - (s.y + s.h / 2); }
+    if (nx * vx + ny * vy >= 0) ids.push(s.id);
+  }
+  return ids;
+}
+
 /** Speed (px/s) and range (px) of a throw with the given charge 0..1. */
 export function throwPower(charge: number): { speed: number; range: number } {
   const c = CONFIG.snowball;

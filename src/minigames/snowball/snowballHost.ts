@@ -4,7 +4,7 @@ import { moveCircle, tileAt, type Arena, type Solid } from '../common/arena';
 import { Edge } from '../common/edges';
 import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
-import { advanceBall, BALL_LIFT, throwPower, type BallTarget } from './snowballBalls';
+import { advanceBall, BALL_LIFT, ballOverlaps, spawnIgnores, throwPower, type BallTarget } from './snowballBalls';
 import { stepMover, type Mover } from './snowballMove';
 
 export type SnowPlayer = Mover & {
@@ -97,6 +97,8 @@ export function createSnowballHost(
     .map((s) => ({ id: s.id, hits: 0, state: 'heil', rebuildMs: 0 }));
   const snowmanById = new Map(snowmen.map((s) => [s.id, s]));
   let balls: Ball[] = [];
+  /** Host-only: per ball id, solids it spawned in and still overlaps (kept out of snapshots). */
+  const ignore = new Map<number, string[]>();
   let fx: (SnowFx & { atMs: number })[] = [];
   let elapsedMs = 0;
   let nextBallId = 1;
@@ -122,7 +124,7 @@ export function createSnowballHost(
     return { key: k, x: best.x, y: best.y };
   };
 
-  const throwBall = (k: PlayerKey, aimX: number, aimY: number, charge: number) => {
+  const throwBall = (k: PlayerKey, aimX: number, aimY: number, charge: number, solids: Solid[]) => {
     const p = players[k];
     let dx = aimX - p.x;
     let dy = aimY - p.y;
@@ -132,10 +134,13 @@ export function createSnowballHost(
       len = 1;
     }
     const { speed, range } = throwPower(charge);
-    balls.push({
+    const b: Ball = {
       id: nextBallId++, x: p.x, y: p.y - BALL_LIFT, vx: (dx / len) * speed, vy: (dy / len) * speed,
       left: range, owner: k, kind: 'normal', bounces: 0,
-    });
+    };
+    balls.push(b);
+    const ids = spawnIgnores(b.x, b.y, b.vx, b.vy, solids);
+    if (ids.length > 0) ignore.set(b.id, ids);
     p.balls -= 1;
     p.reloading = false;
     reloadMs[k] = 0;
@@ -212,9 +217,15 @@ export function createSnowballHost(
         const p = players[k];
         const inp = inputs[k] ?? neutralInput();
         const presses = taps[k].take(inp.primaryTaps);
-        p.charging = inp.primary;
+        // Stumbling after a shove: presses are consumed, no charging, no throw.
+        p.charging = inp.primary && !p.stun;
+        if (p.stun) {
+          p.reloading = false;
+          reloadMs[k] = 0;
+          continue;
+        }
         if (presses > 0 && p.balls >= 1 && sinceThrowMs[k] >= c.throwGapMs) {
-          throwBall(k, inp.aimX, inp.aimY, inp.primaryCharge);
+          throwBall(k, inp.aimX, inp.aimY, inp.primaryCharge, solids);
           continue;
         }
         const held = inp.up || inp.down || inp.left || inp.right;
@@ -238,7 +249,12 @@ export function createSnowballHost(
       for (const b of balls) {
         const rewind = remote[b.owner] ?? false;
         const targets = keys.map((k) => seenAt(k, rewind));
-        const ev = advanceBall(b, sec, arena, solids, targets);
+        const skip = ignore.get(b.id);
+        const ev = advanceBall(b, sec, arena, skip ? solids.filter((s) => !skip.includes(s.id)) : solids, targets);
+        if (skip) {
+          const still = ev ? [] : skip.filter((id) => { const s = solids.find((o) => o.id === id); return s && ballOverlaps(s, b.x, b.y); });
+          if (still.length > 0) ignore.set(b.id, still); else ignore.delete(b.id);
+        }
         if (!ev) { kept.push(b); continue; }
         if (ev.kind === 'player') {
           const v = players[ev.victim];
