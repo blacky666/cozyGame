@@ -1,5 +1,6 @@
 import { CONFIG } from '../config';
 import { normalizeRoomCode } from '../net/roomCode';
+import { versionLabel } from '../version';
 import { clear, h } from './dom';
 
 export type StartHandlers = {
@@ -52,6 +53,7 @@ export function showStart(root: HTMLElement, o: StartHandlers): void {
         h('button', { class: 'cg-btn cg-secondary', text: 'Profil', onclick: o.onProfile }),
       ),
     ),
+    h('p', { class: 'cg-version', text: versionLabel() }),
   );
 }
 

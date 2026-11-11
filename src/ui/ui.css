@@ -54,3 +54,4 @@
   border-radius: 4px; padding: 2px 8px; margin-top: 2px; cursor: pointer;
 }
 .cg-kick:hover { background: var(--hi); color: var(--primary-text); }
+.cg-version { position: fixed; left: 12px; bottom: 8px; margin: 0; font-size: 14px; color: #b9b3d0; pointer-events: none; }
