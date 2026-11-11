@@ -5,9 +5,11 @@ import type { ClientSession, HostSession } from '../net/session';
 import { MINIGAMES } from '../minigames/registry';
 import { playerKey, type PlayerKey } from '../minigames/types';
 import { DEFAULT_TIMING, EveningHost, type EveningTiming } from './eveningHost';
+import type { AssetFile } from '../gfx/assetTypes';
 import { createKeyboard } from './keyboard';
 import { createPlayerCache } from './playerCache';
 import { Stage } from './phaserGame';
+import { PointerInput } from './pointer';
 import type { StageTiming } from './stageCtx';
 
 /*
@@ -34,16 +36,27 @@ const keyFor = (players: { id: string; slot: 0 | 1 | 2 | 3 }[], id: string | nul
   return p ? playerKey(p.slot) : 'p?';
 };
 
-/** Host: run the evening (simulation + own stage). `onLobby` fires after "Nochmal?". */
-export function runHostEvening(session: HostSession, rounds: number, onLobby: () => void): void {
+/**
+ * Host: run the evening (simulation + own stage). `assets` are the menus' loaded asset files (the
+ * games' host simulations build their arenas from them). `onLobby` fires after "Nochmal?".
+ */
+export function runHostEvening(
+  session: HostSession,
+  rounds: number,
+  assets: Record<string, AssetFile>,
+  onLobby: () => void,
+): void {
   const keyboard = createKeyboard();
+  // Written by MinigameScene, read here every tick: the host's own player throws like a client.
+  const pointer = new PointerInput();
   const t = timings();
   let stage: Stage | null = null;
   const host = new EveningHost({
     session,
     rounds,
     games: MINIGAMES,
-    localInput: () => keyboard.state(),
+    localInput: () => pointer.merge(keyboard.state()),
+    assets,
     timing: t.host,
     onPhase: (p) => stage?.setPhase(p),
   });
@@ -55,6 +68,7 @@ export function runHostEvening(session: HostSession, rounds: number, onLobby: ()
     players: createPlayerCache(() => session.roster.list()),
     selfKey: () => keyFor(session.roster.list(), session.selfId),
     keyboard,
+    pointer,
     timing: t.stage,
     hostSnapshot: () =>
       host.phase.kind === 'playing'
@@ -79,13 +93,20 @@ export function runHostEvening(session: HostSession, rounds: number, onLobby: ()
 
 /** Client: render phases from the host. Returns the stage (driven by startEvening.ts). */
 export function runClientEvening(session: ClientSession, backToStart: () => void): Stage {
+  const pointer = new PointerInput();
   // Focus lost / tab hidden: send released keys at once (the host also expires stale input); counters stay.
-  const keyboard = createKeyboard({ onIdle: () => session.sendInput(keyboard.state()) });
+  const keyboard = createKeyboard({
+    onIdle: () => {
+      pointer.button.cancel();
+      session.sendInput(pointer.merge(keyboard.state()));
+    },
+  });
   const stage: Stage = new Stage({
     isHost: false,
     players: createPlayerCache(() => session.roster),
     selfKey: () => keyFor(session.roster, session.playerId),
     keyboard,
+    pointer,
     timing: timings().stage,
     sendInput: (s) => session.sendInput(s),
     backToStart: () => {

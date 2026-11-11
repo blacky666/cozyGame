@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '../../config';
 import { mulberry32 } from '../../flow/rng';
 import type { AssetFile } from '../../gfx/assetTypes';
@@ -9,6 +9,12 @@ import { buildArena, tileAt } from '../common/arena';
 import { playerKey, type GamePlayer, type PlayerKey } from '../types';
 import { createSnowballHost, SPAWNS, type SnowState } from './snowballHost';
 import { stepMover, type Mover } from './snowballMove';
+import { MINIGAMES } from '../registry';
+import { lerpSnow, snowball } from './snowball';
+import { toMap } from './snowballView';
+
+// The views import Phaser, which needs a browser; the definition tests only need its module to load.
+vi.mock('phaser', () => ({ default: { GameObjects: { Container: class {} } } }));
 
 const file = JSON.parse(readFileSync('public/assets/arena-schneeball.json', 'utf8')) as AssetFile;
 const arena = buildArena(file, 'schneeball.map');
@@ -477,5 +483,57 @@ describe('schneeball extras', () => {
     d.tick(20);
     s = d.snap();
     expect(s.players.p2.score).toBe(C.hitPoints);
+  });
+});
+
+describe('schneeball definition', () => {
+  const player = (x: number, y: number) => ({
+    x, y, vx: 0, vy: 0, dir: 'down' as const, score: 0, balls: 5, reloading: false, charging: false, invulnMs: 0,
+    stun: false, swing: false, shoveCdMs: 0, extra: null, extraLeft: 0, hat: false, throwAnimMs: 0,
+  });
+  const ball = (id: number, x: number, y: number) => ({ id, x, y, vx: 10, vy: 0, left: 100, owner: 'p0', kind: 'normal' as const, bounces: 0 });
+
+  it('lerps players and balls by id and takes the rest from the newer state', () => {
+    const a: SnowState = {
+      timeLeftMs: 1000, players: { p0: { ...player(0, 0), score: 1 } }, balls: [ball(1, 0, 0), ball(2, 50, 50)],
+      snowmen: [], pickups: [], fx: [],
+    };
+    const b: SnowState = {
+      timeLeftMs: 900, players: { p0: { ...player(10, 20), score: 3 }, p1: player(5, 5) }, balls: [ball(1, 10, 10), ball(3, 70, 70)],
+      snowmen: [{ id: 'obj0', hits: 1, state: 'schaden1', rebuildMs: 0 }], pickups: [{ id: 1, x: 1, y: 2, kind: 'riesenball' }],
+      fx: [{ id: 4, kind: 'treffer', x: 3, y: 4 }],
+    };
+    const s = lerpSnow(a, b, 0.5);
+    expect(s.timeLeftMs).toBe(900);
+    expect(s.players.p0).toMatchObject({ x: 5, y: 10, score: 3 });
+    expect(s.players.p1).toMatchObject({ x: 5, y: 5 });
+    expect(s.balls).toEqual([{ ...ball(1, 5, 5) }, ball(3, 70, 70)]);
+    expect(s.snowmen).toEqual(b.snowmen);
+    expect(s.pickups).toEqual(b.pickups);
+    expect(s.fx).toEqual(b.fx);
+  });
+
+  it('converts pointer world coordinates to map coordinates', () => {
+    expect(toMap(105, 126)).toEqual({ x: 100, y: 100 });
+  });
+
+  it('registry offers schneeball and muenzjagd', () => {
+    expect(MINIGAMES.map((g) => g.id)).toEqual(['schneeball', 'muenzjagd']);
+  });
+
+  it('describes the game and builds its host from the asset map', () => {
+    expect(snowball).toMatchObject({
+      id: 'schneeball',
+      title: 'Schneeball-Schlacht',
+      rule: 'Triff die anderen! Treffer +2, getroffen −1.',
+      controls: 'WASD laufen · Maus zielen · Klick werfen (halten = stärker) · Leertaste schubsen',
+      durationMs: C.durationMs,
+      aimOffset: { x: 5, y: 26 },
+    });
+    expect(() => snowball.createHost(gp(['p0', 'p1']), mulberry32(1))).toThrow(/assets/);
+    const host = snowball.createHost(gp(['p0', 'p1']), mulberry32(1), { assets: { 'arena-schneeball': file } });
+    const s = host.snapshot();
+    expect(s.players.p0).toMatchObject({ x: SPAWNS[0][0], y: SPAWNS[0][1] });
+    expect(s.snowmen.length).toBeGreaterThan(0);
   });
 });

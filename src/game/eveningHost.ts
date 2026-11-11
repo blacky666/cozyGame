@@ -3,6 +3,7 @@ import { Evening, type EveningPhase } from '../flow/evening';
 import { neutralInput, type InputState } from '../net/protocol';
 import type { PlayerInfo } from '../net/roster';
 import { startHostTicker, type HostSession } from '../net/session';
+import type { AssetFile } from '../gfx/assetTypes';
 import { playerKey, type BotView, type GamePlayer, type MiniGame, type MiniGameHost, type PlayerKey } from '../minigames/types';
 
 /*
@@ -30,6 +31,8 @@ export interface EveningHostOptions {
   games: MiniGame[];
   /** Host's own input (keyboard), sampled every tick for slot 0. */
   localInput: () => InputState;
+  /** Loaded asset files, handed to each game's createHost (arena maps). */
+  assets?: Record<string, AssetFile>;
   rand?: () => number;
   timing?: EveningTiming;
   /** Clock for snapshot tick times (ms); default performance.now. */
@@ -181,7 +184,7 @@ export class EveningHost {
       }));
     const durationMs = def.durationMs === null ? undefined : def.durationMs * this.timing.durationScale;
     this.def = def;
-    this.game = def.createHost(players, this.rand, { durationMs });
+    this.game = def.createHost(players, this.rand, { durationMs, assets: this.o.assets });
     this.latest = this.game.snapshot();
     this.latestTick = 0;
     this.latestAt = this.now();

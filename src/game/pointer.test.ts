@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ChargeButton } from './pointer';
+import { neutralInput } from '../net/protocol';
+import { ChargeButton, PointerInput } from './pointer';
 
 describe('ChargeButton', () => {
   it('counts a completed click and its charge', () => {
@@ -28,5 +29,18 @@ describe('ChargeButton', () => {
     const b = new ChargeButton();
     b.release(100);
     expect(b.taps).toBe(0);
+  });
+});
+
+describe('PointerInput', () => {
+  it('adds button and aim to the keyboard state', () => {
+    const p = new PointerInput();
+    p.button.press(0);
+    p.button.release(500);
+    p.button.press(600);
+    p.aimX = 12;
+    p.aimY = 34;
+    const s = p.merge({ ...neutralInput(), up: true, shoves: 2 });
+    expect(s).toMatchObject({ up: true, shoves: 2, primary: true, primaryTaps: 1, primaryCharge: 0.5, aimX: 12, aimY: 34 });
   });
 });

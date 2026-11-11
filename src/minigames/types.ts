@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import type { AssetFile } from '../gfx/assetTypes';
 import type { InputState } from '../net/protocol';
 import type { Look } from '../save/profile';
 
@@ -26,6 +27,8 @@ export interface MiniGameView<S> {
   render(s: S, selfKey: PlayerKey): void;
   /** Client-side prediction of the own player (called every frame before render; clients only). */
   predict?(input: InputState, dt: number, latest: S | null, ackSeq: number, sentSeq: number): void;
+  /** Local charge (0..1) of the held primary button, null when not held; called every frame before render. */
+  setCharge?(charge: number | null): void;
   destroy(): void;
 }
 
@@ -35,8 +38,20 @@ export interface MiniGame<S = unknown> {
   rule: string;
   controls: string;
   durationMs: number | null;
-  /** `opts.durationMs` overrides the game's duration (dev-only fast mode). */
-  createHost(players: GamePlayer[], rand: () => number, opts?: { durationMs?: number }): MiniGameHost<S>;
+  /**
+   * Games aimed with the mouse: simulation = pointer world position minus this offset (where the
+   * view draws the map). Also turns the cursor into a crosshair while the game runs.
+   */
+  aimOffset?: { x: number; y: number };
+  /**
+   * `opts.durationMs` overrides the game's duration (dev-only fast mode); `opts.assets` are the loaded
+   * asset files (games with an arena map need them).
+   */
+  createHost(
+    players: GamePlayer[],
+    rand: () => number,
+    opts?: { durationMs?: number; assets?: Record<string, AssetFile> },
+  ): MiniGameHost<S>;
   createView(scene: Phaser.Scene, players: GamePlayer[], selfKey: PlayerKey): MiniGameView<S>;
   /** Snapshot interpolation for clients (default: step to the newer state). */
   lerp?(a: S, b: S, t: number): S;

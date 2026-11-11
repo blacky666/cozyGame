@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import type { InputState } from '../net/protocol';
 
 /** Left mouse button with hold-to-charge: counts completed clicks, never loses a quick one. */
 export class ChargeButton {
@@ -38,5 +39,22 @@ export class ChargeButton {
   chargeAt(nowMs: number): number {
     if (this.pressedAt === null) return 0;
     return Math.min(1, Math.max(0, (nowMs - this.pressedAt) / CONFIG.snowball.maxChargeMs));
+  }
+}
+
+/**
+ * Pointer state shared by the minigame scene (writes it from Phaser pointer events) and whoever
+ * builds the input: the client's send loop and the host's localInput.
+ */
+export class PointerInput {
+  readonly button = new ChargeButton();
+  /** Aim in the running game's simulation coordinates. */
+  aimX = 0;
+  aimY = 0;
+
+  /** Keyboard state plus the pointer fields. */
+  merge(s: InputState): InputState {
+    const b = this.button;
+    return { ...s, primary: b.held, primaryTaps: b.taps, primaryCharge: b.charge, aimX: this.aimX, aimY: this.aimY };
   }
 }

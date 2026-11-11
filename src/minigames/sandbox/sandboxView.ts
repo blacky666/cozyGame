@@ -3,6 +3,7 @@ import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
 import { assetsOf, byKey, playerSymbol, txt } from '../../game/ui';
 import { Reconciler } from '../../net/reconcile';
+import { drawShoveRing } from '../common/shoveRing';
 import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { moveStep, SANDBOX, type Facing, type SandboxState } from './sandboxHost';
 
@@ -120,7 +121,7 @@ export class SandboxView implements MiniGameView<SandboxState> {
         a.char.play(anim, p.dir);
       }
       this.scores.get(key)?.setText(String(sp.score));
-      if (key === selfKey) this.drawRing(Math.round(p.x), Math.round(p.y), sp.shoveCdMs);
+      if (key === selfKey) drawShoveRing(this.ring, Math.round(p.x), Math.round(p.y), sp.shoveCdMs);
     }
     const alive = new Set(s.coins.map((c) => c.id));
     for (const [id, r] of this.coins) {
@@ -139,17 +140,6 @@ export class SandboxView implements MiniGameView<SandboxState> {
       this.coins.set(c.id, r);
     }
     this.time.setText(`${Math.ceil(s.timeLeftMs / 1000)} s`);
-  }
-
-  /** Filling ellipse under the feet while the shove cools down; hidden when ready. */
-  private drawRing(x: number, y: number, cdMs: number): void {
-    const g = this.ring.clear();
-    if (cdMs <= 0) return;
-    const done = 1 - cdMs / CONFIG.shove.cooldownMs;
-    g.setPosition(x, y + 1).setScale(1, 0.5).setDepth(y - 1);
-    g.lineStyle(2, 0x3b2418, 0.35).strokeCircle(0, 0, 10);
-    g.lineStyle(2, 0xfff4a8, 0.9).beginPath();
-    g.arc(0, 0, 10, -Math.PI / 2, -Math.PI / 2 + done * Math.PI * 2, false).strokePath();
   }
 
   destroy(): void {

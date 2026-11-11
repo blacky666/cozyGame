@@ -1,5 +1,6 @@
 import type { EveningPhase } from '../flow/evening';
 import type { Stage } from '../game/phaserGame';
+import type { AssetFile } from '../gfx/assetTypes';
 import type { Transport } from '../net/transport';
 import type { ClientSession, HostSession } from '../net/session';
 import type { Profile } from '../save/profile';
@@ -16,6 +17,8 @@ export type EveningContext = {
   profile: Profile;
   isHost: boolean;
   rounds: number;
+  /** Host: asset files loaded by the menus (null when loading failed). */
+  assets?: Record<string, AssetFile> | null;
   /** DOM overlay root (the lobby stays rendered inside while hidden). */
   root: HTMLElement;
   /** Called after the evening returned to the lobby. */
@@ -28,6 +31,7 @@ const setOverlay = (root: HTMLElement, visible: boolean) => void (root.style.dis
 
 /** Shown in the lobby when the host's start failed. */
 export const START_ABORTED = 'Start abgebrochen – zu wenige Spieler.';
+const NO_ASSETS = 'Grafiken konnten nicht geladen werden. Bitte Seite neu laden.';
 
 /** Host pressed "Los geht's!". */
 export function onStartEvening(ctx: EveningContext): void {
@@ -44,10 +48,16 @@ export function onStartEvening(ctx: EveningContext): void {
       if (hint) hint.textContent = notice;
     }
   };
+  const assets = ctx.assets;
+  if (!assets) {
+    // The host simulations need the arena maps from the assets.
+    abort(NO_ASSETS);
+    return;
+  }
   void loadRuntime().then(
     ({ runHostEvening }) => {
       try {
-        runHostEvening(session, ctx.rounds, () => {
+        runHostEvening(session, ctx.rounds, assets, () => {
           setOverlay(ctx.root, true);
           ctx.onLobby?.();
         });

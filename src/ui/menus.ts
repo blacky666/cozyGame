@@ -86,7 +86,7 @@ export function startMenus(root: HTMLElement): void {
         code, selfId: session.selfId, isHost: true, rounds, assets,
         onReady: (r) => session.setLocalReady(session.selfId, r),
         onRounds: (n) => (rounds = n),
-        onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, root }),
+        onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, assets, root }),
         onLeave: leave,
         onKick: (id) => void session.kick(id),
       },

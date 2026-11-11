@@ -4,6 +4,7 @@ import type { PlayerInfo } from '../net/roster';
 import type { PlayerKey } from '../minigames/types';
 import type { SnapPayload } from './eveningHost';
 import type { KeyboardInput } from './keyboard';
+import type { PointerInput } from './pointer';
 
 export type StageTiming = { ruleMs: number; countdownMs: number; standingsMs: number };
 
@@ -13,6 +14,8 @@ export interface StageCtx {
   players(): PlayerInfo[];
   selfKey(): PlayerKey;
   keyboard: KeyboardInput;
+  /** Mouse state: written by MinigameScene, read by the client's input send and the host's localInput. */
+  pointer: PointerInput;
   timing: StageTiming;
   /** Host: latest authoritative minigame snapshot with its tick number and tick time (ms, performance.now clock). */
   hostSnapshot?(): (SnapPayload & { tick: number; at: number }) | null;
