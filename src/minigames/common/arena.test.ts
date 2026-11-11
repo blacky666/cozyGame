@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { AssetFile } from '../../gfx/assetTypes';
+import { SPUD_SPAWNS } from '../kartoffel/spudHost';
 import { buildArena, moveCircle, segmentHit, tileAt } from './arena';
 
 const file = JSON.parse(readFileSync('public/assets/arena-schneeball.json', 'utf8')) as AssetFile;
@@ -106,8 +107,8 @@ describe('garden arena (kartoffel)', () => {
     expect(up.hitY).toBe(true);
   });
   it('garden: no solid at the four spawn points', () => {
-    const spawns = [[72, 88], [344, 88], [72, 184], [344, 184]];
-    for (const [x, y] of spawns) expect(g.solids.some((s) => hitsRect(s, x, y, 7))).toBe(false);
+    expect(SPUD_SPAWNS.length).toBe(4);
+    for (const [x, y] of SPUD_SPAWNS) expect(g.solids.some((s) => hitsRect(s, x, y, 7))).toBe(false);
   });
   it('adds rand-layer solids with id rand<col>,<row>', () => {
     expect(g.solids.some((s) => s.id.startsWith('rand') && s.kind === 'wall')).toBe(true);

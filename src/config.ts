@@ -78,6 +78,44 @@ interface GameConfig {
     giantExtraRadius: number;
     extraThrows: number;
   };
+  kartoffel: {
+    walkSpeed: number;
+    bodyRadius: number;
+    /** Max feet distance for a pass by touch (px). */
+    touchPx: number;
+    /** Left click: speed factor for sprintMs, then no sprint for sprintCooldownMs (counted from the click). */
+    sprintFactor: number;
+    sprintMs: number;
+    sprintCooldownMs: number;
+    /** After a pass the giver cannot get the potato back for this long. */
+    noBackMs: number;
+    /** "Kein Zurück!" fx at most this often per potato. */
+    noBackFxMs: number;
+    /** Real fuse, random in this range (host-only). */
+    fuseMinMs: number;
+    fuseMaxMs: number;
+    /** Fraction of the fuse burnt at which heat becomes 1, 2, 3. */
+    heatSteps: number[];
+    /** Pause after a bang before the next potato. */
+    boomPauseMs: number;
+    /** Kurze Lunte: the real fuse is cut to this much remaining time. */
+    shortFuseMs: number;
+    fakeFuseMinMs: number;
+    fakeFuseMaxMs: number;
+    /** Gießkanne: the holder is slower by slowFactor for slowMs. */
+    slowMs: number;
+    slowFactor: number;
+    /** Speed factor of the evening leader while not holding a potato. */
+    leaderFactor: number;
+    pickupSpawnMs: number;
+    maxPickups: number;
+    /** The round ends after this long at the latest (living players share first place). */
+    safetyMs: number;
+    /** Two players: bangs per round (best of), the first to lose a majority is out. */
+    bestOf: number;
+    /** How long fx stay in snapshots. */
+    fxKeepMs: number;
+  };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -135,6 +173,15 @@ export const CONFIG = deepFreeze<GameConfig>({
     hitPoints: 2, hitPenalty: 1, downMs: 900, invulnMs: 2500, snowmanHits: 3, snowmanRebuildMs: 15000, snowmanAufbauMs: 500,
     walkSpeed: 60, iceAccel: 140, iceFriction: 0.8, spawnMs: 12000, maxPickups: 2, bounces: 2,
     giantSpeedFactor: 0.7, giantExtraRadius: 4, extraThrows: 3,
+  },
+  // Heiße Kartoffel (px, px/s, ms).
+  kartoffel: {
+    walkSpeed: 64, bodyRadius: 5, touchPx: 13,
+    sprintFactor: 1.8, sprintMs: 400, sprintCooldownMs: 3000,
+    noBackMs: 1000, noBackFxMs: 500,
+    fuseMinMs: 12000, fuseMaxMs: 20000, heatSteps: [0.5, 0.75, 0.9], boomPauseMs: 1800,
+    shortFuseMs: 3000, fakeFuseMinMs: 6000, fakeFuseMaxMs: 10000, slowMs: 2000, slowFactor: 0.6,
+    leaderFactor: 0.95, pickupSpawnMs: 7000, maxPickups: 2, safetyMs: 180000, bestOf: 3, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
