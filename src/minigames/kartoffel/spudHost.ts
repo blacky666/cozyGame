@@ -61,6 +61,8 @@ type HostPotato = Potato & {
   fuseMs: number;
   burnMs: number;
   fake: boolean;
+  /** Heat thresholds as fractions of the fuse, jittered per potato so heat does not reveal the fuse. */
+  steps: number[];
   /** Time of the last "Kein Zurück!" fx of this potato. */
   blockFxAtMs: number;
 };
@@ -75,6 +77,11 @@ export const SPUD_SPAWNS: ReadonlyArray<readonly [number, number]> = [
 const START_DIR: Facing = 'down';
 /** Float slack for timers that count down in tick steps. */
 const EPS = 1e-6;
+/** Raster character of the vegetable beds: the only tiles pickups spawn on. */
+const BEET = 'b';
+/** Minimum gap between two heat thresholds and to the ends of (0, 1). */
+const HEAT_GAP = 0.01;
+const PICKUP_KINDS: ReadonlyArray<SpudPickup['kind']> = ['fake', 'kurze_lunte', 'giesskanne'];
 
 /** Walking speed in px/s: walkSpeed x sprint x slow x leader. The client uses it for prediction. */
 export function speedOf(p: SpudPlayer): number {
@@ -119,6 +126,15 @@ export function createSpudHost(
   let pauseMs = 0;
   let potatoes: HostPotato[] = [];
   const pickups: SpudPickup[] = [];
+  /** Centres of all beet tiles (pickup spawn spots). */
+  const beets: { x: number; y: number }[] = [];
+  arena.raster.forEach((line, row) => {
+    for (let col = 0; col < line.length; col++) {
+      if (line[col] === BEET) beets.push({ x: (col + 0.5) * arena.tile, y: (row + 0.5) * arena.tile });
+    }
+  });
+  let spawnMs = 0;
+  let nextPickupId = 1;
   let fx: (SpudFx & { atMs: number })[] = [];
   const out: PlayerKey[] = [];
   let bang = 0;
@@ -133,8 +149,22 @@ export function createSpudHost(
   const pick = <T>(list: T[]): T => list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
   const heatOf = (p: HostPotato): Potato['heat'] => {
     const burnt = p.burnMs / p.fuseMs;
-    return c.heatSteps.filter((s) => burnt >= s).length as Potato['heat'];
+    return p.steps.filter((s) => burnt >= s).length as Potato['heat'];
   };
+  /** Each heat step shifted by up to +-heatJitter, strictly increasing and inside (0, 1). */
+  const jitteredSteps = (): number[] => {
+    let prev = 0;
+    return c.heatSteps.map((s, i) => {
+      const lo = prev + HEAT_GAP;
+      const hi = 1 - HEAT_GAP * (c.heatSteps.length - i);
+      prev = Math.min(hi, Math.max(lo, s + (rand() * 2 - 1) * c.heatJitter));
+      return prev;
+    });
+  };
+  const newPotato = (holder: PlayerKey, fuseMs: number, fake: boolean): HostPotato => ({
+    id: nextPotatoId++, holder, heat: 0, noBackFrom: null, noBackMs: 0,
+    fuseMs, burnMs: 0, fake, steps: jitteredSteps(), blockFxAtMs: -Infinity,
+  });
   /** The leader flag carries the speed factor: only while the leader holds no potato. */
   const refreshLeaders = () => {
     for (const k of keys) players[k].leader = isLeader.has(k) && !potatoes.some((p) => p.holder === k);
@@ -146,10 +176,42 @@ export function createSpudHost(
     const cands = alive.filter(present);
     const holder = pick(cands.length > 0 ? cands : alive);
     const fuseMs = c.fuseMinMs + rand() * (c.fuseMaxMs - c.fuseMinMs);
-    potatoes.push({
-      id: nextPotatoId++, holder, heat: 0, noBackFrom: null, noBackMs: 0,
-      fuseMs, burnMs: 0, fake: false, blockFxAtMs: -Infinity,
-    });
+    potatoes.push(newPotato(holder, fuseMs, false));
+  };
+
+  /** One new pickup on a free beet tile far from every living player, or none after pickupTries tries. */
+  const spawnPickup = () => {
+    const alive = living();
+    for (let i = 0; i < c.pickupTries && beets.length > 0; i++) {
+      const spot = pick(beets);
+      if (pickups.some((pk) => pk.x === spot.x && pk.y === spot.y)) continue;
+      if (alive.some((k) => Math.hypot(players[k].x - spot.x, players[k].y - spot.y) < c.pickupClearPx)) continue;
+      // At most one fake at a time (as a pickup or as a potato in play).
+      const fakeAround = pickups.some((pk) => pk.kind === 'fake') || potatoes.some((o) => o.fake);
+      const kind = pick(PICKUP_KINDS.filter((kd) => kd !== 'fake' || !fakeAround));
+      pickups.push({ id: nextPickupId++, x: spot.x, y: spot.y, kind });
+      return;
+    }
+  };
+
+  /** `k` took the pickup: apply its effect. */
+  const applyPickup = (pk: SpudPickup, k: PlayerKey) => {
+    addFx('pickup', pk.x, pk.y, k);
+    if (pk.kind === 'fake') {
+      const fuseMs = c.fakeFuseMinMs + rand() * (c.fakeFuseMaxMs - c.fakeFuseMinMs);
+      potatoes.push(newPotato(k, fuseMs, true));
+      return;
+    }
+    for (const pot of potatoes) {
+      if (pot.fake) continue;
+      if (pk.kind === 'kurze_lunte') {
+        pot.fuseMs = Math.min(pot.fuseMs, pot.burnMs + c.shortFuseMs);
+        addFx('kurze_lunte', pk.x, pk.y, pot.holder);
+      } else {
+        players[pot.holder].slowMs = c.slowMs;
+        addFx('giesskanne', players[pot.holder].x, players[pot.holder].y, pot.holder);
+      }
+    }
   };
 
   /** The real potato burst on `k`. */
@@ -211,7 +273,8 @@ export function createSpudHost(
         p.slowMs = countDown(p.slowMs, ms);
       }
 
-      // 3. Sprint taps. Absent players take no edge, so a reconnect fires no phantom sprint.
+      // 3. Sprint taps. Absent players take no edge. Edge only re-bases when a counter drops, so a
+      // reconnect whose counter grew meanwhile fires its sprint once (as in snowballHost).
       for (const k of keys) {
         const inp = inputs[k];
         if (!inp) continue;
@@ -223,7 +286,26 @@ export function createSpudHost(
         addFx('sprint', p.x, p.y, k);
       }
 
-      // 4. Pickups (Task 3 hook: spawn on beet tiles, collect, apply fake / kurze Lunte / Gießkanne).
+      // 4. Pickups: spawn on beet tiles every pickupSpawnMs while playing, collected by touch by
+      // living players with input (ghosts never). Effects: fake potato / kurze Lunte / Gießkanne.
+      if (phase === 'play') {
+        spawnMs += ms;
+        if (spawnMs >= c.pickupSpawnMs - EPS) {
+          spawnMs = 0;
+          if (pickups.length < c.maxPickups) spawnPickup();
+        }
+        for (const pk of [...pickups]) {
+          let taker: PlayerKey | null = null;
+          let takerD = c.pickupTouchPx;
+          for (const k of active) {
+            const d = Math.hypot(players[k].x - pk.x, players[k].y - pk.y);
+            if (d <= takerD) { taker = k; takerD = d; }
+          }
+          if (!taker) continue;
+          pickups.splice(pickups.indexOf(pk), 1);
+          applyPickup(pk, taker);
+        }
+      }
 
       // 5. Passes by touch: each potato at most once per tick, to the nearest touching living
       // player with input. The giver cannot get it back while noBackMs runs. Shoves never pass.

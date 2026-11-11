@@ -410,4 +410,203 @@ describe('Heiße Kartoffel host', () => {
     expect(d.snap().phase).toBe('play');
     expect(['p1', 'p2']).toContain(d.holder());
   });
+
+  it('heat thresholds are jittered per potato, stay increasing and reach 3 before the bang', () => {
+    const ratios: number[] = [];
+    for (let seed = 1; seed <= 120; seed++) {
+      const d = driver(['p0', 'p1', 'p2'], { rand: mulberry32(seed) });
+      let t1 = -1;
+      let t = 0;
+      let heat = 0;
+      let reached3 = false;
+      const n = d.untilBang(() => {
+        t++;
+        const p = d.snap().potatoes[0];
+        if (!p) return;
+        expect(p.heat).toBeGreaterThanOrEqual(heat);
+        heat = p.heat;
+        if (heat >= 1 && t1 < 0) t1 = t;
+        if (heat === 3) reached3 = true;
+      });
+      expect(reached3).toBe(true);
+      ratios.push(t1 / n);
+    }
+    const first = K.heatSteps[0];
+    expect(Math.max(...ratios) - Math.min(...ratios)).toBeGreaterThan(0.05);
+    for (const r of ratios) {
+      expect(r).toBeGreaterThan(first - K.heatJitter - 0.03);
+      expect(r).toBeLessThan(first + K.heatJitter + 0.03);
+    }
+  });
+
+  describe('garden extras', () => {
+    const KINDS = ['fake', 'kurze_lunte', 'giesskanne'] as const;
+    const FOUR = ['p0', 'p1', 'p2', 'p3'];
+    const tileOf = (x: number, y: number) => arena.raster[Math.floor(y / arena.tile)][Math.floor(x / arena.tile)];
+    /** Walk k to (x, y): first along y, then along x, until within 3 px (or the pickup is gone). */
+    const walkTo = (d: ReturnType<typeof driver>, k: string, x: number, y: number, max = 600, stopWhenGone = true) => {
+      for (let n = 0; n < max; n++) {
+        const me = d.snap().players[k];
+        if (Math.hypot(me.x - x, me.y - y) <= 3) break;
+        if (Math.abs(me.y - y) > 1.1) d.set(k, me.y < y ? { down: true } : { up: true });
+        else d.set(k, me.x < x ? { right: true } : { left: true });
+        d.tick();
+        if (stopWhenGone && d.snap().pickups.length === 0) break;
+      }
+      d.set(k, {});
+    };
+    /**
+     * Seed search: a game where a pickup of `kind` appeared and the nearest non-holder walked onto it
+     * before any bang. `run` gets the driver right after the pickup was taken and returns whether the
+     * scenario was usable; at least one seed must be.
+     */
+    const collected = (kind: (typeof KINDS)[number], run: (d: ReturnType<typeof driver>, who: string, before: SpudState) => boolean): void => {
+      let applicable = 0;
+      for (let seed = 1; seed <= 80 && applicable < 3; seed++) {
+        const d = driver(FOUR, { rand: mulberry32(seed) });
+        let n = 0;
+        while (d.snap().pickups.length === 0 && d.snap().bang === 0 && n++ < 600) d.tick();
+        const pk = d.snap().pickups.find((p) => p.kind === kind);
+        if (!pk || d.snap().bang > 0) continue;
+        const s0 = d.snap();
+        const who = FOUR.filter((k) => k !== d.holder()).sort((a, b) =>
+          Math.hypot(s0.players[a].x - pk.x, s0.players[a].y - pk.y) - Math.hypot(s0.players[b].x - pk.x, s0.players[b].y - pk.y))[0];
+        walkTo(d, who, pk.x, pk.y);
+        const s = d.snap();
+        if (s.bang > 0 || s.pickups.some((p) => p.id === pk.id)) continue;
+        if (run(d, who, s)) applicable++;
+      }
+      expect(applicable).toBeGreaterThan(0);
+    };
+
+    it('pickups spawn every 7 s on beet tiles, at most 2', () => {
+      const d = driver(FOUR, { rand: mulberry32(5) });
+      let max = 0;
+      let firstAt = -1;
+      for (let i = 0; i < Math.ceil(30000 / TICK_MS); i++) {
+        d.tick();
+        const ps = d.snap().pickups;
+        max = Math.max(max, ps.length);
+        if (ps.length > 0 && firstAt < 0) firstAt = d.snap().elapsedMs;
+        expect(ps.length).toBeLessThanOrEqual(K.maxPickups);
+        for (const p of ps) expect(tileOf(p.x, p.y)).toBe('b');
+      }
+      expect(firstAt).toBeGreaterThanOrEqual(K.pickupSpawnMs - TICK_MS);
+      expect(firstAt).toBeLessThanOrEqual(K.pickupSpawnMs + 2 * TICK_MS);
+      expect(max).toBe(K.maxPickups);
+    });
+
+    it('fake potato: a second potato of the same shape, bursts as confetti, nobody out', () => {
+      collected('fake', (d, who, before) => {
+        const s = d.snap();
+        expect(s.potatoes.length).toBe(2);
+        expect(s.fx.some((f) => f.kind === 'pickup' && f.who === who)).toBe(true);
+        const real = s.potatoes[0];
+        const fake = s.potatoes[1];
+        expect(Object.keys(fake).sort()).toEqual(Object.keys(real).sort());
+        expect(fake.holder).toBe(who);
+        expect(before.out).toEqual([]);
+        // Run until the fake is gone; while it exists no further fake spawns.
+        let n = 0;
+        while (d.snap().potatoes.length === 2 && d.snap().bang === 0 && n++ < 900) {
+          d.tick();
+          if (d.snap().potatoes.length === 2) expect(d.snap().pickups.every((p) => p.kind !== 'fake')).toBe(true);
+        }
+        const e = d.snap();
+        if (e.bang > 0) return false;
+        expect(e.potatoes.length).toBe(1);
+        expect(e.potatoes[0].id).toBe(real.id);
+        expect(e.fx.some((f) => f.kind === 'konfetti')).toBe(true);
+        expect(e.out).toEqual([]);
+        expect(e.phase).toBe('play');
+        return true;
+      });
+    });
+
+    it('fake potato passes by touch like the real one', () => {
+      collected('fake', (d, who) => {
+        const fakeId = d.snap().potatoes[1].id;
+        const other = FOUR.filter((k) => k !== who && k !== d.holder())[0];
+        d.approach(other, who, 8);
+        if (d.snap().bang > 0) return false;
+        const f = d.snap().potatoes.find((p) => p.id === fakeId);
+        if (!f) return false;
+        expect(f.holder).toBe(other);
+        expect(f.noBackFrom).toBe(who);
+        return true;
+      });
+    });
+
+    it('a player holding both passes both, each with its own no-back; ghosts never hold', () => {
+      collected('fake', (d, who) => {
+        const rh = d.snap().potatoes[0].holder;
+        // The real holder walks to the fake holder and hands the real potato over: `who` holds both.
+        d.approach(rh, who, 8);
+        const s1 = d.snap();
+        if (s1.bang > 0 || s1.potatoes.length !== 2 || s1.potatoes.some((p) => p.holder !== who)) return false;
+        const third = FOUR.filter((k) => k !== who && k !== rh)[0];
+        d.approach(third, who, 8);
+        const s2 = d.snap();
+        if (s2.bang > 0 || s2.potatoes.length !== 2) return false;
+        expect(s2.potatoes.map((p) => p.holder)).toEqual([third, third]);
+        for (const p of s2.potatoes) {
+          expect(p.noBackFrom).toBe(who);
+          expect(p.noBackMs).toBeGreaterThan(0);
+        }
+        d.untilBang();
+        const e = d.snap();
+        const ghosts = Object.keys(e.players).filter((k) => e.players[k].ghost);
+        expect(ghosts.length).toBe(1);
+        expect(e.potatoes.every((p) => !ghosts.includes(p.holder))).toBe(true);
+        d.tick(Math.ceil(K.boomPauseMs / TICK_MS) + 5);
+        expect(d.snap().potatoes.every((p) => !d.snap().players[p.holder].ghost)).toBe(true);
+        return true;
+      });
+    });
+
+    it('short fuse: the real potato bursts within 3 s', () => {
+      collected('kurze_lunte', (d) => {
+        const s = d.snap();
+        expect(s.fx.some((f) => f.kind === 'kurze_lunte')).toBe(true);
+        expect(s.potatoes.length).toBe(1);
+        const n = d.untilBang();
+        expect(n * TICK_MS).toBeLessThanOrEqual(K.shortFuseMs + TICK_MS + 1e-6);
+        expect(d.snap().bang).toBe(1);
+        return true;
+      });
+    });
+
+    it('watering can slows the current real holder for 2 s', () => {
+      collected('giesskanne', (d, who) => {
+        const s = d.snap();
+        const h = s.potatoes[0].holder;
+        expect(s.fx.some((f) => f.kind === 'giesskanne')).toBe(true);
+        expect(s.players[h].slowMs).toBeGreaterThan(0);
+        expect(s.players[h].slowMs).toBeLessThanOrEqual(K.slowMs);
+        for (const k of FOUR) if (k !== h) expect(s.players[k].slowMs).toBe(0);
+        const x0 = s.players[h].x;
+        d.set(h, { left: true });
+        d.tick(3);
+        expect(x0 - d.snap().players[h].x).toBeCloseTo(K.walkSpeed * K.slowFactor * 0.1, 1);
+        d.tick(Math.ceil(K.slowMs / TICK_MS));
+        expect(d.snap().players[h].slowMs).toBe(0);
+        return who !== h;
+      });
+    });
+
+    it('ghosts cannot pick up extras', () => {
+      const d = driver(['p0', 'p1', 'p2'], { rand: () => 0 });
+      d.untilBang(); // p0 is out at 12 s; the first pickup spawned at 7 s on the first beet tile
+      expect(d.snap().players.p0.ghost).toBe(true);
+      const pk = d.snap().pickups[0];
+      expect(pk).toBeDefined();
+      d.tick(Math.ceil(K.boomPauseMs / TICK_MS));
+      walkTo(d, 'p0', pk.x, pk.y, 300, false);
+      d.tick(10);
+      const g = d.snap().players.p0;
+      expect(Math.hypot(g.x - pk.x, g.y - pk.y)).toBeLessThanOrEqual(3);
+      expect(d.snap().pickups.some((p) => p.id === pk.id)).toBe(true);
+      expect(d.snap().potatoes.length).toBe(1);
+    });
+  });
 });

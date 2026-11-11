@@ -96,6 +96,8 @@ interface GameConfig {
     fuseMaxMs: number;
     /** Fraction of the fuse burnt at which heat becomes 1, 2, 3. */
     heatSteps: number[];
+    /** Each heat step is shifted per potato by a random amount in +-heatJitter (fraction of the fuse), so heat does not reveal the fuse. */
+    heatJitter: number;
     /** Pause after a bang before the next potato. */
     boomPauseMs: number;
     /** Kurze Lunte: the real fuse is cut to this much remaining time. */
@@ -109,6 +111,11 @@ interface GameConfig {
     leaderFactor: number;
     pickupSpawnMs: number;
     maxPickups: number;
+    /** A living player within this feet distance of a pickup takes it (px). */
+    pickupTouchPx: number;
+    /** Pickups spawn at least this far from every living player (px), after at most pickupTries tries. */
+    pickupClearPx: number;
+    pickupTries: number;
     /** The round ends after this long at the latest (living players share first place). */
     safetyMs: number;
     /** Two players: bangs per round (best of), the first to lose a majority is out. */
@@ -179,9 +186,9 @@ export const CONFIG = deepFreeze<GameConfig>({
     walkSpeed: 64, bodyRadius: 5, touchPx: 13,
     sprintFactor: 1.8, sprintMs: 400, sprintCooldownMs: 3000,
     noBackMs: 1000, noBackFxMs: 500,
-    fuseMinMs: 12000, fuseMaxMs: 20000, heatSteps: [0.5, 0.75, 0.9], boomPauseMs: 1800,
+    fuseMinMs: 12000, fuseMaxMs: 20000, heatSteps: [0.5, 0.75, 0.9], heatJitter: 0.08, boomPauseMs: 1800,
     shortFuseMs: 3000, fakeFuseMinMs: 6000, fakeFuseMaxMs: 10000, slowMs: 2000, slowFactor: 0.6,
-    leaderFactor: 0.95, pickupSpawnMs: 7000, maxPickups: 2, safetyMs: 180000, bestOf: 3, fxKeepMs: 500,
+    leaderFactor: 0.95, pickupSpawnMs: 7000, maxPickups: 2, pickupTouchPx: 12, pickupClearPx: 24, pickupTries: 20, safetyMs: 180000, bestOf: 3, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
