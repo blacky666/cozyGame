@@ -101,6 +101,48 @@ export function stepCrane(x: number, input: InputState, dt: number, b: { min: nu
   return clamp(x + dir * CONFIG.wackelturm.craneSpeed * dt, b);
 }
 
+/** Turn counters of one input (InputState.turnsCw / turnsCcw). */
+export type Turns = { cw: number; ccw: number };
+
+/**
+ * Client prediction of the hanging block's rotation: the server rotation plus the quarter turns sent but
+ * not acked yet (the host has applied everything up to the acked counters). Unknown acked counters or
+ * counters that dropped (the host re-bases then) predict nothing.
+ */
+export function predictRot(server: Rot, now: Turns, acked: Turns | null): Rot {
+  if (!acked) return server;
+  const cw = now.cw - acked.cw;
+  const ccw = now.ccw - acked.ccw;
+  if (cw < 0 || ccw < 0) return server;
+  return ((((server + cw - ccw) % QUARTER_TURNS) + QUARTER_TURNS) % QUARTER_TURNS) as Rot;
+}
+
+/** Entries kept without an ack (as the Reconciler's frames). */
+const TURN_HISTORY_MAX = 120;
+
+/** Recent turn counters by input seq, for predictRot (the client side keeps one). */
+export class TurnHistory {
+  private entries: { seq: number; turns: Turns }[] = [];
+
+  record(seq: number, turns: Turns): void {
+    this.entries.push({ seq, turns: { ...turns } });
+    if (this.entries.length > TURN_HISTORY_MAX) this.entries.splice(0, this.entries.length - TURN_HISTORY_MAX);
+  }
+
+  /** The counters of the latest entry with seq ≤ ackSeq (older entries are dropped), or null. */
+  acked(ackSeq: number): Turns | null {
+    let i = -1;
+    for (let j = 0; j < this.entries.length && this.entries[j].seq <= ackSeq; j++) i = j;
+    if (i < 0) return null;
+    this.entries.splice(0, i);
+    return { ...this.entries[0].turns };
+  }
+
+  clear(): void {
+    this.entries = [];
+  }
+}
+
 /** Time left (ms) at which the finale music starts; scales with the round length (fast mode). */
 export function finaleAt(durationMs: number): number {
   const c = CONFIG.wackelturm;

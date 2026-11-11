@@ -6,10 +6,12 @@ import { zoomOf } from '../../game/zoom';
 import { Reconciler } from '../../net/reconcile';
 import { drawCrosshair, pointerPixel } from '../common/crosshair';
 import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
-import { columnAt, craneBounds, stepCrane, type ArmedAction, type TowerFx, type TowerPlayer, type TowerState } from './towerHost';
+import {
+  columnAt, craneBounds, predictRot, stepCrane, TurnHistory, type ArmedAction, type TowerFx, type TowerPlayer, type TowerState,
+} from './towerHost';
 import { BAND_H, TowerHud } from './towerHud';
 import { readLayout, type Plot, type TowerLayout } from './towerLayout';
-import { KINDS, shapeSize, type Kind } from './towerPhysics';
+import { KINDS, shapeSize, type Kind, type Rot } from './towerPhysics';
 import { TowerSounds } from './towerSounds';
 import { ARENA_FILE, CraneRig, drawBackdrop, readCrane } from './towerScene';
 
@@ -92,7 +94,8 @@ export class TowerView implements MiniGameView<TowerState> {
   private zoom = 0;
   /** Latest rendered state (camera scroll in frame()). */
   private shown: TowerState | null = null;
-  // Prediction (clients): the own crane x, stepped like the host with the bounds of the latest own block.
+  // Prediction (clients): the own crane x, stepped like the host with the bounds of the latest own block
+  // at its predicted rotation.
   private bounds = { min: 0, max: 0 };
   private readonly reconciler = new Reconciler<number>((x, input, dt) => stepCrane(x, input, dt, this.bounds));
   private target: number | null = null;
@@ -100,6 +103,9 @@ export class TowerView implements MiniGameView<TowerState> {
   private lastLatest: TowerState | null = null;
   private lastSentSeq = 0;
   private pred: number | null = null;
+  /** Predicted rotation of the own hanging block (server rotation + turns not acked yet). */
+  private readonly turns = new TurnHistory();
+  private predRot: Rot | null = null;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -181,7 +187,10 @@ export class TowerView implements MiniGameView<TowerState> {
 
   predict(input: InputState, dt: number, latest: TowerState | null, ackSeq: number, sentSeq: number): void {
     // A lower seq means a new connection: the host restarted its ack counter.
-    if (sentSeq < this.lastSentSeq) this.reconciler.clear();
+    if (sentSeq < this.lastSentSeq) {
+      this.reconciler.clear();
+      this.turns.clear();
+    }
     this.lastSentSeq = sentSeq;
     const ack = ackSeq > sentSeq ? 0 : ackSeq;
     const server = latest?.players[this.selfKey];
@@ -189,9 +198,14 @@ export class TowerView implements MiniGameView<TowerState> {
     if (!latest || !server || !plot) return;
     const fresh = latest !== this.lastLatest;
     this.lastLatest = latest;
-    this.bounds = server.hang ? craneBounds(plot, server.hang.kind, server.hang.rot) : { min: plot.minX, max: plot.maxX };
+    this.turns.record(sentSeq, { cw: input.turnsCw, ccw: input.turnsCcw });
+    const acked = this.turns.acked(ack);
+    this.predRot = server.hang ? predictRot(server.hang.rot, { cw: input.turnsCw, ccw: input.turnsCcw }, acked) : null;
+    this.bounds = server.hang && this.predRot !== null ? craneBounds(plot, server.hang.kind, this.predRot) : { min: plot.minX, max: plot.maxX };
     if (latest.timeLeftMs <= 0 || latest.winner !== null) {
       this.reconciler.clear();
+      this.turns.clear();
+      this.predRot = null;
       this.target = server.craneX;
       this.off = 0;
       this.pred = server.craneX;
@@ -225,7 +239,8 @@ export class TowerView implements MiniGameView<TowerState> {
       if (!p) continue;
       const craneX = key === selfKey && this.pred !== null ? this.pred : p.craneX;
       col.crane?.update(p.hangTop, craneX);
-      this.renderHang(col, p, craneX);
+      const rot = key === selfKey && this.predRot !== null ? this.predRot : (p.hang?.rot ?? 0);
+      this.renderHang(col, p, craneX, rot);
       this.renderWind(col, p);
     }
     this.renderBlocks(s);
@@ -244,7 +259,7 @@ export class TowerView implements MiniGameView<TowerState> {
   }
 
   /** The hanging block below the hook: its top edge at hangTop, its pivot on the crane x. */
-  private renderHang(col: Column, p: TowerPlayer, craneX: number): void {
+  private renderHang(col: Column, p: TowerPlayer, craneX: number, rot: Rot): void {
     const h = p.hang;
     if (!h) {
       col.hang?.setVisible(false);
@@ -260,10 +275,10 @@ export class TowerView implements MiniGameView<TowerState> {
       swapSprite(this.scene, col.hang, name);
     }
     col.hangKind = h.kind;
-    const half = shapeSize(h.kind, h.rot).h / 2;
+    const half = shapeSize(h.kind, rot).h / 2;
     col.hang
       .setPosition(Math.round(craneX) + WORLD.x, Math.round(p.hangTop + half) + WORLD.y)
-      .setRotation(h.rot * QUARTER)
+      .setRotation(rot * QUARTER)
       .setVisible(true);
   }
 

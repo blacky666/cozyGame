@@ -8,7 +8,7 @@ import { INPUT_COUNTERS, neutralInput, type InputState } from '../../net/protoco
 import { defaultProfile } from '../../save/profile';
 import { playerKey, type GamePlayer, type PlayerKey } from '../types';
 import { readLayout } from './towerLayout';
-import { columnAt, craneBounds, createTowerHost, finaleAt, stepCrane, type TowerFx, type TowerState } from './towerHost';
+import { columnAt, craneBounds, createTowerHost, finaleAt, predictRot, stepCrane, TurnHistory, type TowerFx, type TowerState } from './towerHost';
 import { atRest, FIES_KINDS, KINDS, NORMAL_KINDS, shapeSize, spawnBlock, type Kind, type Rot } from './towerPhysics';
 
 const file = JSON.parse(readFileSync('public/assets/arena-wackelturm.json', 'utf8')) as AssetFile;
@@ -98,6 +98,32 @@ describe('Wackel-Turm host', () => {
     expect(stepCrane(5, neutralInput(), 0.1, b)).toBe(10);
     expect(finaleAt(C.durationMs)).toBe(C.finaleMs);
     expect(finaleAt(18000)).toBeCloseTo((C.finaleMs * 18000) / C.durationMs, 9);
+  });
+
+  it('predictRot: the server rotation plus the turns not acked yet, wrapped to 0–3', () => {
+    expect(predictRot(0, { cw: 5, ccw: 2 }, { cw: 5, ccw: 2 })).toBe(0);
+    expect(predictRot(0, { cw: 6, ccw: 2 }, { cw: 5, ccw: 2 })).toBe(1);
+    expect(predictRot(1, { cw: 5, ccw: 4 }, { cw: 5, ccw: 2 })).toBe(3);
+    expect(predictRot(3, { cw: 9, ccw: 0 }, { cw: 4, ccw: 0 })).toBe(0);
+    // Nothing known about the acked counters (start, new connection): the server value.
+    expect(predictRot(2, { cw: 9, ccw: 0 }, null)).toBe(2);
+    // Counters below the acked ones (reset): the host re-bases, no turn.
+    expect(predictRot(2, { cw: 1, ccw: 0 }, { cw: 4, ccw: 0 })).toBe(2);
+  });
+
+  it('TurnHistory: the counters sent with the latest seq the host has acked', () => {
+    const h = new TurnHistory();
+    expect(h.acked(0)).toBeNull();
+    h.record(1, { cw: 0, ccw: 0 });
+    h.record(2, { cw: 1, ccw: 0 });
+    h.record(2, { cw: 2, ccw: 0 });
+    h.record(3, { cw: 2, ccw: 1 });
+    expect(h.acked(0)).toBeNull();
+    expect(h.acked(1)).toEqual({ cw: 0, ccw: 0 });
+    expect(h.acked(2)).toEqual({ cw: 2, ccw: 0 });
+    expect(h.acked(5)).toEqual({ cw: 2, ccw: 1 });
+    h.clear();
+    expect(h.acked(5)).toBeNull();
   });
 
   it('start: crane parked at the hook offset, a block hangs, goalPx from CONFIG', () => {
