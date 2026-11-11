@@ -14,13 +14,15 @@ export type GamePlayer = { key: PlayerKey; slot: 0 | 1 | 2 | 3; name: string; lo
 
 /**
  * Minimal world view handed to dev bots (see src/dev/bots.ts). `aim`: point to aim and throw at (same
- * coordinates as the simulation); `idle`: stand still (e.g. reloading).
+ * coordinates as the simulation); `idle`: stand still (e.g. reloading); `fire`: press that button now.
  */
 export type BotView = {
   self: { x: number; y: number };
   targets: { x: number; y: number }[];
   aim?: { x: number; y: number };
   idle?: boolean;
+  /** Press exactly this button this call (instead of the random throws at `aim`). */
+  fire?: 'primary' | 'secondary';
 };
 
 export interface MiniGameHost<S> {

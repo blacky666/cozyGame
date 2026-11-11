@@ -43,6 +43,19 @@ describe('createBotInputs', () => {
     expect(right).toBeLessThan(60);
   });
 
+  it('fire presses exactly that counter', () => {
+    const bot = createBotInputs(4);
+    const view = { self: { x: 100, y: 100 }, targets: [{ x: 160, y: 100 }], aim: { x: 220, y: 90 } };
+    let last = neutralInput();
+    for (let i = 0; i < 5; i++) last = bot({ ...view, fire: 'primary' });
+    expect(last).toMatchObject({ primaryTaps: 5, secondaryTaps: 0, aimX: 220, aimY: 90 });
+    for (let i = 0; i < 3; i++) last = bot({ ...view, fire: 'secondary' });
+    expect(last).toMatchObject({ primaryTaps: 5, secondaryTaps: 3 });
+    // Without aim and fire nothing is pressed (Farbkrieg bots only aim when they fire).
+    for (let i = 0; i < 300; i++) last = bot({ self: view.self, targets: view.targets });
+    expect(last).toMatchObject({ primaryTaps: 5, secondaryTaps: 3 });
+  });
+
   it('is deterministic per seed and wanders without targets', () => {
     const run = (seed: number) => {
       const bot = createBotInputs(seed);

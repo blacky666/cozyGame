@@ -8,17 +8,19 @@ const store = (v: string | null): Storage => ({ getItem: (k: string) => (k === G
 
 describe('game catalog', () => {
   it('matches the registry (ids and titles)', () => {
+    expect(GAME_CATALOG.map((g) => g.id)).toEqual(['schneeball', 'kartoffel', 'farbkrieg']);
     expect(GAME_CATALOG.map((g) => [g.id, g.title])).toEqual(MINIGAMES.map((g) => [g.id, g.title]));
   });
 
   it('keeps known ids in catalog order; empty means all', () => {
     expect(cleanSelection(['kartoffel', 'gibtsnicht', 'muenzjagd', 'schneeball'])).toEqual(['schneeball', 'kartoffel']);
-    expect(cleanSelection(['gibtsnicht'])).toEqual(['schneeball', 'kartoffel']);
+    expect(cleanSelection(['farbkrieg', 'schneeball'])).toEqual(['schneeball', 'farbkrieg']);
+    expect(cleanSelection(['gibtsnicht'])).toEqual(['schneeball', 'kartoffel', 'farbkrieg']);
   });
 
   it('loads the stored choice, falls back to all', () => {
     expect(loadSelection(store('["kartoffel"]'))).toEqual(['kartoffel']);
-    expect(loadSelection(store('{oops'))).toEqual(['schneeball', 'kartoffel']);
-    expect(loadSelection(store(null))).toEqual(['schneeball', 'kartoffel']);
+    expect(loadSelection(store('{oops'))).toEqual(['schneeball', 'kartoffel', 'farbkrieg']);
+    expect(loadSelection(store(null))).toEqual(['schneeball', 'kartoffel', 'farbkrieg']);
   });
 });

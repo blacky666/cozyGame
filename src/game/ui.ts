@@ -66,8 +66,14 @@ function pivotOrigin(s: Phaser.GameObjects.Sprite, def: { w: number; h: number; 
 }
 
 /** assetSprite with the origin on the sprite's pivot, so (x, y) is the pivot point. */
-export function pivotSprite(scene: Phaser.Scene, name: string, x: number, y: number): Phaser.GameObjects.Sprite | null {
-  const s = assetSprite(scene, name, x, y);
+export function pivotSprite(
+  scene: Phaser.Scene,
+  name: string,
+  x: number,
+  y: number,
+  colors: ColorMap = {},
+): Phaser.GameObjects.Sprite | null {
+  const s = assetSprite(scene, name, x, y, colors);
   const def = findSprite(assetsOf(scene), name)?.def;
   if (s && def) pivotOrigin(s, def, false);
   return s;
@@ -75,12 +81,19 @@ export function pivotSprite(scene: Phaser.Scene, name: string, x: number, y: num
 
 /**
  * Show another asset sprite on an existing sprite (no-op when already shown). The origin moves to
- * the new pivot unless `keepOrigin`; `flip` mirrors it (facing left).
+ * the new pivot unless `keepOrigin`; `flip` mirrors it (facing left); `colors` recolours it (as assetSprite).
  */
-export function swapSprite(scene: Phaser.Scene, s: Phaser.GameObjects.Sprite, name: string, flip = false, keepOrigin = false): void {
+export function swapSprite(
+  scene: Phaser.Scene,
+  s: Phaser.GameObjects.Sprite,
+  name: string,
+  flip = false,
+  keepOrigin = false,
+  colors: ColorMap = {},
+): void {
   const found = findSprite(assetsOf(scene), name);
   if (!found) return;
-  const key = getTextureKey(scene, found.file, name, {});
+  const key = getTextureKey(scene, found.file, name, colors);
   if (s.texture.key !== key) {
     s.setTexture(key, 0);
     if (found.def.frames.length > 1) s.play(key);
@@ -90,11 +103,17 @@ export function swapSprite(scene: Phaser.Scene, s: Phaser.GameObjects.Sprite, na
   if (!keepOrigin) pivotOrigin(s, found.def, flip);
 }
 
+/** Recolour map for sprites with the player colour codes (c/C): the slot's ramp from char-misc. */
+export function playerColors(scene: Phaser.Scene, slot: number): ColorMap {
+  const ramp = assetsOf(scene)['char-misc']?.ramps?.player?.[slot];
+  return ramp ? { player: ramp.c, player_dark: ramp.C } : {};
+}
+
 /** Symbol (kreis/dreieck/quadrat/stern) in the player's colour. */
 export function playerSymbol(scene: Phaser.Scene, slot: number, x: number, y: number): Phaser.GameObjects.Sprite | null {
   const ramp = assetsOf(scene)['char-misc']?.ramps?.player?.[slot];
   if (!ramp) return null;
-  return assetSprite(scene, `ui.symbol.${ramp.symbol}`, x, y, { player: ramp.c, player_dark: ramp.C });
+  return assetSprite(scene, `ui.symbol.${ramp.symbol}`, x, y, playerColors(scene, slot));
 }
 
 export function playerColor(scene: Phaser.Scene, slot: number): string {

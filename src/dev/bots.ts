@@ -94,6 +94,11 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
     if (view.aim) {
       out.aimX = view.aim.x;
       out.aimY = view.aim.y;
+    }
+    // A view that says which button to press gets exactly that press (no random throw on top).
+    if (view.fire === 'primary') out.primaryTaps = ++taps;
+    else if (view.fire === 'secondary') out.secondaryTaps = ++strongTaps;
+    else if (view.aim) {
       if (rand() < THROW_CHANCE) {
         if (rand() < STRONG_CHANCE) out.secondaryTaps = ++strongTaps;
         else out.primaryTaps = ++taps;

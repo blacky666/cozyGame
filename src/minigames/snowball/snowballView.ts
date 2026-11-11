@@ -6,6 +6,7 @@ import { assetsOf, byKey, pivotSprite, playerColor, swapSprite, txt } from '../.
 import { Reconciler } from '../../net/reconcile';
 import { buildArena, tileAt, type Arena, type Solid } from '../common/arena';
 import { drawArena } from '../common/arenaView';
+import { CROSSHAIR_DEPTH, CROSSHAIR_DIM, CROSSHAIR_OUTLINE, drawCrosshair, pointerPixel } from '../common/crosshair';
 import type { Facing } from '../common/shove';
 import { drawShoveRing } from '../common/shoveRing';
 import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
@@ -31,22 +32,6 @@ const BLINK_MS = 100;
 /** Height of the visual arc at mid-flight; it starts and ends on the true path. */
 const ARC_PX = 6;
 const FX_DEPTH = 900;
-const CROSSHAIR_DEPTH = 3000;
-const CROSSHAIR_OUTLINE = 0x3b2418;
-/** Alpha of the crosshair while the own player cannot throw. */
-const CROSSHAIR_DIM = 0.4;
-/**
- * Crosshair, 13x13 around the pointer pixel (0, 0): four arms 5 px long and 2 px thick around an
- * empty 3x3 centre. [x, y, w, h] of each arm and of its 1 px outline; the outline leaves the inner
- * end open so the centre gap stays 3x3. With an even thickness inside an odd box the arms sit on
- * pixel rows/columns 0 and 1 (half a pixel off the box centre).
- */
-const CROSSHAIR_ARMS: ReadonlyArray<readonly [readonly number[], readonly number[]]> = [
-  [[2, 0, 5, 2], [2, -1, 6, 4]],
-  [[-6, 0, 5, 2], [-7, -1, 6, 4]],
-  [[0, 2, 2, 5], [-1, 2, 4, 6]],
-  [[0, -6, 2, 5], [-1, -7, 4, 6]],
-];
 /** Ammo dots under the crosshair: 3x3 px each (1 px outline), 6 px apart, this far below the pointer. */
 const AMMO_DOT = 3;
 const AMMO_STEP = 6;
@@ -144,7 +129,7 @@ export class SnowballView implements MiniGameView<SnowState> {
     this.ring = scene.add.graphics();
     this.objects.push(this.ring);
     const self = players.find((p) => p.key === selfKey);
-    this.crosshair = this.drawCrosshair(self ? playerColor(scene, self.slot) : '#ffffff');
+    this.crosshair = drawCrosshair(scene, self ? playerColor(scene, self.slot) : '#ffffff');
     this.objects.push(this.crosshair);
     this.dots = scene.add.graphics().setDepth(CROSSHAIR_DEPTH).setVisible(false);
     this.hint = txt(scene, 0, 0, EMPTY_HINT, 10, '#ffe08a').setDepth(CROSSHAIR_DEPTH - 1).setVisible(false);
@@ -154,32 +139,20 @@ export class SnowballView implements MiniGameView<SnowState> {
     scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPress);
   }
 
-  private drawCrosshair(color: string): Phaser.GameObjects.Graphics {
-    const fill = Number.parseInt(color.replace('#', ''), 16);
-    const g = this.scene.add.graphics().setDepth(CROSSHAIR_DEPTH).setVisible(false);
-    g.fillStyle(CROSSHAIR_OUTLINE, 1);
-    for (const [, [x, y, w, h]] of CROSSHAIR_ARMS) g.fillRect(x, y, w, h);
-    g.fillStyle(Number.isFinite(fill) ? fill : 0xffffff, 1);
-    for (const [[x, y, w, h]] of CROSSHAIR_ARMS) g.fillRect(x, y, w, h);
-    return g;
-  }
-
   /** Every frame: crosshair on the pointer's world pixel; dimmed while the own player cannot throw, hidden off the canvas. */
   frame(): void {
-    const input = this.scene.input;
-    if (!input?.manager || !input.isOver) {
+    const w = pointerPixel(this.scene);
+    if (!w) {
       this.crosshair.setVisible(false);
       this.dots.setVisible(false);
       return;
     }
-    const p = input.activePointer;
-    const w = this.scene.cameras.main.getWorldPoint(p.x, p.y);
     this.crosshair
-      .setPosition(Math.floor(w.x), Math.floor(w.y))
+      .setPosition(w.x, w.y)
       .setAlpha(this.canThrow ? 1 : CROSSHAIR_DIM)
       .setVisible(true);
     this.drawDots();
-    this.dots.setPosition(Math.floor(w.x), Math.floor(w.y)).setVisible(true);
+    this.dots.setPosition(w.x, w.y).setVisible(true);
   }
 
   /** One dot per ball under the crosshair: filled = ready, hollow = empty, half = loading right now. */
