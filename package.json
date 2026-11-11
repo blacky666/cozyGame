@@ -10,10 +10,12 @@
     "assets:check": "npx tsx tools/check-assets.ts"
   },
   "dependencies": {
+    "matter-js": "0.20.0",
     "phaser": "3.90",
     "trystero": "0.25"
   },
   "devDependencies": {
+    "@types/matter-js": "0.20.2",
     "@types/node": "^22.20.5",
     "tsx": "^4",
     "typescript": "5",

@@ -180,6 +180,53 @@ interface GameConfig {
     /** Bot targets stay this far inside the map edges. */
     botMarginPx: number;
   };
+  wackelturm: {
+    durationMs: number;
+    /** A dropped block counts as placed (charges, height) after resting this long while still in its column. */
+    restHoldMs: number;
+    /** Fixed physics sub-step (ms); the host feeds dt into an accumulator and steps in whole stepMs. */
+    stepMs: number;
+    /** Matter gravity y (scale stays at Matter's default 0.001). */
+    gravityY: number;
+    /** Block material. */
+    friction: number;
+    frictionStatic: number;
+    restitution: number;
+    density: number;
+    /** A block is at rest below this speed (px/step) and angular speed (rad/step). */
+    restSpeed: number;
+    restAngSpeed: number;
+    /** Crane: sideways speed (px/s), rise speed (px/s) and clearance above the highest landed block (px). */
+    craneSpeed: number;
+    craneRiseSpeed: number;
+    craneClearPx: number;
+    /** Gap after a drop before the next block hangs. */
+    dropCooldownMs: number;
+    /** A block whose centre is below surfaceY + fallMarginPx (or outside its column) is removed. */
+    fallMarginPx: number;
+    /**
+     * Goal height above the foundation (px). The asset's crane marker sits only 107 px (~6.7 cells) above
+     * the foundation, too easy for two minutes. readLayout still reports the asset's goalY/goalPx, but the
+     * host uses this value and the view draws the goal marker at surfaceY - goalPx.
+     */
+    goalPx: number;
+    /** One Ärger-Aktion charge per chargeEvery placed blocks, at most chargeCap. */
+    chargeEvery: number;
+    chargeCap: number;
+    /** Windstoß: duration (ms) and push (px/s², force = mass * windAccel / 1e6 per step). */
+    windMs: number;
+    windAccel: number;
+    /** Wobble sound: a block faster than wobbleSpeed (px/step), at most once per wobbleGapMs. */
+    wobbleSpeed: number;
+    wobbleGapMs: number;
+    /** A height drop this large in one tick gives fx 'einsturz' (px). */
+    collapseDropPx: number;
+    /** Finale music in the last finaleMs or once anyone is within finaleNearPx of the goal. */
+    finaleMs: number;
+    finaleNearPx: number;
+    /** How long fx stay in snapshots. */
+    fxKeepMs: number;
+  };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -258,6 +305,17 @@ export const CONFIG = deepFreeze<GameConfig>({
     pickupSpawnMs: 8000, maxPickups: 2, pickupTouchPx: 10, pickupClearPx: 24, pickupTries: 20,
     finaleMs: 15000, finaleFallMs: 2000, finalePaintR: 48, fxKeepMs: 500,
     mapW: 416, mapH: 208, botMarginPx: 24,
+  },
+  // Wackel-Turm (px, px/s, ms; Matter units per 1000/60 ms step where noted).
+  wackelturm: {
+    durationMs: 120000, restHoldMs: 2000, stepMs: 1000 / 60, gravityY: 1,
+    friction: 0.6, frictionStatic: 0.9, restitution: 0.02, density: 0.001,
+    restSpeed: 0.08, restAngSpeed: 0.004,
+    craneSpeed: 64, craneRiseSpeed: 48, craneClearPx: 64, dropCooldownMs: 600, fallMarginPx: 16,
+    // 12 cells; overrides the asset marker (107 px), see the interface comment.
+    goalPx: 192,
+    chargeEvery: 3, chargeCap: 2, windMs: 1500, windAccel: 250,
+    wobbleSpeed: 0.6, wobbleGapMs: 400, collapseDropPx: 32, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
