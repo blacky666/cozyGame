@@ -10,7 +10,7 @@ import { playerKey, type GamePlayer } from '../types';
 import type { TowerPlayer, TowerState } from './towerHost';
 import { readLayout } from './towerLayout';
 import { ARENA_OFFSET } from './towerView';
-import { lerpTower, towerBotView, wackelturm } from './wackelturm';
+import { flatRot, lerpTower, towerBotView, wackelturm } from './wackelturm';
 
 // The view imports Phaser, which needs a browser; the definition tests only need its module to load.
 vi.mock('phaser', () => ({ default: { GameObjects: { Container: class {} } } }));
@@ -79,14 +79,14 @@ describe('wackelturm definition', () => {
 describe('wackelturm botView', () => {
   const P0 = layout.plots[0];
 
-  it('bot rotates an l to rot 1, moves to the target, then drops', () => {
+  it('bot turns an l to its long side (rot 3), moves to the target, then drops', () => {
     // placed 4 → offset index 1 → the plot centre.
     const far = state({ p0: player(0, { craneX: P0.centre - 20, placed: 4, hang: { kind: 'l', rot: 0 } }) });
     const self = { x: P0.centre - 20, y: 0 };
     expect(towerBotView(far, 'p0', layout)).toEqual({ self, targets: [{ x: P0.centre, y: 0 }], turn: 'cw' });
-    far.players.p0.hang = { kind: 'l', rot: 1 };
+    far.players.p0.hang = { kind: 'l', rot: 3 };
     expect(towerBotView(far, 'p0', layout)).toEqual({ self, targets: [{ x: P0.centre, y: 0 }] });
-    const near = state({ p0: player(0, { craneX: P0.centre + 2, placed: 4, hang: { kind: 'l', rot: 1 } }) });
+    const near = state({ p0: player(0, { craneX: P0.centre + 2, placed: 4, hang: { kind: 'l', rot: 3 } }) });
     expect(towerBotView(near, 'p0', layout)).toEqual({
       self: { x: P0.centre + 2, y: 0 }, targets: [{ x: P0.centre, y: 0 }], fire: 'primary',
     });
@@ -117,6 +117,22 @@ describe('wackelturm botView', () => {
     // The leader never is the bot itself: p0 (highest) aims at p2.
     s.players.p0.armed = 'wind';
     expect(towerBotView(s, 'p0', layout)).toMatchObject({ aim: { x: layout.plots[2].centre }, fire: 'primary' });
+  });
+
+  it('flatRot picks the widest base, ties to the lowest rotation', () => {
+    expect(flatRot('l')).toBe(3);
+    expect(flatRot('t')).toBe(2);
+    expect(flatRot('lang')).toBe(0);
+    expect(flatRot('quader')).toBe(0);
+    expect(flatRot('kugel')).toBe(0);
+  });
+
+  it('an armed bot with no other player cancels; with charges it never arms', () => {
+    const s = state({ p0: player(0, { charges: 1 }) });
+    expect(towerBotView(s, 'p0', layout)?.fire).not.toBe('secondary');
+    s.players.p0.armed = 'wind';
+    expect(towerBotView(s, 'p0', layout)).toMatchObject({ fire: 'secondary' });
+    expect(towerBotView(s, 'p0', layout)?.aim).toBeUndefined();
   });
 
   it('bot idles at the end', () => {

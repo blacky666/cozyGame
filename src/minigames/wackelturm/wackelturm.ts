@@ -2,7 +2,7 @@ import { CONFIG } from '../../config';
 import type { BotView, MiniGame, PlayerKey } from '../types';
 import { craneBounds, createTowerHost, type TowerPlayer, type TowerState } from './towerHost';
 import { readLayout, type TowerLayout } from './towerLayout';
-import { shapeSize, type Kind, type Rot } from './towerPhysics';
+import { CELLS, type Kind, type Rot } from './towerPhysics';
 import { ARENA_FILE, ARENA_OFFSET, TowerView } from './towerView';
 
 /** Values per block in TowerPlayer.blocks: id, kind index, x × 10, y × 10, angle × 100. */
@@ -54,10 +54,20 @@ const BOT_OFFSETS = [-16, 0, 16] as const;
 const BOT_NEAR = 2;
 const ROTS: readonly Rot[] = [0, 1, 2, 3];
 
-/** The lowest rotation with the widest footprint (the flattest way to lay the block). */
+/** Number of filled cells on the bottom row of a kind at a rotation (its base width in cells). */
+export function baseCells(kind: Kind, rot: Rot): number {
+  let rows: readonly string[] = CELLS[kind];
+  for (let i = 0; i < rot; i++) {
+    // One clockwise quarter turn: the new rows are the old columns, read bottom to top.
+    rows = Array.from(rows[0], (_, c) => rows.map((_r, r) => rows[rows.length - 1 - r][c]).join(''));
+  }
+  return [...rows[rows.length - 1]].filter((ch) => ch === 'X').length;
+}
+
+/** The rotation with the widest base (most cells on the bottom row); ties go to the lowest rotation. */
 export function flatRot(kind: Kind): Rot {
   let best: Rot = 0;
-  for (const r of ROTS) if (shapeSize(kind, r).w > shapeSize(kind, best).w) best = r;
+  for (const r of ROTS) if (baseCells(kind, r) > baseCells(kind, best)) best = r;
   return best;
 }
 
@@ -87,9 +97,12 @@ export function towerBotView(s: TowerState, key: PlayerKey, layout: TowerLayout)
       if (k !== key && (!leader || p.heightPx > leader.heightPx)) leader = p;
     }
     const at = leader ? layout.plots[leader.plot] : undefined;
-    return { self, targets, aim: { x: at ? at.centre : -1, y: 0 }, fire: 'primary' };
+    // Nobody to target: cycle the armed action back to none.
+    if (!at) return { self, targets, fire: 'secondary' };
+    return { self, targets, aim: { x: at.centre, y: 0 }, fire: 'primary' };
   }
-  if (me.charges > 0) return { self, targets, fire: 'secondary' };
+  const hasTarget = Object.keys(s.players).some((k) => k !== key);
+  if (me.charges > 0 && hasTarget) return { self, targets, fire: 'secondary' };
   if (!me.hang || flat === null) return { self, targets };
   if (me.hang.rot !== flat) return { self, targets, turn: 'cw' };
   if (Math.abs(me.craneX - x) <= BOT_NEAR) return { self, targets, fire: 'primary' };
