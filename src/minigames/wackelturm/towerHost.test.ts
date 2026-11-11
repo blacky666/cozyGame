@@ -8,8 +8,8 @@ import { INPUT_COUNTERS, neutralInput, type InputState } from '../../net/protoco
 import { defaultProfile } from '../../save/profile';
 import { playerKey, type GamePlayer, type PlayerKey } from '../types';
 import { readLayout } from './towerLayout';
-import { craneBounds, createTowerHost, finaleAt, stepCrane, type TowerFx, type TowerState } from './towerHost';
-import { KINDS, NORMAL_KINDS, shapeSize, spawnBlock, type Kind, type Rot } from './towerPhysics';
+import { columnAt, craneBounds, createTowerHost, finaleAt, stepCrane, type TowerFx, type TowerState } from './towerHost';
+import { FIES_KINDS, KINDS, NORMAL_KINDS, shapeSize, spawnBlock, type Kind, type Rot } from './towerPhysics';
 
 const file = JSON.parse(readFileSync('public/assets/arena-wackelturm.json', 'utf8')) as AssetFile;
 const layout = readLayout(file);
@@ -448,6 +448,165 @@ describe('Wackel-Turm host', () => {
     const avg = (performance.now() - t0) / 60;
     console.log(`[wackelturm] tick cost 4 × 40 bodies: ${avg.toFixed(2)} ms`);
     expect(avg).toBeLessThan(8);
+  });
+
+  describe('Ärger-Aktionen', () => {
+    const AIM = (i: number) => layout.plots[i].centre;
+    /** Gives player k n charges by resting 3n spawned blocks on its tower. */
+    const charge = (d: Driver, k: string, plot: number, n = 1) => {
+      for (let i = 0; i < 3 * n; i++) spawnBlock(d.world(k), 'quader', layout.plots[plot].centre, layout.surfaceY - 16 - 32 * i, 0);
+      d.tick(ticksFor(C.restHoldMs + 2500));
+      expect(d.snap().players[k].charges).toBe(n);
+    };
+    const click = (d: Driver, k: string, plot: number) => {
+      d.set(k, { aimX: AIM(plot) });
+      d.press(k, 'primaryTaps');
+      d.tick();
+    };
+    const rightClick = (d: Driver, k: string) => { d.press(k, 'secondaryTaps'); d.tick(); };
+    const arm = (d: Driver, k: string, action: 'wind' | 'fies') => {
+      rightClick(d, k);
+      if (action === 'fies') rightClick(d, k);
+    };
+
+    it('columnAt maps aim x to the plot index or null', () => {
+      expect(columnAt(layout, AIM(1))).toBe(1);
+      expect(columnAt(layout, layout.plots[0].minX - 1)).toBeNull();
+      expect(columnAt(layout, layout.plots[0].maxX)).toBe(1);
+    });
+
+    it('right click cycles armed null → wind → fies → null; it does nothing without charges', () => {
+      const d = driver(['p0', 'p1'], { rand: always('kurz') });
+      rightClick(d, 'p0');
+      expect(d.snap().players.p0.armed).toBeNull();
+      charge(d, 'p0', 0);
+      const seen: unknown[] = [];
+      for (let i = 0; i < 3; i++) { rightClick(d, 'p0'); seen.push(d.snap().players.p0.armed); }
+      expect(seen).toEqual(['wind', 'fies', null]);
+    });
+
+    it('armed + left click on another column fires and uses a charge; own column or empty plot cancels and keeps it', () => {
+      const d = driver(['p0', 'p1'], { rand: always('kurz') });
+      charge(d, 'p0', 0);
+      arm(d, 'p0', 'wind');
+      click(d, 'p0', 0);
+      expect(d.snap().players.p0).toMatchObject({ armed: null, charges: 1 });
+      arm(d, 'p0', 'wind');
+      d.set('p0', { aimX: layout.plots[0].minX - 50 });
+      d.press('p0', 'primaryTaps');
+      d.tick();
+      expect(d.snap().players.p0).toMatchObject({ armed: null, charges: 1 });
+      arm(d, 'p0', 'wind');
+      click(d, 'p0', 1);
+      expect(d.snap().players.p0).toMatchObject({ armed: null, charges: 0 });
+      expect(d.snap().fx.filter((f) => f.kind === 'wind')).toHaveLength(1);
+    });
+
+    it('armed left click never drops; S still drops while armed', () => {
+      const d = driver(['p0', 'p1'], { rand: always('kurz') });
+      charge(d, 'p0', 0);
+      arm(d, 'p0', 'wind');
+      click(d, 'p0', 0);
+      expect(d.snap().players.p0.hang).not.toBeNull();
+      arm(d, 'p0', 'wind');
+      d.press('p0', 'drops');
+      d.tick();
+      expect(d.snap().players.p0.hang).toBeNull();
+      expect(d.snap().players.p0.armed).toBe('wind');
+    });
+
+    it('Windstoß: target world gets windMs and a direction from rand; resting blocks move; the user tower is untouched', () => {
+      for (const [r, dir] of [[0.2, -1], [0.8, 1]] as const) {
+        let windRoll = false;
+        const base = always('kurz');
+        const d = driver(['p0', 'p1'], { rand: () => (windRoll ? r : base()) });
+        charge(d, 'p0', 0);
+        spawnBlock(d.world('p1'), 'kurz', layout.plots[1].centre, layout.surfaceY - 8, 0);
+        d.tick(ticksFor(C.restHoldMs));
+        const x1 = blocks(d.snap(), 'p1')[0].x;
+        windRoll = true;
+        arm(d, 'p0', 'wind');
+        click(d, 'p0', 1);
+        expect(d.world('p1').windMs).toBeGreaterThan(C.windMs - 100);
+        expect(d.world('p1').windDir).toBe(dir);
+        expect(d.world('p0').windMs).toBe(0);
+        expect(d.snap().players.p1.windMs).toBeGreaterThan(0);
+        expect(d.snap().fx.find((f) => f.kind === 'wind')).toMatchObject({ who: 'p1', by: 'p0' });
+        d.tick(ticksFor(C.windMs));
+        expect(Math.sign(blocks(d.snap(), 'p1')[0].x - x1)).toBe(dir);
+      }
+    });
+
+    it('Fieser Klotz with the target block hanging: swapped at once to a mean kind, the normal block comes next', () => {
+      const d = driver(['p0', 'p1'], { rand: always('lang') });
+      charge(d, 'p0', 0);
+      expect(d.snap().players.p1.hang?.kind).toBe('lang');
+      arm(d, 'p0', 'fies');
+      click(d, 'p0', 1);
+      expect(FIES_KINDS).toContain(d.snap().players.p1.hang!.kind);
+      expect(d.snap().fx.find((f) => f.kind === 'fies')).toMatchObject({ who: 'p1', by: 'p0' });
+      expect(FIES_KINDS).toContain(dropReady(d, 'p1'));
+      d.tick(ticksFor(C.dropCooldownMs) + 1);
+      expect(d.snap().players.p1.hang?.kind).toBe('lang');
+    });
+
+    it('Fieser Klotz during the target cooldown: the block that appears next is mean; the sequence index is not advanced', () => {
+      const d = driver(['p0', 'p1'], { rand: always('lang') });
+      charge(d, 'p0', 0);
+      dropReady(d, 'p1');
+      expect(d.snap().players.p1.hang).toBeNull();
+      arm(d, 'p0', 'fies');
+      click(d, 'p0', 1);
+      d.tick(ticksFor(C.dropCooldownMs));
+      expect(FIES_KINDS).toContain(d.snap().players.p1.hang!.kind);
+      dropReady(d, 'p1');
+      d.tick(ticksFor(C.dropCooldownMs) + 1);
+      expect(d.snap().players.p1.hang?.kind).toBe('lang');
+    });
+
+    it('Fieser Klotz while the target block is still falling: that block is unaffected', () => {
+      const d = driver(['p0', 'p1'], { rand: always('lang') });
+      charge(d, 'p0', 0);
+      dropReady(d, 'p1');
+      arm(d, 'p0', 'fies');
+      click(d, 'p0', 1);
+      expect(blocks(d.snap(), 'p1').map((b) => b.kind)).toEqual(['lang']);
+    });
+
+    it('two Fieser Klötze queue: the next two blocks are both mean', () => {
+      const d = driver(['p0', 'p1'], { rand: always('lang') });
+      charge(d, 'p0', 0, 2);
+      dropReady(d, 'p1');
+      for (let i = 0; i < 2; i++) { arm(d, 'p0', 'fies'); click(d, 'p0', 1); }
+      expect(d.snap().players.p0.charges).toBe(0);
+      d.tick(ticksFor(C.dropCooldownMs));
+      expect(FIES_KINDS).toContain(dropReady(d, 'p1'));
+      expect(FIES_KINDS).toContain(dropReady(d, 'p1'));
+    });
+
+    it('absent players cannot arm or fire, but can be targeted', () => {
+      const d = driver(['p0', 'p1', 'p2'], { rand: always('kurz') });
+      charge(d, 'p0', 0);
+      const away = { ...d.inputs.p1 };
+      delete d.inputs.p1;
+      d.press('p0', 'secondaryTaps');
+      d.tick();
+      expect(d.snap().players.p0.armed).toBe('wind');
+      click(d, 'p0', 1);
+      expect(d.snap().players.p0.charges).toBe(0);
+      expect(d.world('p1').windMs).toBeGreaterThan(0);
+      // An absent p1 holding a charge cannot arm.
+      const e = driver(['p0', 'p1'], { rand: always('kurz') });
+      charge(e, 'p1', 1);
+      const gone = { ...e.inputs.p1 };
+      delete e.inputs.p1;
+      e.tick();
+      e.join('p1', gone);
+      delete e.inputs.p1;
+      e.tick();
+      expect(e.snap().players.p1.armed).toBeNull();
+      expect(away).toBeDefined();
+    });
   });
 });
 

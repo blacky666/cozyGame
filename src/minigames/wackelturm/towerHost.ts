@@ -65,6 +65,12 @@ export type TowerHost = MiniGameHost<TowerState> & {
   __world(k: PlayerKey): TowerWorld;
 };
 
+/** Plot index of the column under aimX (column bounds, right edge exclusive), or null outside all columns. */
+export function columnAt(layout: TowerLayout, aimX: number): number | null {
+  const i = layout.plots.findIndex((pl) => aimX >= pl.minX && aimX < pl.maxX);
+  return i < 0 ? null : i;
+}
+
 /** Float slack for timers that count down in tick steps. */
 const EPS = 1e-6;
 /** Snapshot precision: positions in 1/10 px, angles in 1/100 rad, crane values in 1/100 px. */
@@ -72,6 +78,8 @@ const POS_SCALE = 10;
 const ANGLE_SCALE = 100;
 const CRANE_SCALE = 100;
 const QUARTER_TURNS = 4;
+/** rand() below this picks wind direction left. */
+const WIND_LEFT_BELOW = 0.5;
 const TAU = 2 * Math.PI;
 
 /** Angle in (−π, π]. */
@@ -207,8 +215,51 @@ export function createTowerHost(
       p.hang.rot = ((((p.hang.rot + turn) % QUARTER_TURNS) + QUARTER_TURNS) % QUARTER_TURNS) as Rot;
     }
     p.craneX = stepCrane(p.craneX, inp, sec, boundsOf(k));
-    const wantDrop = n.drops > 0 || (n.primaryTaps > 0 && p.armed === null);
+    // Right click cycles none -> wind -> fies -> none (only with a charge); a left click while armed
+    // fires or cancels and never drops.
+    for (let i = 0; i < n.secondaryTaps; i++) p.armed = cycleArmed(p);
+    const armedClick = n.primaryTaps > 0 && p.armed !== null;
+    if (armedClick) fire(k, inp.aimX);
+    const wantDrop = n.drops > 0 || (n.primaryTaps > 0 && !armedClick);
     if (wantDrop && p.hang && !slots[k].rising) drop(k);
+  };
+
+  const cycleArmed = (p: TowerPlayer): ArmedAction | null => {
+    if (p.armed === 'wind') return 'fies';
+    if (p.armed === 'fies') return null;
+    return p.charges > 0 ? 'wind' : null;
+  };
+
+  /** Left click while armed: another player's column fires (one charge), anything else cancels. */
+  const fire = (k: PlayerKey, aimX: number) => {
+    const p = players[k];
+    const action = p.armed;
+    p.armed = null;
+    const col = columnAt(layout, aimX);
+    const target = col === null ? undefined : keys[col];
+    if (!action || target === undefined || target === k || p.charges <= 0) return;
+    p.charges--;
+    const t = players[target];
+    const x = plotOf(target).centre;
+    if (action === 'wind') {
+      const w = slots[target].world;
+      w.windMs = c.windMs;
+      w.windDir = rand() < WIND_LEFT_BELOW ? -1 : 1;
+      t.windMs = Math.ceil(w.windMs);
+      t.windDir = w.windDir;
+      addFx('wind', target, x, layout.surfaceY - t.heightPx, { by: k });
+      return;
+    }
+    const mean = pick(FIES_KINDS);
+    if (t.hang) {
+      // Swap the hanging block now; the normal one comes right after.
+      slots[target].fiesQueue.unshift(t.hang.kind);
+      t.hang = { kind: mean, rot: t.hang.rot };
+      t.craneX = clamp(t.craneX, boundsOf(target));
+    } else {
+      slots[target].fiesQueue.push(mean);
+    }
+    addFx('fies', target, x, t.hangTop, { by: k });
   };
 
   const drop = (k: PlayerKey) => {
@@ -329,6 +380,7 @@ export function createTowerHost(
         const inp = inputs[k];
         if (inp === undefined) {
           slots[k].edges = newEdges();
+          players[k].armed = null;
           continue;
         }
         const e = slots[k].edges;
