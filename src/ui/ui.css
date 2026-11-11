@@ -74,3 +74,20 @@
 .cg-games { display: flex; gap: 8px 18px; align-items: center; justify-content: center; flex-wrap: wrap; }
 .cg-game { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .cg-game input { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; margin: 0; }
+/* Start screen: a very soft, slowly drifting glow over the dark page colour. */
+#ui > .cg-start-bg {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vmax 45vmax at 20% 25%, rgba(184, 68, 58, .16), transparent 70%),
+    radial-gradient(55vmax 45vmax at 80% 75%, rgba(70, 110, 160, .16), transparent 70%),
+    radial-gradient(50vmax 40vmax at 70% 15%, rgba(239, 220, 176, .07), transparent 70%),
+    #1b1b2a;
+  background-size: 160% 160%;
+  animation: cg-drift 28s ease-in-out infinite alternate;
+}
+@keyframes cg-drift {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 40%; }
+  100% { background-position: 30% 100%; }
+}
+@media (prefers-reduced-motion: reduce) { #ui > .cg-start-bg { animation: none; } }

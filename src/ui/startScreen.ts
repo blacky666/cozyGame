@@ -44,6 +44,8 @@ export function showStart(root: HTMLElement, o: StartHandlers): void {
   };
   code.addEventListener('keydown', (e) => e.key === 'Enter' && join());
   root.append(
+    // Slowly drifting colour glow behind the start panel.
+    h('div', { class: 'cg-start-bg', 'aria-hidden': 'true' }),
     h(
       'div',
       { class: 'cg-screen' },

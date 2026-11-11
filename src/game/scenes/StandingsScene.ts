@@ -8,11 +8,11 @@ import { assetsOf, byKey, INK, playerSymbol, txt } from '../ui';
 
 export const CARD_PLACEHOLDER = 'Gemeinheit-Karte (kommt in Plan 7)';
 
-const ROW_H = 32;
+const ROW_H = 42;
 /** Standings music starts after the jingle. */
 const MUSIC_AFTER_MS = 1500;
 
-const TOP = 46;
+const TOP = 36;
 
 /** Ranking after a round: the round points fly into the totals. */
 export class StandingsScene extends Phaser.Scene {
@@ -40,7 +40,7 @@ export class StandingsScene extends Phaser.Scene {
       const p = info.get(key);
       const pts = phase.points[key] ?? 0;
       const total = phase.totals[key];
-      this.add.rectangle(w / 2, y, w - 80, ROW_H - 4, 0xefdcb0).setStrokeStyle(2, 0x8a5a3a);
+      this.add.rectangle(w / 2, y, w - 80, ROW_H - 6, 0xefdcb0).setStrokeStyle(2, 0x8a5a3a);
       txt(this, 58, y, `${rank}.`, 13, INK);
       if (p) {
         new Character(this, assets, p.look, p.slot).setPosition(86, y + 13);
@@ -76,7 +76,7 @@ export class StandingsScene extends Phaser.Scene {
     }
 
     // Placeholder for the prank card picked by the last player (Plan 7).
-    const boxY = TOP + keys.length * ROW_H + 18;
+    const boxY = TOP + keys.length * ROW_H + 16;
     this.add.rectangle(w / 2, boxY, 220, 22, 0x3b2a4a).setStrokeStyle(1, 0xffd27a);
     txt(this, w / 2, boxY, CARD_PLACEHOLDER, 9, '#ffd27a');
   }

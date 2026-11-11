@@ -14,7 +14,6 @@ import { sound } from '../audio/sound';
 import { mountSoundButton } from '../audio/soundButton';
 import { mountClickSounds, uiSound } from '../audio/uiSounds';
 import { loadSelection, saveSelection } from '../minigames/catalog';
-import { setFavicon } from './favicon';
 import { showLobby } from './lobbyScreen';
 import { showProfile } from './profileScreen';
 import { showConnecting, showStart } from './startScreen';
@@ -34,10 +33,7 @@ const REJECT_TEXT: Record<RejectReason, string> = {
 let assetsPromise: Promise<Record<string, AssetFile> | null> | null = null;
 const getAssets = () =>
   (assetsPromise ??= loadAssets().then(
-    (a) => {
-      setFavicon(a);
-      return a;
-    },
+    (a) => a,
     (e) => {
       console.warn('assets unavailable, lobby without previews', e);
       return null;
