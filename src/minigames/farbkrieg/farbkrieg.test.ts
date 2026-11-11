@@ -36,7 +36,7 @@ const blob = (id: number, x: number, y: number, extra: Partial<Blob> = {}): Blob
 const neutral = () => '0'.repeat(COLS * ROWS);
 const state = (players: Record<string, PaintPlayer>, extra: Partial<PaintState> = {}): PaintState => ({
   timeLeftMs: 60000, durationMs: F.durationMs, players, grid: neutral(), blobs: [], pickups: [], fx: [],
-  finale: { phase: 'wait', fallLeftMs: 0, x: 208, y: 104 }, ...extra,
+  finale: { phase: 'wait', fallLeftMs: 0, x: 208, y: 104, who: null }, ...extra,
 });
 
 /** Grid string with the given tiles ([col, row, owner]) set. */
@@ -87,8 +87,8 @@ describe('farbkrieg definition', () => {
         grid: paint([[5, 5, 1]]),
         blobs: [blob(1, 20, 30, { left: 80 }), blob(3, 70, 70, { kind: 'bombe', owner: 'p1' })],
         pickups: [{ id: 4, x: 8, y: 8, kind: 'rollschuhe' }],
-        fx: [{ id: 9, kind: 'platsch', x: 1, y: 2, who: 'p0', r: 24 }],
-        finale: { phase: 'fall', fallLeftMs: 1500, x: 208, y: 104 },
+        fx: [{ id: 9, kind: 'platsch', x: 1, y: 2, who: 'p0', r: 24, owner: null }],
+        finale: { phase: 'fall', fallLeftMs: 1500, x: 208, y: 104, who: 'p1' },
       },
     );
     const s = lerpPaint(a, b, 0.5);

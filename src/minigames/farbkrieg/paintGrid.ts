@@ -4,6 +4,9 @@ import type { PlayerKey } from '../types';
 /** Owner 0 is neutral; 1-4 are slot+1. `count` is the number of paintable tiles. */
 export type Grid = { cols: number; rows: number; tile: number; owner: Uint8Array; paintable: Uint8Array; count: number };
 
+/** Tile size of the Farbkrieg map (px): the grid is mapW/PAINT_TILE x mapH/PAINT_TILE (a test checks the map file). */
+export const PAINT_TILE = 16;
+
 /** Spawn point per slot (px). */
 export const PAINT_SPAWNS: [number, number][] = [[40, 72], [376, 72], [48, 184], [368, 184]];
 

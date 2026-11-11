@@ -1,7 +1,7 @@
 import { CONFIG } from '../../config';
 import { buildArena } from '../common/arena';
 import type { BotView, MiniGame, PlayerKey } from '../types';
-import { createGrid } from './paintGrid';
+import { createGrid, PAINT_TILE as TILE } from './paintGrid';
 import { createPaintHost, type Blob, type PaintPlayer, type PaintState } from './paintHost';
 import { ARENA_FILE, ARENA_MAP, ARENA_OFFSET, PaintView } from './paintView';
 
@@ -21,9 +21,6 @@ export function lerpPaint(a: PaintState, b: PaintState, t: number): PaintState {
   });
   return { ...b, players, blobs };
 }
-
-/** Grid tile size (px); the grid is mapW/TILE x mapH/TILE (a test checks the map file). */
-const TILE = 16;
 
 /**
  * Paint bots: walk to the nearest tile that is not their own (foreign tiles first, then neutral ones,

@@ -1,6 +1,7 @@
 import { CONFIG } from '../../config';
 import type { PlayerKey } from '../types';
 import type { Cue } from '../snowball/snowballSounds';
+import { PAINT_TILE } from './paintGrid';
 import { finaleAt, type PaintFx, type PaintState } from './paintHost';
 
 export type { Cue };
@@ -8,6 +9,8 @@ export type { Cue };
 /** Stereo spread: the map edges are this far left/right. */
 const PAN_SPREAD = 0.6;
 const OTHERS = 0.5;
+/** Events everybody hears the same: full volume, centred. */
+const GLOBAL: ReadonlySet<PaintFx['kind']> = new Set(['finale_fall', 'finale']);
 /** The painting loop keeps running this long after the last own tile was painted. */
 const PAINT_HOLD_MS = 300;
 
@@ -24,31 +27,30 @@ const FX_SOUND: Record<PaintFx['kind'], string> = {
 
 const panAt = (x: number): number => Math.max(-1, Math.min(1, (x / CONFIG.farbkrieg.mapW) * 2 - 1)) * PAN_SPREAD;
 
-/** Owner digit under pixel (x, y); the grid is cols x rows with the map's aspect ratio. */
+const COLS = Math.round(CONFIG.farbkrieg.mapW / PAINT_TILE);
+const ROWS = Math.round(CONFIG.farbkrieg.mapH / PAINT_TILE);
+
+/** Owner digit under pixel (x, y) of a COLS x ROWS grid string; 0 off the map or for a grid of another size. */
 function ownerAt(grid: string, x: number, y: number): number {
-  const c = CONFIG.farbkrieg;
-  const cols = Math.round(Math.sqrt((grid.length * c.mapW) / c.mapH));
-  if (cols <= 0) return 0;
-  const tile = c.mapW / cols;
-  const col = Math.floor(x / tile);
-  const row = Math.floor(y / tile);
-  const rows = grid.length / cols;
-  if (col < 0 || row < 0 || col >= cols || row >= rows) return 0;
-  const v = grid.charCodeAt(row * cols + col) - 48;
+  if (grid.length !== COLS * ROWS) return 0;
+  const col = Math.floor(x / PAINT_TILE);
+  const row = Math.floor(y / PAINT_TILE);
+  if (col < 0 || row < 0 || col >= COLS || row >= ROWS) return 0;
+  const v = grid.charCodeAt(row * COLS + col) - 48;
   return v >= 0 && v <= 4 ? v : 0;
 }
 
 /**
  * Turns successive (rendered) paint states into one-shot sounds, from state differences only, so
  * host and clients hear the same events. The first state only sets the baseline.
- * `slot` is the own colour slot; without it a gain of own tiles counts as own paint.
+ * `slot` is the own colour slot (own paint is owner slot + 1).
  */
 export class PaintSounds {
   private prev: PaintState | null = null;
   private readonly seenFx = new Set<number>();
   private paintUntil = -Infinity;
 
-  constructor(private readonly selfKey: PlayerKey, private readonly slot?: number) {}
+  constructor(private readonly selfKey: PlayerKey, private readonly slot: number) {}
 
   /** Music for this state: the finale track from finaleAt, none once the time is up. */
   static music(s: PaintState): string | null {
@@ -83,7 +85,8 @@ export class PaintSounds {
     for (const f of s.fx) {
       if (this.seenFx.has(f.id)) continue;
       this.seenFx.add(f.id);
-      out.push({ name: FX_SOUND[f.kind], volume: f.who === self ? 1 : OTHERS, pan: panAt(f.x) });
+      const global = GLOBAL.has(f.kind);
+      out.push({ name: FX_SOUND[f.kind], volume: global || f.who === self ? 1 : OTHERS, pan: global ? 0 : panAt(f.x) });
     }
 
     const fa = finaleAt(s.durationMs);
@@ -102,8 +105,7 @@ export class PaintSounds {
     if (me && s.grid !== prev.grid) {
       const before = ownerAt(prev.grid, me.x, me.y);
       const now = ownerAt(s.grid, me.x, me.y);
-      const own = this.slot !== undefined ? now === this.slot + 1 : me.tiles > (prev.players[self]?.tiles ?? 0);
-      if (now !== before && now > 0 && own) this.paintUntil = nowMs + PAINT_HOLD_MS;
+      if (now !== before && now === this.slot + 1) this.paintUntil = nowMs + PAINT_HOLD_MS;
     }
     return out;
   }

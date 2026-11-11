@@ -152,6 +152,8 @@ interface GameConfig {
     slowFactor: number;
     /** Mopp pickup: duration of the effect (ms). */
     moppMs: number;
+    /** Tiles around the feet tile in which the mopp turns foreign paint neutral (1 = the 3x3 block). */
+    moppReach: number;
     /** Roller pickup: duration (ms) and speed factor. */
     rollMs: number;
     rollFactor: number;
@@ -247,9 +249,9 @@ export const CONFIG = deepFreeze<GameConfig>({
     durationMs: 90000, walkSpeed: 64, bodyRadius: 5,
     klecksCooldownMs: 1500, blobSpeed: 180, blobRange: 140, blobRadius: 2, blobHitPx: 8,
     klecksPaintR: 24, bombPaintR: 48, finaleKlecksFactor: 2, slowMs: 500, slowFactor: 0.5,
-    moppMs: 4000, rollMs: 4000, rollFactor: 1.5,
+    moppMs: 4000, moppReach: 1, rollMs: 4000, rollFactor: 1.5,
     pickupSpawnMs: 8000, maxPickups: 2, pickupTouchPx: 10, pickupClearPx: 24, pickupTries: 20,
-    finaleMs: 15000, finaleFallMs: 2000, finalePaintR: 64, fxKeepMs: 500,
+    finaleMs: 15000, finaleFallMs: 2000, finalePaintR: 48, fxKeepMs: 500,
     mapW: 416, mapH: 208, botMarginPx: 24,
   },
   // Shove (Space) in all top-down games.

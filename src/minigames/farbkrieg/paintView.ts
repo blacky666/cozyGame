@@ -44,8 +44,11 @@ const FALL_PX = 200;
 /** Flying blobs: drawn this far above their floor path at most, sinking onto it over the last px. */
 const BLOB_LIFT = 8;
 const BLOB_SINK = 0.15;
-/** Colours for sprites without an owner (the falling finale bomb, a finale nobody got). */
+/** Colours for sprites without an owner (a finale bomb nobody got). */
 const NEUTRAL_COLORS: ColorMap = { player: '#fbf7ee', player_dark: '#d6cdbf' };
+const FINALE_BOMB = 'farbe.finale_bombe';
+/** Own slot of a view without one (not a player): no tile is ever own paint. */
+const NO_SLOT = -1;
 
 const BLOB_SPRITE: Record<Blob['kind'], string> = { klecks: 'farbe.klecks.flug', bombe: 'farbe.bombe.flug' };
 /** Fx with a sprite (recoloured to `who`); getuencht marks its figure, the rest are sound-only (Task 5). */
@@ -92,6 +95,8 @@ export class PaintView implements MiniGameView<PaintState> {
   private readonly finaleShadow: Phaser.GameObjects.Graphics;
   /** Local time the finale fall started (smooth between snapshots), null when not falling. */
   private fallStart: number | null = null;
+  /** Player whose colours the falling bomb wears (undefined: not recoloured yet). */
+  private bombWho: PlayerKey | null | undefined = undefined;
   // Prediction (clients): the host's walking step at the speed of the latest own state.
   private speed: number = CONFIG.farbkrieg.walkSpeed;
   private readonly reconciler = new Reconciler<Mover>((m, input, dt) => this.step(m, input, dt));
@@ -125,12 +130,12 @@ export class PaintView implements MiniGameView<PaintState> {
     }
     this.ring = scene.add.graphics();
     this.finaleShadow = scene.add.graphics().setDepth(SHADOW_DEPTH).setVisible(false);
-    this.finaleBomb = pivotSprite(scene, 'farbe.finale_bombe', 0, 0, NEUTRAL_COLORS)?.setDepth(FX_DEPTH - 1).setVisible(false) ?? null;
+    this.finaleBomb = pivotSprite(scene, FINALE_BOMB, 0, 0, NEUTRAL_COLORS)?.setDepth(FX_DEPTH - 1).setVisible(false) ?? null;
     const self = players.find((p) => p.key === selfKey);
     this.crosshair = drawCrosshair(scene, self ? playerColor(scene, self.slot) : '#ffffff');
     this.objects.push(this.ring, this.finaleShadow, this.crosshair, ...(this.finaleBomb ? [this.finaleBomb] : []));
     this.hud = new PaintHud(scene, players, grid.count);
-    this.sounds = new PaintSounds(selfKey, self?.slot);
+    this.sounds = new PaintSounds(selfKey, self?.slot ?? NO_SLOT);
   }
 
   private step(m: Mover, input: InputState, dt: number): Mover {
@@ -191,7 +196,6 @@ export class PaintView implements MiniGameView<PaintState> {
 
   render(s: PaintState, selfKey: PlayerKey): void {
     const now = this.scene.time.now;
-    // The floor first: a getüncht fx takes its colour from the freshly painted tile under it.
     this.layer.update(s.grid);
     this.renderFx(s.fx);
     this.renderAvatars(s, selfKey, now);
@@ -301,7 +305,7 @@ export class PaintView implements MiniGameView<PaintState> {
     }
   }
 
-  /** The finale bomb drops onto the centre during the fall, its shadow growing below it. */
+  /** The finale bomb drops onto the centre during the fall in its player's colours, its shadow growing below it. */
   private renderFinale(s: PaintState, now: number): void {
     const f = s.finale;
     if (f.phase !== 'fall') {
@@ -312,6 +316,11 @@ export class PaintView implements MiniGameView<PaintState> {
     }
     const total = CONFIG.farbkrieg.finaleFallMs;
     this.fallStart ??= now - (total - f.fallLeftMs);
+    if (this.finaleBomb && this.bombWho !== f.who) {
+      this.bombWho = f.who;
+      const colors = (f.who && this.colorsOf.get(f.who)) || NEUTRAL_COLORS;
+      swapSprite(this.scene, this.finaleBomb, FINALE_BOMB, false, false, colors);
+    }
     const t = Math.min(1, Math.max(0, (now - this.fallStart) / total));
     const x = Math.round(f.x + ARENA_OFFSET.x);
     const ground = Math.round(f.y + ARENA_OFFSET.y);
@@ -333,10 +342,9 @@ export class PaintView implements MiniGameView<PaintState> {
       if (this.fxSeen.has(f.id)) continue;
       this.fxSeen.add(f.id);
       if (f.kind === 'getuencht' && f.who) {
-        // The hit painted the tile under the victim in the thrower's colour.
+        // The victim wears the thrower's colour.
         const a = this.avatars.get(f.who);
-        const owner = this.layer.ownerAt(f.x, f.y);
-        if (a) a.splatColors = owner > 0 ? playerColors(this.scene, owner - 1) : {};
+        if (a) a.splatColors = (f.owner && this.colorsOf.get(f.owner)) || {};
       }
       const name = FX_SPRITE[f.kind];
       if (!name) continue;

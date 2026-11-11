@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AssetFile } from '../../gfx/assetTypes';
 import { buildArena } from '../common/arena';
 import {
-  createGrid, decodeGrid, edgeMask, encodeGrid, paintDisc, paintTile, rankByCount, tileCounts, tileIndex,
+  createGrid, decodeGrid, edgeMask, encodeGrid, PAINT_TILE, paintDisc, paintTile, rankByCount, tileCounts, tileIndex,
   type Grid,
 } from './paintGrid';
 
@@ -20,6 +20,7 @@ describe('paintGrid', () => {
   it('paintable mask', () => {
     const g = createGrid(arena);
     expect([g.cols, g.rows, g.tile]).toEqual([26, 13, 16]);
+    expect(g.tile).toBe(PAINT_TILE);
     expect(g.count).toBe(239);
     for (let c = 0; c < 26; c++) for (const r of [0, 1]) expect(g.paintable[at(g, c, r)]).toBe(0);
     for (let r = 0; r < 13; r++) for (const c of [0, 25]) expect(g.paintable[at(g, c, r)]).toBe(0);
@@ -62,6 +63,17 @@ describe('paintGrid', () => {
     paintTile(real, at(real, 1, 2), 1);
     paintTile(real, at(real, 2, 2), 1);
     expect(edgeMask(real, at(real, 1, 2))).toBe(2);
+  });
+  it('edgeMask never exceeds 15 for every tile of a fully painted grid', () => {
+    for (const g of [createGrid(arena), open(4, 3)]) {
+      for (let i = 0; i < g.owner.length; i++) paintTile(g, i, 2);
+      for (let i = 0; i < g.owner.length; i++) {
+        const m = edgeMask(g, i);
+        expect(Number.isInteger(m)).toBe(true);
+        expect(m).toBeGreaterThanOrEqual(0);
+        expect(m).toBeLessThanOrEqual(15);
+      }
+    }
   });
   it('encode/decode round trip', () => {
     const g = createGrid(arena);

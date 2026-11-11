@@ -37,15 +37,6 @@ export class PaintLayer {
     this.colors = [0, 1, 2, 3].map((slot) => playerColors(scene, slot));
   }
 
-  /** Owner (0-4) of the tile under the map point, from the last decoded grid. */
-  ownerAt(x: number, y: number): number {
-    const g = this.grid;
-    const c = Math.floor(x / g.tile);
-    const r = Math.floor(y / g.tile);
-    if (!(c >= 0 && r >= 0 && c < g.cols && r < g.rows)) return 0;
-    return g.owner[r * g.cols + c];
-  }
-
   /**
    * Show a snapshot grid. A string of the wrong length (a broken or foreign snapshot) is ignored and
    * the previous floor stays. Only tiles whose owner or mask changed are touched.

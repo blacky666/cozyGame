@@ -45,6 +45,8 @@ export type PaintFx = {
   who: PlayerKey | null;
   /** Paint radius of a splash (px), 0 for other kinds. */
   r: number;
+  /** getuencht: the thrower, whose colour the victim wears; null for the other kinds. */
+  owner: PlayerKey | null;
 };
 export type PaintState = {
   timeLeftMs: number;
@@ -56,7 +58,8 @@ export type PaintState = {
   pickups: PaintPickup[];
   /** Events of the last fxKeepMs (ids grow), so a missed snapshot still shows them. */
   fx: PaintFx[];
-  finale: { phase: 'wait' | 'fall' | 'done'; fallLeftMs: number; x: number; y: number };
+  /** `who`: colour of the finale bomb, picked when the fall starts (null while waiting or when nobody was present). */
+  finale: { phase: 'wait' | 'fall' | 'done'; fallLeftMs: number; x: number; y: number; who: PlayerKey | null };
 };
 
 const START_DIR: Facing = 'down';
@@ -114,7 +117,7 @@ export function createPaintHost(
   const colour = (k: PlayerKey) => slotOf[k] + 1;
   let blobs: Blob[] = [];
   const pickups: PaintPickup[] = [];
-  const finale: PaintState['finale'] = { phase: 'wait', fallLeftMs: 0, x: arena.w / 2, y: arena.h / 2 };
+  const finale: PaintState['finale'] = { phase: 'wait', fallLeftMs: 0, x: arena.w / 2, y: arena.h / 2, who: null };
   let fx: (PaintFx & { atMs: number })[] = [];
   let elapsedMs = 0;
   /** Centres of all paintable tiles (pickup spawn spots). */
@@ -128,37 +131,40 @@ export function createPaintHost(
   let nextBlobId = 1;
   let nextFxId = 1;
 
-  const addFx = (kind: PaintFx['kind'], x: number, y: number, who: PlayerKey | null, r = 0) => {
-    fx.push({ id: nextFxId++, kind, x: Math.round(x), y: Math.round(y), who, r, atMs: elapsedMs });
+  const addFx = (kind: PaintFx['kind'], x: number, y: number, who: PlayerKey | null, r = 0, owner: PlayerKey | null = null) => {
+    fx.push({ id: nextFxId++, kind, x: Math.round(x), y: Math.round(y), who, r, owner, atMs: elapsedMs });
   };
 
-  /** Paintable tiles under k's feet: the feet tile, or the 3x3 block around it on rollers. */
-  const feetTiles = (k: PlayerKey): number[] => {
+  /** Paintable tiles in the block of `reach` tiles around k's feet tile (none when off the grid). */
+  const around = (k: PlayerKey, reach: number): number[] => {
     const p = players[k];
     const i = tileIndex(grid, p.x, p.y);
     if (i === null) return [];
-    if (p.rollMs <= 0) return grid.paintable[i] ? [i] : [];
     const col = i % grid.cols;
     const row = Math.floor(i / grid.cols);
     const out: number[] = [];
-    for (let r = row - ROLL_REACH; r <= row + ROLL_REACH; r++) {
-      for (let cc = col - ROLL_REACH; cc <= col + ROLL_REACH; cc++) {
+    for (let r = row - reach; r <= row + reach; r++) {
+      for (let cc = col - reach; cc <= col + reach; cc++) {
         if (cc < 0 || r < 0 || cc >= grid.cols || r >= grid.rows) continue;
         if (grid.paintable[r * grid.cols + cc]) out.push(r * grid.cols + cc);
       }
     }
     return out;
   };
+  /** Paintable tiles under k's feet: the feet tile, or the 3x3 block around it on rollers. */
+  const feetTiles = (k: PlayerKey): number[] => around(k, players[k].rollMs > 0 ? ROLL_REACH : 0);
 
   /**
-   * Feet paint: each present player without a mopp claims its feet area. A tile owned by one of its
-   * claimants stays; otherwise the claimant with the lowest slot gets it. Then the mopp claimants
-   * turn the foreign tiles of their feet area neutral (own and neutral tiles stay, nothing is painted).
+   * Feet paint: every present player claims its feet area (with or without a mopp). A tile owned by
+   * one of its claimants stays; otherwise rand picks among the claimants, one draw per contested tile.
+   * Claimants are collected in slot order, so the result does not depend on the order of players or
+   * inputs. Then each mopp turns the foreign tiles in the moppReach block around its feet tile
+   * neutral; own and neutral tiles stay, and so do the mopp player's own feet tiles.
    */
   const paintFeet = (present: PlayerKey[]) => {
+    const bySlot = [...present].sort((a, b) => slotOf[a] - slotOf[b]);
     const claims = new Map<number, PlayerKey[]>();
-    for (const k of present) {
-      if (players[k].moppMs > 0) continue;
+    for (const k of bySlot) {
       for (const i of feetTiles(k)) {
         const list = claims.get(i);
         if (list) list.push(k); else claims.set(i, [k]);
@@ -166,12 +172,14 @@ export function createPaintHost(
     }
     for (const [i, ks] of claims) {
       if (ks.some((k) => grid.owner[i] === colour(k))) continue;
-      const winner = ks.reduce((a, b) => (slotOf[b] < slotOf[a] ? b : a));
-      paintTile(grid, i, colour(winner));
+      paintTile(grid, i, colour(ks.length === 1 ? ks[0] : pick(ks)));
     }
-    for (const k of present) {
+    for (const k of bySlot) {
       if (players[k].moppMs <= 0) continue;
-      for (const i of feetTiles(k)) if (grid.owner[i] !== 0 && grid.owner[i] !== colour(k)) paintTile(grid, i, 0);
+      const feet = new Set(feetTiles(k));
+      for (const i of around(k, c.moppReach)) {
+        if (!feet.has(i) && grid.owner[i] !== 0 && grid.owner[i] !== colour(k)) paintTile(grid, i, 0);
+      }
     }
   };
 
@@ -225,13 +233,19 @@ export function createPaintHost(
     else p.rollMs = c.rollMs;
   };
 
-  /** Finale bomb: lands in the colour of the present player with the fewest tiles (ties by rand). */
-  const explodeFinale = (present: PlayerKey[]) => {
-    finale.phase = 'done';
+  /** The present player with the fewest tiles (ties by rand), null when nobody is present. */
+  const fewestTiles = (present: PlayerKey[]): PlayerKey | null => {
+    if (present.length === 0) return null;
     const counts = tileCounts(grid);
     const fewest = Math.min(...present.map((k) => counts[colour(k)]));
-    const losers = present.filter((k) => counts[colour(k)] === fewest);
-    const who = losers.length > 0 ? pick(losers) : null;
+    return pick(present.filter((k) => counts[colour(k)] === fewest));
+  };
+
+  /** Finale bomb: lands in the colour picked when the fall started; re-picked if that player is gone. */
+  const explodeFinale = (present: PlayerKey[]) => {
+    finale.phase = 'done';
+    const who = finale.who !== null && present.includes(finale.who) ? finale.who : fewestTiles(present);
+    finale.who = who;
     if (who !== null) paintDisc(grid, finale.x, finale.y, c.finalePaintR, colour(who));
     addFx('finale', finale.x, finale.y, who, c.finalePaintR);
   };
@@ -323,7 +337,7 @@ export function createPaintHost(
         paintDisc(grid, ev.x, ev.y, r, colour(b.owner));
         if (ev.kind === 'player') {
           players[ev.victim].slowMs = c.slowMs;
-          addFx('getuencht', ev.x, ev.y, ev.victim, r);
+          addFx('getuencht', ev.x, ev.y, ev.victim, r, b.owner);
         } else {
           addFx(b.kind === 'bombe' ? 'bombe' : 'platsch', ev.x, ev.y, b.owner, r);
         }
@@ -334,7 +348,8 @@ export function createPaintHost(
       if (finale.phase === 'wait' && inFinale()) {
         finale.phase = 'fall';
         finale.fallLeftMs = c.finaleFallMs;
-        addFx('finale_fall', finale.x, finale.y, null);
+        finale.who = fewestTiles(present);
+        addFx('finale_fall', finale.x, finale.y, finale.who);
       } else if (finale.phase === 'fall') {
         finale.fallLeftMs = countDown(finale.fallLeftMs, ms);
         if (finale.fallLeftMs <= 0) explodeFinale(present);
@@ -357,7 +372,7 @@ export function createPaintHost(
         grid: encodeGrid(grid),
         blobs: blobs.map((b) => ({ ...b })),
         pickups: pickups.map((pk) => ({ ...pk })),
-        fx: fx.map(({ id, kind, x, y, who, r }) => ({ id, kind, x, y, who, r })),
+        fx: fx.map(({ id, kind, x, y, who, r, owner }) => ({ id, kind, x, y, who, r, owner })),
         finale: { ...finale },
       };
     },
