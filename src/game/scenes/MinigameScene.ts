@@ -108,13 +108,19 @@ export class MinigameScene extends Phaser.Scene {
     return () => {
       if (done) return;
       done = true;
-      this.input.off(Phaser.Input.Events.POINTER_DOWN, down);
-      this.input.off(Phaser.Input.Events.POINTER_UP, up);
-      this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, up);
+      // Unconditional first: window/canvas listeners and the charge must never leak or stick.
       window.removeEventListener('blur', blur);
       canvas.removeEventListener('contextmenu', noMenu);
-      this.input.setDefaultCursor('');
       button.cancel();
+      canvas.style.cursor = '';
+      // On game.destroy() Phaser's InputPlugin has already run its own DESTROY handler (registered
+      // before create()), so `this.input.manager` is null and any input call would throw.
+      if (this.input?.manager) {
+        this.input.off(Phaser.Input.Events.POINTER_DOWN, down);
+        this.input.off(Phaser.Input.Events.POINTER_UP, up);
+        this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, up);
+        this.input.setDefaultCursor('');
+      }
     };
   }
 

@@ -28,7 +28,7 @@ export class RoundIntroScene extends Phaser.Scene {
       txt(this, w / 2, 60, `Runde ${phase.round}`, 12, INK),
       txt(this, w / 2, 86, game?.title ?? phase.game, 22, '#ffd27a'),
       txt(this, w / 2, 124, game?.rule ?? '', 13, INK).setWordWrapWidth(w - 90),
-      txt(this, w / 2, 160, game ? `Steuerung: ${game.controls}` : '', 11, INK),
+      txt(this, w / 2, 168, game ? `Steuerung: ${game.controls}` : '', 11, INK).setWordWrapWidth(w - 90),
     ];
 
     const step = ctx.timing.countdownMs / 3;

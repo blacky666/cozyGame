@@ -21,6 +21,9 @@ export function lerpSnow(a: SnowState, b: SnowState, t: number): SnowState {
 
 /** Keep this far from the nearest opponent while shooting. */
 const BOT_DISTANCE = 60;
+/** Keep-distance targets stay inside the fence (map coordinates). */
+const BOT_BOUNDS = { minX: 16, maxX: 400, minY: 52, maxY: 188 };
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** Bots reload while standing still; with ammo they hold a distance from the nearest opponent and aim at it. */
 export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
@@ -37,7 +40,10 @@ export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
   }
   if (!near) return { self, targets: [], idle: true };
   const d = nearD || 1;
-  const target = { x: near.x - ((near.x - me.x) / d) * BOT_DISTANCE, y: near.y - ((near.y - me.y) / d) * BOT_DISTANCE };
+  const target = {
+    x: clamp(near.x - ((near.x - me.x) / d) * BOT_DISTANCE, BOT_BOUNDS.minX, BOT_BOUNDS.maxX),
+    y: clamp(near.y - ((near.y - me.y) / d) * BOT_DISTANCE, BOT_BOUNDS.minY, BOT_BOUNDS.maxY),
+  };
   return { self, targets: [target], aim: { x: near.x, y: near.y } };
 }
 

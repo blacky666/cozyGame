@@ -68,6 +68,20 @@ describe('snowball bots', () => {
     expect(last.primaryCharge).toBeLessThanOrEqual(1);
   });
 
+  it('keeps the tap counter steady across aim -> idle -> aim', () => {
+    const bot = createBotInputs(9);
+    const aimView = { self: { x: 1, y: 1 }, targets: [], aim: { x: 5, y: 5 } };
+    let prev = 0;
+    for (let i = 0; i < 100; i++) prev = bot(aimView).primaryTaps;
+    for (let i = 0; i < 50; i++) {
+      const t = bot({ self: { x: 1, y: 1 }, targets: [], idle: true }).primaryTaps;
+      expect(t).toBe(prev);
+    }
+    expect(prev).toBeGreaterThan(0);
+    // First aim tick after idle must not jump by more than one regular throw.
+    expect(bot(aimView).primaryTaps - prev).toBeLessThanOrEqual(1);
+  });
+
   it('a bot without balls stands still', () => {
     const bot = createBotInputs(5);
     for (let i = 0; i < 100; i++) {
@@ -87,7 +101,13 @@ describe('snowball bots', () => {
     const brains = players.map((p) => createBotInputs(1 + p.slot * 7919));
     const inputs: Record<string, InputState> = {};
     for (const p of players) inputs[p.key] = neutralInput();
+    const bad: string[] = [];
+    const walk = (v: unknown, path: string) => {
+      if (typeof v === 'number') { if (!Number.isFinite(v)) bad.push(path); }
+      else if (v && typeof v === 'object') for (const [k, c] of Object.entries(v)) walk(c, path + '.' + k);
+    };
     for (let t = 0; t < 120 * 30 + 2; t++) {
+      if (t % 300 === 0) walk(host.snapshot(), 't' + t);
       const state = host.snapshot();
       players.forEach((p, i) => {
         const view = snowball.botView?.(state, p.key);
@@ -103,11 +123,6 @@ describe('snowball bots', () => {
     }
     for (const b of end.balls) expect(Number.isFinite(b.x) && Number.isFinite(b.y)).toBe(true);
     // Every number anywhere in the state is finite (NaN would serialize to null).
-    const bad: string[] = [];
-    const walk = (v: unknown, path: string) => {
-      if (typeof v === 'number') { if (!Number.isFinite(v)) bad.push(path); }
-      else if (v && typeof v === 'object') for (const [k, c] of Object.entries(v)) walk(c, path + '.' + k);
-    };
     walk(end, 'state');
     expect(bad).toEqual([]);
   });
