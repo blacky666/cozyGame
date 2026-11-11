@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { APP_VERSION } from '../version';
 import { migrate, type Look, type Profile } from '../save/profile';
-import { neutralInput, parseInputState, type InputState, type MsgData, type MsgType, type RejectReason } from './protocol';
+import { keepCounters, neutralInput, parseInputState, type InputState, type MsgData, type MsgType, type RejectReason } from './protocol';
 import { Roster, type PlayerInfo } from './roster';
 import type { Transport } from './transport';
 
@@ -151,7 +151,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       // Remote input that stopped arriving (lost packets, frozen tab) must not keep a player running.
       if (!local.has(id) && now() - (inputAt.get(id) ?? 0) > CONFIG.net.inputStaleMs) {
         // Buttons are released, but the action counters stay so the host's edges do not re-fire.
-        return { ...neutralInput(), shoves: s.shoves, primaryTaps: s.primaryTaps, secondaryTaps: s.secondaryTaps };
+        return keepCounters(s);
       }
       return s;
     },

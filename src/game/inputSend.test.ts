@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { neutralInput } from '../net/protocol';
-import { shouldSend } from './inputSend';
+import { sameInput, shouldSend } from './inputSend';
 
 const idle = neutralInput();
 const right = { ...idle, right: true };
@@ -23,5 +23,10 @@ describe('shouldSend', () => {
     expect(shouldSend(idle, { ...idle, primary: true }, 1, 0, 0)).toBe(true);
     expect(shouldSend(idle, { ...idle, primaryTaps: 1 }, 1, 0, 0)).toBe(true);
     expect(shouldSend(idle, { ...idle, secondaryTaps: 1 }, 1, 0, 0)).toBe(true);
+  });
+  it('sameInput differs on drops', () => {
+    expect(sameInput(idle, { ...idle, drops: 1 })).toBe(false);
+    expect(sameInput(idle, { ...idle, turnsCw: 1 })).toBe(false);
+    expect(sameInput(idle, { ...idle })).toBe(true);
   });
 });

@@ -73,3 +73,33 @@ describe('createKeyboard', () => {
     kb.destroy();
   });
 });
+
+describe('createKeyboard turns and drops', () => {
+  it('Q/E count turns only while counting; holding E (repeat) is one turn', () => {
+    const win = new FakeTarget();
+    const kb = createKeyboard({ win, doc: new FakeTarget() });
+    win.dispatchEvent(key('keydown', 'KeyE'));
+    win.dispatchEvent(key('keyup', 'KeyE'));
+    expect(kb.state()).toMatchObject({ turnsCw: 0, turnsCcw: 0 });
+    kb.setCounting(true);
+    win.dispatchEvent(key('keydown', 'KeyE'));
+    win.dispatchEvent(Object.assign(key('keydown', 'KeyE'), { repeat: true }));
+    win.dispatchEvent(key('keyup', 'KeyE'));
+    win.dispatchEvent(key('keydown', 'KeyQ'));
+    expect(kb.state()).toMatchObject({ turnsCw: 1, turnsCcw: 1, drops: 0 });
+    kb.destroy();
+  });
+
+  it('S press counts a drop and sets down', () => {
+    const win = new FakeTarget();
+    const kb = createKeyboard({ win, doc: new FakeTarget() });
+    kb.setCounting(true);
+    win.dispatchEvent(key('keydown', 'KeyS'));
+    win.dispatchEvent(Object.assign(key('keydown', 'KeyS'), { repeat: true }));
+    expect(kb.state()).toMatchObject({ drops: 1, down: true });
+    win.dispatchEvent(key('keyup', 'KeyS'));
+    win.dispatchEvent(key('keydown', 'ArrowDown'));
+    expect(kb.state().drops).toBe(2);
+    kb.destroy();
+  });
+});

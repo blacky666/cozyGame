@@ -45,6 +45,7 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
   let shoves = 0;
   let taps = 0;
   let strongTaps = 0;
+  let turnsCw = 0;
 
   const randomDir = (): InputState => {
     const s = neutralInput();
@@ -90,12 +91,13 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
   return (view) => {
     if (rand() < SHOVE_CHANCE) shoves++;
     // The tap counters are always sent (a drop to 0 would make the host re-base and fire a spurious throw).
-    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, secondaryTaps: strongTaps };
+    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, secondaryTaps: strongTaps, turnsCw, turnsCcw: 0, drops: 0 };
     if (view.aim) {
       out.aimX = view.aim.x;
       out.aimY = view.aim.y;
     }
     // A view that says which button to press gets exactly that press (no random throw on top).
+    if (view.turn === 'cw') out.turnsCw = ++turnsCw;
     if (view.fire === 'primary') out.primaryTaps = ++taps;
     else if (view.fire === 'secondary') out.secondaryTaps = ++strongTaps;
     else if (view.aim) {

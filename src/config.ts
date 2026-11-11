@@ -33,6 +33,10 @@ interface GameConfig {
     /** Host lag compensation: hits of remote throwers are tested against positions this long ago. */
     rewindMs: number;
   };
+  input: {
+    /** Mouse wheel turns: at most one per this many ms (a notch burst is one turn). */
+    wheelGapMs: number;
+  };
   view: { width: number; height: number; zoom: number };
   players: { min: number; max: number; maxName: number };
   turn: { urls: string[]; username: string; credential: string };
@@ -217,6 +221,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     inputStaleMs: 500,
     rewindMs: 150,
   },
+  input: { wheelGapMs: 80 },
   view: { width: 426, height: 240, zoom: 3 },
   players: { min: 2, max: 4, maxName: 16 },
   // Empty until the Metered TURN account exists.

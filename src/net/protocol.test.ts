@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { neutralInput, parseInputState } from './protocol';
+import { INPUT_COUNTERS, keepCounters, neutralInput, parseInputState } from './protocol';
 
 describe('parseInputState', () => {
   it('keeps a valid shove counter', () => {
@@ -27,5 +27,24 @@ describe('parseInputState', () => {
     for (const bad of [-1, 1.5, Number.MAX_SAFE_INTEGER + 2, NaN, '3']) {
       expect(parseInputState({ ...neutralInput(), secondaryTaps: bad })).toBeNull();
     }
+  });
+});
+
+describe('rotation and drop counters', () => {
+  it('parseInputState rejects a missing or negative turnsCw/turnsCcw/drops and keeps valid ones', () => {
+    for (const k of ['turnsCw', 'turnsCcw', 'drops'] as const) {
+      expect(parseInputState({ ...neutralInput(), [k]: 4 })?.[k]).toBe(4);
+      const { [k]: _omit, ...none } = neutralInput();
+      expect(parseInputState(none)).toBeNull();
+      for (const bad of [-1, 1.5, NaN, '3']) expect(parseInputState({ ...neutralInput(), [k]: bad })).toBeNull();
+    }
+  });
+
+  it('keepCounters releases buttons and keeps all six counters', () => {
+    const s = { ...neutralInput(), up: true, primary: true, aimX: 5 };
+    INPUT_COUNTERS.forEach((k, i) => (s[k] = i + 1));
+    const kept = keepCounters(s);
+    expect(INPUT_COUNTERS).toHaveLength(6);
+    expect(kept).toEqual({ ...neutralInput(), shoves: 1, primaryTaps: 2, secondaryTaps: 3, turnsCw: 4, turnsCcw: 5, drops: 6 });
   });
 });

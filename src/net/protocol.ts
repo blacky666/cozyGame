@@ -22,6 +22,11 @@ export type InputState = {
    * flag, so a quick tap between two host ticks is never lost.
    */
   shoves: number;
+  /** Clockwise / counter-clockwise turn presses so far (only ever grow), like shoves. */
+  turnsCw: number;
+  turnsCcw: number;
+  /** Drop presses so far (only ever grows). */
+  drops: number;
 };
 
 export function neutralInput(): InputState {
@@ -29,7 +34,18 @@ export function neutralInput(): InputState {
     up: false, down: false, left: false, right: false,
     primary: false, secondary: false, special: false,
     emote: 0, aimX: 0, aimY: 0, primaryTaps: 0, secondaryTaps: 0, shoves: 0,
+    turnsCw: 0, turnsCcw: 0, drops: 0,
   };
+}
+
+/** Every growing counter of InputState: validated on the wire, compared, and kept when buttons are released. */
+export const INPUT_COUNTERS = ['shoves', 'primaryTaps', 'secondaryTaps', 'turnsCw', 'turnsCcw', 'drops'] as const;
+
+/** A neutral input (all buttons released) that carries the counters of `s`, so a host's edges never re-fire. */
+export function keepCounters(s: InputState): InputState {
+  const out = neutralInput();
+  for (const k of INPUT_COUNTERS) out[k] = s[k];
+  return out;
 }
 
 export type RejectReason = 'full' | 'running' | 'version' | 'name' | 'kicked';
@@ -55,7 +71,6 @@ export const MSG_TYPES: readonly MsgType[] = [
 export type MsgData<T extends MsgType> = Extract<Msg, { type: T }>['data'];
 
 const BUTTONS = ['up', 'down', 'left', 'right', 'primary', 'secondary', 'special'] as const;
-const COUNTERS = ['shoves', 'primaryTaps', 'secondaryTaps'] as const;
 const isCounter = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 
 /** Validate untrusted input from the wire; returns a clean copy or null. */
@@ -67,10 +82,10 @@ export function parseInputState(x: unknown): InputState | null {
   if (emote !== 0 && emote !== 1 && emote !== 2 && emote !== 3 && emote !== 4) return null;
   if (typeof aimX !== 'number' || !Number.isFinite(aimX)) return null;
   if (typeof aimY !== 'number' || !Number.isFinite(aimY)) return null;
-  if (!COUNTERS.every((k) => isCounter(r[k]))) return null;
+  if (!INPUT_COUNTERS.every((k) => isCounter(r[k]))) return null;
   const s = neutralInput();
   for (const k of BUTTONS) s[k] = r[k] as boolean;
-  for (const k of COUNTERS) s[k] = r[k] as number;
+  for (const k of INPUT_COUNTERS) s[k] = r[k] as number;
   s.emote = emote;
   s.aimX = aimX;
   s.aimY = aimY;

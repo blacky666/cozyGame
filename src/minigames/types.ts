@@ -23,6 +23,8 @@ export type BotView = {
   idle?: boolean;
   /** Press exactly this button this call (instead of the random throws at `aim`). */
   fire?: 'primary' | 'secondary';
+  /** Press the clockwise turn once this call. */
+  turn?: 'cw';
 };
 
 export interface MiniGameHost<S> {

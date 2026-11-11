@@ -51,3 +51,18 @@ describe('PointerInput', () => {
     expect(s).toMatchObject({ up: true, shoves: 2, primary: true, primaryTaps: 1, secondaryTaps: 0, aimX: 12, aimY: 34 });
   });
 });
+
+describe('PointerInput wheel', () => {
+  it('wheel: two events 50 ms apart are one turn, 100 ms apart two; merge adds the keyboard turns', () => {
+    const p = new PointerInput();
+    p.wheel(100, 0); // not counting: ignored
+    expect(p.merge(neutralInput())).toMatchObject({ turnsCw: 0, turnsCcw: 0 });
+    p.setCounting(true);
+    p.wheel(100, 1000);
+    p.wheel(100, 1050);
+    expect(p.merge(neutralInput())).toMatchObject({ turnsCw: 1, turnsCcw: 0 });
+    p.wheel(100, 1150);
+    p.wheel(-100, 1300);
+    expect(p.merge({ ...neutralInput(), turnsCw: 5, turnsCcw: 2 })).toMatchObject({ turnsCw: 7, turnsCcw: 3 });
+  });
+});

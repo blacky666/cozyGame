@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import type { InputState } from '../net/protocol';
 
 /**
@@ -14,6 +15,9 @@ export class PointerInput {
   private secondaryTaps = 0;
   private primaryHeld = false;
   private secondaryHeld = false;
+  private wheelCw = 0;
+  private wheelCcw = 0;
+  private lastWheelAt = -Infinity;
   private counting = false;
 
   setCounting(on: boolean): void {
@@ -32,6 +36,15 @@ export class PointerInput {
       this.secondaryHeld = true;
       if (this.counting) this.secondaryTaps++;
     }
+  }
+
+  /** Mouse wheel: down/forward (deltaY > 0) turns clockwise, up counter-clockwise; at most one turn per wheelGapMs. */
+  wheel(deltaY: number, nowMs: number): void {
+    if (!this.counting || deltaY === 0) return;
+    if (nowMs - this.lastWheelAt < CONFIG.input.wheelGapMs) return;
+    this.lastWheelAt = nowMs;
+    if (deltaY > 0) this.wheelCw++;
+    else this.wheelCcw++;
   }
 
   release(button: number): void {
@@ -53,6 +66,8 @@ export class PointerInput {
       secondary: this.secondaryHeld,
       primaryTaps: this.primaryTaps,
       secondaryTaps: this.secondaryTaps,
+      turnsCw: s.turnsCw + this.wheelCw,
+      turnsCcw: s.turnsCcw + this.wheelCcw,
       aimX: this.aimX,
       aimY: this.aimY,
     };

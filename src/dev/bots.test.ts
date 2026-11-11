@@ -56,6 +56,14 @@ describe('createBotInputs', () => {
     expect(last).toMatchObject({ primaryTaps: 5, secondaryTaps: 3 });
   });
 
+  it('turn presses turnsCw exactly once; counters never drop to 0', () => {
+    const bot = createBotInputs(4);
+    const view = { self: { x: 100, y: 100 }, targets: [{ x: 160, y: 100 }] };
+    expect(bot(view)).toMatchObject({ turnsCw: 0, turnsCcw: 0, drops: 0 });
+    expect(bot({ ...view, turn: 'cw' })).toMatchObject({ turnsCw: 1 });
+    for (let i = 0; i < 50; i++) expect(bot(view)).toMatchObject({ turnsCw: 1, turnsCcw: 0, drops: 0 });
+  });
+
   it('is deterministic per seed and wanders without targets', () => {
     const run = (seed: number) => {
       const bot = createBotInputs(seed);

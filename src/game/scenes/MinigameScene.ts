@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
 import { SnapshotBuffer } from '../../net/interpolation';
-import { neutralInput, type InputState } from '../../net/protocol';
+import { keepCounters, neutralInput, type InputState } from '../../net/protocol';
 import { getMinigame } from '../../minigames/registry';
 import { playerKey, type GamePlayer, type MiniGame, type MiniGameView } from '../../minigames/types';
 import type { SceneData, StageCtx } from '../stageCtx';
@@ -89,8 +89,7 @@ export class MinigameScene extends Phaser.Scene {
       if (!ctx.isHost) {
         ctx.onSnap(null);
         // Released buttons, but the counters stay (a drop would make the next host re-base them).
-        const { primaryTaps, secondaryTaps } = ctx.pointer.merge(neutralInput());
-        ctx.sendInput?.({ ...neutralInput(), shoves: ctx.keyboard.state().shoves, primaryTaps, secondaryTaps });
+        ctx.sendInput?.(keepCounters(ctx.pointer.merge(ctx.keyboard.state())));
       }
       this.view?.destroy();
       this.view = null;
@@ -108,12 +107,14 @@ export class MinigameScene extends Phaser.Scene {
     pointer.releaseAll();
     const down = (p: Phaser.Input.Pointer) => pointer.press(p.button);
     const up = (p: Phaser.Input.Pointer) => pointer.release(p.button);
+    const wheel = (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => pointer.wheel(dy, this.time.now);
     const blur = () => pointer.releaseAll();
     const noMenu = (e: Event) => e.preventDefault();
     const canvas = this.game.canvas;
     this.input.on(Phaser.Input.Events.POINTER_DOWN, down);
     this.input.on(Phaser.Input.Events.POINTER_UP, up);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, up);
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, wheel);
     window.addEventListener('blur', blur);
     canvas.addEventListener('contextmenu', noMenu);
     if (this.def?.aimOffset) this.input.setDefaultCursor('none');
@@ -132,6 +133,7 @@ export class MinigameScene extends Phaser.Scene {
         this.input.off(Phaser.Input.Events.POINTER_DOWN, down);
         this.input.off(Phaser.Input.Events.POINTER_UP, up);
         this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, up);
+        this.input.off(Phaser.Input.Events.POINTER_WHEEL, wheel);
         this.input.setDefaultCursor('');
       }
     };

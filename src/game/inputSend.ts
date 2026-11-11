@@ -1,11 +1,11 @@
 import { CONFIG } from '../config';
-import type { InputState } from '../net/protocol';
+import { INPUT_COUNTERS, type InputState } from '../net/protocol';
 
 /** Equal in everything but the aim (aim-only changes are throttled separately). */
 export const sameInput = (a: InputState, b: InputState): boolean =>
   a.up === b.up && a.down === b.down && a.left === b.left && a.right === b.right &&
-  a.primary === b.primary && a.secondary === b.secondary && a.special === b.special && a.emote === b.emote && a.shoves === b.shoves &&
-  a.primaryTaps === b.primaryTaps && a.secondaryTaps === b.secondaryTaps;
+  a.primary === b.primary && a.secondary === b.secondary && a.special === b.special && a.emote === b.emote &&
+  INPUT_COUNTERS.every((k) => a[k] === b[k]);
 
 /** Whether the client should send its input this frame. Times are in ms. */
 export function shouldSend(prev: InputState, next: InputState, nowMs: number, lastSentAt: number, lastAimAt: number): boolean {
