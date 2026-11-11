@@ -22,5 +22,6 @@ describe('shouldSend', () => {
   it('sends a button change at once', () => {
     expect(shouldSend(idle, { ...idle, primary: true }, 1, 0, 0)).toBe(true);
     expect(shouldSend(idle, { ...idle, primaryTaps: 1 }, 1, 0, 0)).toBe(true);
+    expect(shouldSend(idle, { ...idle, secondaryTaps: 1 }, 1, 0, 0)).toBe(true);
   });
 });

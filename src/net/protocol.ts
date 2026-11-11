@@ -13,10 +13,10 @@ export type InputState = {
   /** Pointer position in the minigame's simulation coordinates (pointer world position minus the game's aim offset). */
   aimX: number;
   aimY: number;
-  /** Completed left clicks so far (only ever grows), so a quick click between two host ticks is never lost. */
+  /** Left button presses so far (only ever grows), so a quick click between two host ticks is never lost. */
   primaryTaps: number;
-  /** 0..1: hold time of the last completed click, relative to CONFIG.snowball.maxChargeMs. */
-  primaryCharge: number;
+  /** Right button presses so far (only ever grows), like primaryTaps. */
+  secondaryTaps: number;
   /**
    * How often the shove key was pressed so far (only ever grows). A counter instead of a held
    * flag, so a quick tap between two host ticks is never lost.
@@ -28,7 +28,7 @@ export function neutralInput(): InputState {
   return {
     up: false, down: false, left: false, right: false,
     primary: false, secondary: false, special: false,
-    emote: 0, aimX: 0, aimY: 0, primaryTaps: 0, primaryCharge: 0, shoves: 0,
+    emote: 0, aimX: 0, aimY: 0, primaryTaps: 0, secondaryTaps: 0, shoves: 0,
   };
 }
 
@@ -55,6 +55,8 @@ export const MSG_TYPES: readonly MsgType[] = [
 export type MsgData<T extends MsgType> = Extract<Msg, { type: T }>['data'];
 
 const BUTTONS = ['up', 'down', 'left', 'right', 'primary', 'secondary', 'special'] as const;
+const COUNTERS = ['shoves', 'primaryTaps', 'secondaryTaps'] as const;
+const isCounter = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 
 /** Validate untrusted input from the wire; returns a clean copy or null. */
 export function parseInputState(x: unknown): InputState | null {
@@ -65,18 +67,12 @@ export function parseInputState(x: unknown): InputState | null {
   if (emote !== 0 && emote !== 1 && emote !== 2 && emote !== 3 && emote !== 4) return null;
   if (typeof aimX !== 'number' || !Number.isFinite(aimX)) return null;
   if (typeof aimY !== 'number' || !Number.isFinite(aimY)) return null;
-  const { shoves } = r;
-  if (typeof shoves !== 'number' || !Number.isSafeInteger(shoves) || shoves < 0) return null;
-  const { primaryTaps, primaryCharge } = r;
-  if (typeof primaryTaps !== 'number' || !Number.isSafeInteger(primaryTaps) || primaryTaps < 0) return null;
-  if (typeof primaryCharge !== 'number' || !Number.isFinite(primaryCharge)) return null;
+  if (!COUNTERS.every((k) => isCounter(r[k]))) return null;
   const s = neutralInput();
   for (const k of BUTTONS) s[k] = r[k] as boolean;
+  for (const k of COUNTERS) s[k] = r[k] as number;
   s.emote = emote;
   s.aimX = aimX;
   s.aimY = aimY;
-  s.shoves = shoves;
-  s.primaryTaps = primaryTaps;
-  s.primaryCharge = Math.min(1, Math.max(0, primaryCharge));
   return s;
 }

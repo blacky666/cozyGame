@@ -33,6 +33,8 @@ const DEAD_ZONE = 2;
 const SHOVE_CHANCE = 0.02;
 /** Chance per tick that an aiming bot throws (about once every 1.2 s at 30 Hz). */
 const THROW_CHANCE = 1 / 36;
+/** Share of the throws that are strong (right click). */
+const STRONG_CHANCE = 0.25;
 
 /** Bot brain: walks toward the nearest target, with occasional random detours. */
 export function createBotInputs(seed: number): (view: BotView) => InputState {
@@ -42,7 +44,7 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
   // Bots press shove now and then (the host decides whether it lands).
   let shoves = 0;
   let taps = 0;
-  let charge = 0;
+  let strongTaps = 0;
 
   const randomDir = (): InputState => {
     const s = neutralInput();
@@ -87,14 +89,14 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
   };
   return (view) => {
     if (rand() < SHOVE_CHANCE) shoves++;
-    // The tap counter is always sent (a drop to 0 would make the host re-base and fire a spurious throw).
-    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, primaryCharge: charge };
+    // The tap counters are always sent (a drop to 0 would make the host re-base and fire a spurious throw).
+    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, secondaryTaps: strongTaps };
     if (view.aim) {
       out.aimX = view.aim.x;
       out.aimY = view.aim.y;
       if (rand() < THROW_CHANCE) {
-        out.primaryTaps = ++taps;
-        out.primaryCharge = charge = rand();
+        if (rand() < STRONG_CHANCE) out.secondaryTaps = ++strongTaps;
+        else out.primaryTaps = ++taps;
       }
     }
     return out;

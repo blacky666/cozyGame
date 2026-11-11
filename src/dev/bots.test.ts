@@ -64,22 +64,41 @@ describe('snowball bots', () => {
     expect(last.primaryTaps).toBeGreaterThan(0);
     expect(last.aimX).toBe(220);
     expect(last.aimY).toBe(90);
-    expect(last.primaryCharge).toBeGreaterThanOrEqual(0);
-    expect(last.primaryCharge).toBeLessThanOrEqual(1);
   });
 
-  it('keeps the tap counter steady across aim -> idle -> aim', () => {
+  it('strong throws happen sometimes', () => {
+    const bot = createBotInputs(4);
+    let last = neutralInput();
+    for (let i = 0; i < 3000; i++) {
+      last = bot({ self: { x: 100, y: 100 }, targets: [{ x: 160, y: 100 }], aim: { x: 220, y: 90 } });
+    }
+    const all = last.primaryTaps + last.secondaryTaps;
+    expect(last.secondaryTaps).toBeGreaterThan(0);
+    // About a quarter of the throws are strong.
+    expect(last.secondaryTaps / all).toBeGreaterThan(0.1);
+    expect(last.secondaryTaps / all).toBeLessThan(0.4);
+  });
+
+  it('keeps the tap counters steady across aim -> idle -> aim (they never decrease)', () => {
     const bot = createBotInputs(9);
     const aimView = { self: { x: 1, y: 1 }, targets: [], aim: { x: 5, y: 5 } };
-    let prev = 0;
-    for (let i = 0; i < 100; i++) prev = bot(aimView).primaryTaps;
-    for (let i = 0; i < 50; i++) {
-      const t = bot({ self: { x: 1, y: 1 }, targets: [], idle: true }).primaryTaps;
-      expect(t).toBe(prev);
+    let prev = neutralInput();
+    for (let i = 0; i < 300; i++) {
+      const s = bot(aimView);
+      expect(s.primaryTaps).toBeGreaterThanOrEqual(prev.primaryTaps);
+      expect(s.secondaryTaps).toBeGreaterThanOrEqual(prev.secondaryTaps);
+      prev = s;
     }
-    expect(prev).toBeGreaterThan(0);
-    // First aim tick after idle must not jump by more than one regular throw.
-    expect(bot(aimView).primaryTaps - prev).toBeLessThanOrEqual(1);
+    for (let i = 0; i < 50; i++) {
+      const s = bot({ self: { x: 1, y: 1 }, targets: [], idle: true });
+      expect(s.primaryTaps).toBe(prev.primaryTaps);
+      expect(s.secondaryTaps).toBe(prev.secondaryTaps);
+    }
+    expect(prev.primaryTaps).toBeGreaterThan(0);
+    expect(prev.secondaryTaps).toBeGreaterThan(0);
+    // First aim tick after idle must not jump by more than one throw in total.
+    const next = bot(aimView);
+    expect(next.primaryTaps - prev.primaryTaps + next.secondaryTaps - prev.secondaryTaps).toBeLessThanOrEqual(1);
   });
 
   it('a bot without balls stands still', () => {
@@ -88,6 +107,7 @@ describe('snowball bots', () => {
       const s = bot({ self: { x: 100, y: 100 }, targets: [], idle: true });
       expect(s.up || s.down || s.left || s.right).toBe(false);
       expect(s.primaryTaps).toBe(0);
+      expect(s.secondaryTaps).toBe(0);
     }
   });
 

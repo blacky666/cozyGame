@@ -4,21 +4,15 @@ import { byKey, pivotSprite, playerSymbol, swapSprite, txt } from '../../game/ui
 import type { GamePlayer, PlayerKey } from '../types';
 import type { SnowState } from './snowballHost';
 
-const BAR_W = 16;
-const BAR_H = 3;
-/** Charge bar top, relative to the feet (between the player symbol and the name label). */
-const BAR_DY = -38;
-
 /**
- * Schneeball HUD: top bar like Münzjagd (symbol + score per player, time in the middle), the own
- * player's ammo bottom-left and the charge bar above the own figure while the button is held.
+ * Schneeball HUD: top bar like Münzjagd (symbol + score per player, time in the middle) and the own
+ * player's ammo bottom-left.
  */
 export class SnowballHud {
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
   private readonly scores = new Map<PlayerKey, Phaser.GameObjects.Text>();
   private readonly ammo: Phaser.GameObjects.Sprite[] = [];
   private readonly time: Phaser.GameObjects.Text;
-  private readonly bar: Phaser.GameObjects.Graphics;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -43,8 +37,6 @@ export class SnowballHud {
       this.ammo.push(s);
       this.objects.push(s);
     }
-    this.bar = scene.add.graphics().setDepth(1001);
-    this.objects.push(this.bar);
   }
 
   update(s: SnowState, selfKey: PlayerKey): void {
@@ -55,16 +47,6 @@ export class SnowballHud {
     this.time.setText(`${Math.ceil(s.timeLeftMs / 1000)} s`);
     const balls = s.players[selfKey]?.balls ?? 0;
     this.ammo.forEach((a, i) => swapSprite(this.scene, a, i < balls ? 'schnee.munition.voll' : 'schnee.munition.leer'));
-  }
-
-  /** Charge bar above the own figure at feet (x, y); null hides it. */
-  drawCharge(x: number, y: number, charge: number | null): void {
-    const g = this.bar.clear();
-    if (charge === null) return;
-    const left = x - BAR_W / 2;
-    const top = y + BAR_DY;
-    g.fillStyle(0x3b2418, 0.8).fillRect(left - 1, top - 1, BAR_W + 2, BAR_H + 2);
-    g.fillStyle(charge >= 1 ? 0xffffff : 0xfff4a8, 1).fillRect(left, top, Math.round(BAR_W * charge), BAR_H);
   }
 
   destroy(): void {

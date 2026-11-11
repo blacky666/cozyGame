@@ -43,17 +43,23 @@ interface GameConfig {
     durationMs: number;
     maxBalls: number;
     reloadMs: number;
-    maxChargeMs: number;
     /** Minimum time between two throws of one player. */
     throwGapMs: number;
-    /** [charge 0, charge 1] pairs, linear in between (px/s and px). */
-    ballSpeed: [number, number];
-    ballRange: [number, number];
+    /** Left click: speed (px/s) and max flight distance (px). */
+    normalSpeed: number;
+    normalRange: number;
+    /** Right click: faster and farther, then no throw at all for strongCooldownMs. */
+    strongSpeed: number;
+    strongRange: number;
+    strongCooldownMs: number;
     ballRadius: number;
     bodyRadius: number;
     hitRadius: number;
     hitPoints: number;
     hitPenalty: number;
+    /** After a hit the victim lies on the ground this long (no move, no throw, not shovable). */
+    downMs: number;
+    /** Total invulnerability after a hit (counted from the hit, includes downMs). */
     invulnMs: number;
     snowmanHits: number;
     snowmanRebuildMs: number;
@@ -121,9 +127,10 @@ export const CONFIG = deepFreeze<GameConfig>({
   sandbox: { durationMs: 30000, speed: 60, spawnMs: 1500, coinSize: 8, pickupRadius: 9, maxCoins: 12 },
   // Schneeball-Schlacht (px, px/s, ms).
   snowball: {
-    durationMs: 120000, maxBalls: 5, reloadMs: 600, maxChargeMs: 1000, throwGapMs: 250,
-    ballSpeed: [150, 230], ballRange: [110, 210], ballRadius: 3, bodyRadius: 5, hitRadius: 7,
-    hitPoints: 2, hitPenalty: 1, invulnMs: 1500, snowmanHits: 3, snowmanRebuildMs: 15000, snowmanAufbauMs: 500,
+    durationMs: 120000, maxBalls: 5, reloadMs: 600, throwGapMs: 250,
+    normalSpeed: 160, normalRange: 150, strongSpeed: 240, strongRange: 240, strongCooldownMs: 800,
+    ballRadius: 3, bodyRadius: 5, hitRadius: 7,
+    hitPoints: 2, hitPenalty: 1, downMs: 900, invulnMs: 2500, snowmanHits: 3, snowmanRebuildMs: 15000, snowmanAufbauMs: 500,
     walkSpeed: 60, iceAccel: 140, iceFriction: 0.8, spawnMs: 12000, maxPickups: 2, bounces: 2,
     giantSpeedFactor: 0.7, giantHitRadius: 11, extraThrows: 3,
   },

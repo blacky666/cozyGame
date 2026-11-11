@@ -1,10 +1,11 @@
 import { CONFIG } from '../../config';
 import { buildArena } from '../common/arena';
 import type { BotView, MiniGame, PlayerKey } from '../types';
+import { BALL_LIFT } from './snowballBalls';
 import { createSnowballHost, type Ball, type SnowPlayer, type SnowState } from './snowballHost';
 import { ARENA_FILE, ARENA_MAP, ARENA_OFFSET, SnowballView } from './snowballView';
 
-/** Snapshot interpolation: players and balls (by id) move, everything else comes from `b`. */
+/** Snapshot interpolation: players and balls (by id, incl. their remaining flight) move, everything else comes from `b`. */
 export function lerpSnow(a: SnowState, b: SnowState, t: number): SnowState {
   const players: Record<PlayerKey, SnowPlayer> = {};
   for (const [k, pb] of Object.entries(b.players)) {
@@ -14,7 +15,9 @@ export function lerpSnow(a: SnowState, b: SnowState, t: number): SnowState {
   const before = new Map(a.balls.map((x) => [x.id, x]));
   const balls: Ball[] = b.balls.map((bb) => {
     const ba = before.get(bb.id);
-    return ba ? { ...bb, x: ba.x + (bb.x - ba.x) * t, y: ba.y + (bb.y - ba.y) * t } : { ...bb };
+    return ba
+      ? { ...bb, x: ba.x + (bb.x - ba.x) * t, y: ba.y + (bb.y - ba.y) * t, left: ba.left + (bb.left - ba.left) * t }
+      : { ...bb };
   });
   return { ...b, players, balls };
 }
@@ -25,7 +28,10 @@ const BOT_DISTANCE = 60;
 const BOT_BOUNDS = { minX: 16, maxX: 400, minY: 52, maxY: 188 };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** Bots reload while standing still; with ammo they hold a distance from the nearest opponent and aim at it. */
+/**
+ * Bots reload while standing still; with ammo they hold a distance from the nearest opponent and
+ * aim at its body (the ball path point above the feet, where a hit counts).
+ */
 export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
   const me = s.players[key];
   if (!me) return null;
@@ -44,14 +50,14 @@ export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
     x: clamp(near.x - ((near.x - me.x) / d) * BOT_DISTANCE, BOT_BOUNDS.minX, BOT_BOUNDS.maxX),
     y: clamp(near.y - ((near.y - me.y) / d) * BOT_DISTANCE, BOT_BOUNDS.minY, BOT_BOUNDS.maxY),
   };
-  return { self, targets: [target], aim: { x: near.x, y: near.y } };
+  return { self, targets: [target], aim: { x: near.x, y: near.y - BALL_LIFT } };
 }
 
 export const snowball: MiniGame<SnowState> = {
   id: 'schneeball',
   title: 'Schneeball-Schlacht',
   rule: 'Triff die anderen! Treffer +2, getroffen −1.',
-  controls: 'WASD laufen · Maus zielen · Klick werfen (halten = stärker) · Leertaste schubsen',
+  controls: 'WASD laufen · Maus zielen · Linksklick werfen · Rechtsklick fest werfen · Leertaste schubsen',
   durationMs: CONFIG.snowball.durationMs,
   aimOffset: ARENA_OFFSET,
   createHost: (players, rand, opts) => {

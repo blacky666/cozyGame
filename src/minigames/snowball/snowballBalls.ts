@@ -41,11 +41,10 @@ export function spawnIgnores(x: number, y: number, vx: number, vy: number, solid
   return ids;
 }
 
-/** Speed (px/s) and range (px) of a throw with the given charge 0..1. */
-export function throwPower(charge: number): { speed: number; range: number } {
+/** Speed (px/s) and max flight distance (px) of a left-click (normal) or right-click (strong) throw. */
+export function throwPower(strong: boolean): { speed: number; range: number } {
   const c = CONFIG.snowball;
-  const t = Math.min(1, Math.max(0, Number.isFinite(charge) ? charge : 0));
-  return { speed: lerp(c.ballSpeed[0], c.ballSpeed[1], t), range: lerp(c.ballRange[0], c.ballRange[1], t) };
+  return strong ? { speed: c.strongSpeed, range: c.strongRange } : { speed: c.normalSpeed, range: c.normalRange };
 }
 
 /**

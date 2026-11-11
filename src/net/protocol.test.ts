@@ -13,10 +13,19 @@ describe('parseInputState', () => {
       expect(parseInputState({ ...neutralInput(), shoves: bad })).toBeNull();
     }
   });
-  it('keeps primaryTaps and clamps primaryCharge into 0..1', () => {
-    expect(parseInputState({ ...neutralInput(), primaryTaps: 4, primaryCharge: 0.5 })).toMatchObject({ primaryTaps: 4, primaryCharge: 0.5 });
-    expect(parseInputState({ ...neutralInput(), primaryCharge: 7 })?.primaryCharge).toBe(1);
+  it('keeps primaryTaps and ignores a legacy primaryCharge field', () => {
+    const s = parseInputState({ ...neutralInput(), primaryTaps: 4, primaryCharge: 0.5 });
+    expect(s).toMatchObject({ primaryTaps: 4 });
+    expect(s).not.toHaveProperty('primaryCharge');
     expect(parseInputState({ ...neutralInput(), primaryTaps: -1 })).toBeNull();
-    expect(parseInputState({ ...neutralInput(), primaryCharge: NaN })).toBeNull();
+  });
+
+  it('secondaryTaps is validated like primaryTaps', () => {
+    expect(parseInputState({ ...neutralInput(), secondaryTaps: 3 })?.secondaryTaps).toBe(3);
+    const { secondaryTaps: _omit, ...none } = neutralInput();
+    expect(parseInputState(none)).toBeNull();
+    for (const bad of [-1, 1.5, Number.MAX_SAFE_INTEGER + 2, NaN, '3']) {
+      expect(parseInputState({ ...neutralInput(), secondaryTaps: bad })).toBeNull();
+    }
   });
 });

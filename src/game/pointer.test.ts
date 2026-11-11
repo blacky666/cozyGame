@@ -1,46 +1,53 @@
 import { describe, expect, it } from 'vitest';
 import { neutralInput } from '../net/protocol';
-import { ChargeButton, PointerInput } from './pointer';
-
-describe('ChargeButton', () => {
-  it('counts a completed click and its charge', () => {
-    const b = new ChargeButton();
-    b.press(1000);
-    expect(b.held).toBe(true);
-    expect(b.chargeAt(1500)).toBeCloseTo(0.5);
-    b.release(1600);
-    expect(b.taps).toBe(1);
-    expect(b.charge).toBeCloseTo(0.6);
-    expect(b.held).toBe(false);
-    b.press(2000);
-    b.release(4000);
-    expect(b.taps).toBe(2);
-    expect(b.charge).toBe(1);
-  });
-  it('blur cancels a held charge without counting a tap', () => {
-    const b = new ChargeButton();
-    b.press(0);
-    b.cancel();
-    b.release(500);
-    expect(b.taps).toBe(0);
-    expect(b.held).toBe(false);
-  });
-  it('ignores a release without press (click started outside the canvas)', () => {
-    const b = new ChargeButton();
-    b.release(100);
-    expect(b.taps).toBe(0);
-  });
-});
+import { PointerInput } from './pointer';
 
 describe('PointerInput', () => {
-  it('adds button and aim to the keyboard state', () => {
+  it('left/right pointerdown increase primaryTaps/secondaryTaps only while counting is on', () => {
     const p = new PointerInput();
-    p.button.press(0);
-    p.button.release(500);
-    p.button.press(600);
+    p.press(0);
+    p.press(2);
+    expect(p.merge(neutralInput())).toMatchObject({ primaryTaps: 0, secondaryTaps: 0 });
+    p.release(0);
+    p.release(2);
+    p.setCounting(true);
+    p.press(0);
+    p.release(0);
+    p.press(0);
+    p.press(2);
+    expect(p.merge(neutralInput())).toMatchObject({ primaryTaps: 2, secondaryTaps: 1, primary: true, secondary: true });
+    p.setCounting(false);
+    p.release(0);
+    p.release(2);
+    p.press(2);
+    expect(p.merge(neutralInput())).toMatchObject({ primaryTaps: 2, secondaryTaps: 1 });
+  });
+
+  it('every pointerdown counts (even after a missed pointerup); other buttons are ignored', () => {
+    const p = new PointerInput();
+    p.setCounting(true);
+    p.press(0);
+    p.press(0); // no release in between (pointerup happened outside the window)
+    p.press(1); // middle button
+    expect(p.merge(neutralInput())).toMatchObject({ primaryTaps: 2, secondaryTaps: 0 });
+  });
+
+  it('blur releases the held flags but keeps the counters', () => {
+    const p = new PointerInput();
+    p.setCounting(true);
+    p.press(0);
+    p.press(2);
+    p.releaseAll();
+    expect(p.merge(neutralInput())).toMatchObject({ primary: false, secondary: false, primaryTaps: 1, secondaryTaps: 1 });
+  });
+
+  it('adds buttons and aim to the keyboard state', () => {
+    const p = new PointerInput();
+    p.setCounting(true);
+    p.press(0);
     p.aimX = 12;
     p.aimY = 34;
     const s = p.merge({ ...neutralInput(), up: true, shoves: 2 });
-    expect(s).toMatchObject({ up: true, shoves: 2, primary: true, primaryTaps: 1, primaryCharge: 0.5, aimX: 12, aimY: 34 });
+    expect(s).toMatchObject({ up: true, shoves: 2, primary: true, primaryTaps: 1, secondaryTaps: 0, aimX: 12, aimY: 34 });
   });
 });

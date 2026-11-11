@@ -53,8 +53,10 @@ export class MinigameScene extends Phaser.Scene {
     const unwirePointer = this.wirePointer();
     // Action counters only grow while this scene runs (not during intro/standings).
     ctx.keyboard.setCounting(true);
+    ctx.pointer.setCounting(true);
     const unwire = () => {
       ctx.keyboard.setCounting(false);
+      ctx.pointer.setCounting(false);
       unwirePointer();
     };
     if (!ctx.isHost) {
@@ -77,10 +79,8 @@ export class MinigameScene extends Phaser.Scene {
       if (!ctx.isHost) {
         ctx.onSnap(null);
         // Released buttons, but the counters stay (a drop would make the next host re-base them).
-        const b = ctx.pointer.button;
-        ctx.sendInput?.({
-          ...neutralInput(), shoves: ctx.keyboard.state().shoves, primaryTaps: b.taps, primaryCharge: b.charge,
-        });
+        const { primaryTaps, secondaryTaps } = ctx.pointer.merge(neutralInput());
+        ctx.sendInput?.({ ...neutralInput(), shoves: ctx.keyboard.state().shoves, primaryTaps, secondaryTaps });
       }
       this.view?.destroy();
       this.view = null;
@@ -88,20 +88,17 @@ export class MinigameScene extends Phaser.Scene {
   }
 
   /**
-   * Left mouse button -> the shared ChargeButton (every game; games without aiming ignore it).
-   * Window blur drops a held charge; the canvas context menu is suppressed; the cursor is a
-   * crosshair while an aimed game runs. Returns the cleanup for shutdown.
+   * Left/right mouse button -> the shared PointerInput (every game; games without aiming ignore it).
+   * Presses count on pointerdown; window blur releases the held flags; the canvas context menu is
+   * suppressed (right click throws); the system cursor is hidden while an aimed game runs (the view
+   * draws its own crosshair). Returns the cleanup for shutdown.
    */
   private wirePointer(): () => void {
-    const button = this.ctx.pointer.button;
-    button.cancel();
-    const down = (p: Phaser.Input.Pointer) => {
-      if (p.button === 0) button.press(performance.now());
-    };
-    const up = (p: Phaser.Input.Pointer) => {
-      if (p.button === 0) button.release(performance.now());
-    };
-    const blur = () => button.cancel();
+    const pointer = this.ctx.pointer;
+    pointer.releaseAll();
+    const down = (p: Phaser.Input.Pointer) => pointer.press(p.button);
+    const up = (p: Phaser.Input.Pointer) => pointer.release(p.button);
+    const blur = () => pointer.releaseAll();
     const noMenu = (e: Event) => e.preventDefault();
     const canvas = this.game.canvas;
     this.input.on(Phaser.Input.Events.POINTER_DOWN, down);
@@ -109,15 +106,15 @@ export class MinigameScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, up);
     window.addEventListener('blur', blur);
     canvas.addEventListener('contextmenu', noMenu);
-    if (this.def?.aimOffset) this.input.setDefaultCursor('crosshair');
+    if (this.def?.aimOffset) this.input.setDefaultCursor('none');
     let done = false;
     return () => {
       if (done) return;
       done = true;
-      // Unconditional first: window/canvas listeners and the charge must never leak or stick.
+      // Unconditional first: window/canvas listeners and held buttons must never leak or stick.
       window.removeEventListener('blur', blur);
       canvas.removeEventListener('contextmenu', noMenu);
-      button.cancel();
+      pointer.releaseAll();
       canvas.style.cursor = '';
       // On game.destroy() Phaser's InputPlugin has already run its own DESTROY handler (registered
       // before create()), so `this.input.manager` is null and any input call would throw.
@@ -153,8 +150,6 @@ export class MinigameScene extends Phaser.Scene {
     if (!view || !this.def) return;
     const self = this.ctx.selfKey();
     this.updateAim();
-    const button = this.ctx.pointer.button;
-    view.setCharge?.(button.held ? button.chargeAt(performance.now()) : null);
     if (this.ctx.isHost) {
       const snap = this.ctx.hostSnapshot?.();
       if (snap && snap.round === this.round) {

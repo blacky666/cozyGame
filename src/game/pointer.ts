@@ -1,60 +1,60 @@
-import { CONFIG } from '../config';
 import type { InputState } from '../net/protocol';
-
-/** Left mouse button with hold-to-charge: counts completed clicks, never loses a quick one. */
-export class ChargeButton {
-  private pressedAt: number | null = null;
-  private _taps = 0;
-  private _charge = 0;
-
-  get held(): boolean {
-    return this.pressedAt !== null;
-  }
-  get taps(): number {
-    return this._taps;
-  }
-  /** Charge (0..1) of the last completed click. */
-  get charge(): number {
-    return this._charge;
-  }
-
-  press(nowMs: number): void {
-    this.pressedAt ??= nowMs;
-  }
-
-  /** A release without a press (click started outside the canvas) is ignored. */
-  release(nowMs: number): void {
-    if (this.pressedAt === null) return;
-    this._charge = this.chargeAt(nowMs);
-    this.pressedAt = null;
-    this._taps++;
-  }
-
-  /** Focus lost: drop a held charge without counting a tap. */
-  cancel(): void {
-    this.pressedAt = null;
-  }
-
-  /** Current charge while held (for the charge indicator), else 0. */
-  chargeAt(nowMs: number): number {
-    if (this.pressedAt === null) return 0;
-    return Math.min(1, Math.max(0, (nowMs - this.pressedAt) / CONFIG.snowball.maxChargeMs));
-  }
-}
 
 /**
  * Pointer state shared by the minigame scene (writes it from Phaser pointer events) and whoever
- * builds the input: the client's send loop and the host's localInput.
+ * builds the input: the client's send loop and the host's localInput. Presses are counted on
+ * pointerdown (a counter, so a quick click between two host ticks is never lost), and only while
+ * counting is on (a running minigame), like the keyboard's shove counter.
  */
 export class PointerInput {
-  readonly button = new ChargeButton();
   /** Aim in the running game's simulation coordinates. */
   aimX = 0;
   aimY = 0;
+  private primaryTaps = 0;
+  private secondaryTaps = 0;
+  private primaryHeld = false;
+  private secondaryHeld = false;
+  private counting = false;
+
+  setCounting(on: boolean): void {
+    this.counting = on;
+  }
+
+  /**
+   * `button` as in PointerEvent.button: 0 = left (normal throw), 2 = right (strong throw).
+   * Every pointerdown counts, even without a release before (pointerup outside the window).
+   */
+  press(button: number): void {
+    if (button === 0) {
+      this.primaryHeld = true;
+      if (this.counting) this.primaryTaps++;
+    } else if (button === 2) {
+      this.secondaryHeld = true;
+      if (this.counting) this.secondaryTaps++;
+    }
+  }
+
+  release(button: number): void {
+    if (button === 0) this.primaryHeld = false;
+    else if (button === 2) this.secondaryHeld = false;
+  }
+
+  /** Focus lost: buttons count as released; the counters stay. */
+  releaseAll(): void {
+    this.primaryHeld = false;
+    this.secondaryHeld = false;
+  }
 
   /** Keyboard state plus the pointer fields. */
   merge(s: InputState): InputState {
-    const b = this.button;
-    return { ...s, primary: b.held, primaryTaps: b.taps, primaryCharge: b.charge, aimX: this.aimX, aimY: this.aimY };
+    return {
+      ...s,
+      primary: this.primaryHeld,
+      secondary: this.secondaryHeld,
+      primaryTaps: this.primaryTaps,
+      secondaryTaps: this.secondaryTaps,
+      aimX: this.aimX,
+      aimY: this.aimY,
+    };
   }
 }

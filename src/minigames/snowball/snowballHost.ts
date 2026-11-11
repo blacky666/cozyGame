@@ -11,8 +11,11 @@ export type SnowPlayer = Mover & {
   score: number;
   balls: number;
   reloading: boolean;
-  charging: boolean;
   invulnMs: number;
+  /** Lying on the ground after a hit (no move, no throw, no reload, not shovable). */
+  down: boolean;
+  /** > 0 after a strong throw: no throw of any kind. */
+  strongCdMs: number;
   stun: boolean;
   swing: boolean;
   shoveCdMs: number;
@@ -23,8 +26,10 @@ export type SnowPlayer = Mover & {
 };
 export type Ball = {
   id: number; x: number; y: number; vx: number; vy: number;
-  /** Remaining range in px. */
+  /** Remaining flight distance in px (the ball lands when it reaches 0). */
   left: number;
+  /** Flight distance at the throw (for the view's arc: progress = 1 - left / total). */
+  total: number;
   owner: PlayerKey;
   kind: 'normal' | 'abpraller' | 'riesenball';
   bounces: number;
@@ -88,18 +93,22 @@ export function createSnowballHost(
   const players: Record<PlayerKey, SnowPlayer> = {};
   const shove: Record<PlayerKey, ShoveSlot> = {};
   const taps: Record<PlayerKey, Edge> = {};
+  const strongTaps: Record<PlayerKey, Edge> = {};
+  const downMs: Record<PlayerKey, number> = {};
   const sinceThrowMs: Record<PlayerKey, number> = {};
   const reloadMs: Record<PlayerKey, number> = {};
   const history: Record<PlayerKey, { ms: number; x: number; y: number }[]> = {};
   for (const gp of gamePlayers) {
     const [x, y] = SPAWNS[gp.slot];
     players[gp.key] = {
-      x, y, vx: 0, vy: 0, dir: START_DIR, score: 0, balls: c.maxBalls, reloading: false, charging: false,
-      invulnMs: 0, stun: false, swing: false, shoveCdMs: 0, extra: null, extraLeft: 0, hat: false, throwAnimMs: 0,
+      x, y, vx: 0, vy: 0, dir: START_DIR, score: 0, balls: c.maxBalls, reloading: false,
+      invulnMs: 0, down: false, strongCdMs: 0, stun: false, swing: false, shoveCdMs: 0, extra: null, extraLeft: 0, hat: false, throwAnimMs: 0,
     };
     remote[gp.key] = gp.remote;
     shove[gp.key] = newShoveSlot();
     taps[gp.key] = new Edge();
+    strongTaps[gp.key] = new Edge();
+    downMs[gp.key] = 0;
     sinceThrowMs[gp.key] = Infinity;
     reloadMs[gp.key] = 0;
     history[gp.key] = [{ ms: 0, x, y }];
@@ -139,21 +148,30 @@ export function createSnowballHost(
     return { key: k, x: best.x, y: best.y };
   };
 
-  const throwBall = (k: PlayerKey, aimX: number, aimY: number, charge: number, solids: Solid[]) => {
+  /**
+   * The ball starts at hand height above the feet and flies straight to the aim point, where it
+   * lands (or at the end of its range, if the aim is farther away).
+   */
+  const throwBall = (k: PlayerKey, aimX: number, aimY: number, strong: boolean, solids: Solid[]) => {
     const p = players[k];
-    let dx = aimX - p.x;
-    let dy = aimY - p.y;
+    const sx = p.x;
+    const sy = p.y - BALL_LIFT;
+    const power = throwPower(strong);
+    let dx = aimX - sx;
+    let dy = aimY - sy;
     let len = Number.isFinite(dx) && Number.isFinite(dy) ? Math.hypot(dx, dy) : 0;
+    let flight = Math.min(len, power.range);
     if (len < 1) {
+      // Aim on the spawn point: along the facing, full range.
       [dx, dy] = p.dir === 'side' ? [1, 0] : p.dir === 'left' ? [-1, 0] : p.dir === 'up' ? [0, -1] : [0, 1];
       len = 1;
+      flight = power.range;
     }
-    const power = throwPower(charge);
     const kind: Ball['kind'] = p.extraLeft > 0 && p.extra ? p.extra : 'normal';
     const speed = kind === 'riesenball' ? power.speed * c.giantSpeedFactor : power.speed;
     const b: Ball = {
-      id: nextBallId++, x: p.x, y: p.y - BALL_LIFT, vx: (dx / len) * speed, vy: (dy / len) * speed,
-      left: power.range, owner: k, kind, bounces: 0,
+      id: nextBallId++, x: sx, y: sy, vx: (dx / len) * speed, vy: (dy / len) * speed,
+      left: flight, total: flight, owner: k, kind, bounces: 0,
     };
     if (kind !== 'normal') {
       p.extraLeft -= 1;
@@ -166,6 +184,7 @@ export function createSnowballHost(
     p.reloading = false;
     reloadMs[k] = 0;
     sinceThrowMs[k] = 0;
+    if (strong) p.strongCdMs = c.strongCooldownMs;
     p.throwAnimMs = c.throwGapMs;
   };
 
@@ -238,14 +257,21 @@ export function createSnowballHost(
 
       // 1. Shoves; the slide goes through the arena collision.
       // Only players with an input this tick (= connected) take part: absent ones can neither shove nor be shoved.
-      resolveShoves(keys.filter((k) => inputs[k]), players, shove, inputs);
+      // Down players neither shove nor can be shoved; their presses are consumed, not queued.
+      for (const k of keys) if (players[k].down) shove[k].edge.take(inputs[k]?.shoves ?? 0);
+      resolveShoves(keys.filter((k) => inputs[k] && !players[k].down), players, shove, inputs);
       // 2. Movement.
       for (const k of keys) {
         const p = players[k];
         const sh = shove[k];
         const stunned = sh.stunMs > 0;
         const slide = stepShove(sh, sec);
-        if (stunned) {
+        downMs[k] = Math.max(0, downMs[k] - ms);
+        p.down = downMs[k] > 1e-6;
+        if (p.down) {
+          p.vx = 0;
+          p.vy = 0;
+        } else if (stunned) {
           const r = moveCircle(arena, p.x, p.y, slide.dx, slide.dy, c.bodyRadius, solids);
           p.x = r.x;
           p.y = r.y;
@@ -258,6 +284,7 @@ export function createSnowballHost(
         p.swing = sh.swingMs > 0;
         p.shoveCdMs = Math.ceil(sh.cooldownMs);
         p.invulnMs = Math.max(0, p.invulnMs - ms);
+        p.strongCdMs = Math.max(0, p.strongCdMs - ms);
         p.throwAnimMs = Math.max(0, p.throwAnimMs - ms);
         sinceThrowMs[k] += ms;
         const h = history[k];
@@ -275,21 +302,23 @@ export function createSnowballHost(
       for (const k of keys) {
         const p = players[k];
         const inp = inputs[k] ?? neutralInput();
-        const presses = taps[k].take(inp.primaryTaps);
-        // Stumbling after a shove: presses are consumed, no charging, no throw.
-        p.charging = inp.primary && !p.stun;
-        if (p.stun) {
+        // Both edges every tick: presses are consumed, never queued.
+        const normal = taps[k].take(inp.primaryTaps);
+        const strong = strongTaps[k].take(inp.secondaryTaps);
+        // Stumbling after a shove or lying after a hit: no throw, no reload.
+        if (p.stun || p.down) {
           p.reloading = false;
           reloadMs[k] = 0;
           continue;
         }
-        if (presses > 0 && p.balls >= 1 && sinceThrowMs[k] >= c.throwGapMs) {
-          throwBall(k, inp.aimX, inp.aimY, inp.primaryCharge, solids);
+        // Left and right in the same tick: the strong throw wins, the normal press is dropped.
+        if ((strong > 0 || normal > 0) && p.balls >= 1 && sinceThrowMs[k] >= c.throwGapMs && p.strongCdMs <= 0) {
+          throwBall(k, inp.aimX, inp.aimY, strong > 0, solids);
           continue;
         }
         const held = inp.up || inp.down || inp.left || inp.right;
         const still = Math.hypot(p.vx, p.vy) < 1 && !held;
-        const canReload = still && !p.stun && !p.charging && tileAt(arena, p.x, p.y) !== 'j' && p.balls < c.maxBalls;
+        const canReload = still && tileAt(arena, p.x, p.y) !== 'j' && p.balls < c.maxBalls;
         if (!canReload) {
           p.reloading = false;
           reloadMs[k] = 0;
@@ -331,6 +360,13 @@ export function createSnowballHost(
           if (thrower) thrower.score += c.hitPoints;
           v.score = Math.max(0, v.score - c.hitPenalty);
           v.invulnMs = c.invulnMs;
+          // Knocked down: lies on the ground, cannot act; the shove slide (if any) stops.
+          downMs[ev.victim] = c.downMs;
+          v.down = true;
+          v.vx = 0;
+          v.vy = 0;
+          v.reloading = false;
+          reloadMs[ev.victim] = 0;
           addFx('treffer', ev.x, ev.y);
           continue;
         }
@@ -340,7 +376,7 @@ export function createSnowballHost(
           if (sm.state === 'kaputt') solids = solidsNow();
         }
         if (ev.kind === 'solid' && b.kind === 'abpraller' && b.bounces < c.bounces) {
-          // Bounce: reflect on the hit normal, keep the remaining range minus the distance flown.
+          // Bounce: reflect on the hit normal, keep the remaining flight distance minus the distance flown.
           b.left -= Math.hypot(b.x - fromX, b.y - fromY);
           if (b.left > 1e-6) {
             if (ev.normal === 'x') b.vx = -b.vx; else b.vy = -b.vy;

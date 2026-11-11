@@ -35,8 +35,6 @@ export interface MiniGameView<S> {
   render(s: S, selfKey: PlayerKey): void;
   /** Client-side prediction of the own player (called every frame before render; clients only). */
   predict?(input: InputState, dt: number, latest: S | null, ackSeq: number, sentSeq: number): void;
-  /** Local charge (0..1) of the held primary button, null when not held; called every frame before render. */
-  setCharge?(charge: number | null): void;
   destroy(): void;
 }
 

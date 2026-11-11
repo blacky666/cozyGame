@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
-import { assetsOf, byKey, pivotSprite, swapSprite, txt } from '../../game/ui';
+import { assetsOf, byKey, pivotSprite, playerColor, swapSprite, txt } from '../../game/ui';
 import { Reconciler } from '../../net/reconcile';
 import { buildArena, tileAt, type Arena, type Solid } from '../common/arena';
 import { drawArena } from '../common/arenaView';
@@ -9,7 +9,7 @@ import type { Facing } from '../common/shove';
 import { drawShoveRing } from '../common/shoveRing';
 import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { BALL_LIFT } from './snowballBalls';
-import type { Ball, SnowFx, SnowState } from './snowballHost';
+import type { Ball, SnowFx, SnowPlayer, SnowState } from './snowballHost';
 import { SnowballHud } from './snowballHud';
 import { stepMover, type Mover } from './snowballMove';
 
@@ -24,8 +24,23 @@ export const toMap = (x: number, y: number): { x: number; y: number } => ({ x: x
 const SNOW_BG = 0xe8eef4;
 const HIT_ANIM_MS = 300;
 const BLINK_MS = 100;
+/** Height of the visual arc at mid-flight; it starts and ends on the true path. */
 const ARC_PX = 6;
 const FX_DEPTH = 900;
+const CROSSHAIR_DEPTH = 3000;
+const CROSSHAIR_OUTLINE = 0x3b2418;
+/** Alpha of the crosshair while the own player cannot throw. */
+const CROSSHAIR_DIM = 0.4;
+/**
+ * Crosshair arms around the (empty) centre pixel, 9x9 in total: [x, y, w, h] of the arm and of its
+ * 1 px outline (not covering the centre, so the aimed pixel stays visible).
+ */
+const CROSSHAIR_ARMS: ReadonlyArray<readonly [readonly number[], readonly number[]]> = [
+  [[1, 0, 4, 1], [1, -1, 5, 3]],
+  [[-4, 0, 4, 1], [-5, -1, 5, 3]],
+  [[0, 1, 1, 4], [-1, 1, 3, 5]],
+  [[0, -4, 1, 4], [-1, -5, 3, 5]],
+];
 const BALL_SPRITE: Record<Ball['kind'], string> = {
   normal: 'schnee.ball.flug',
   abpraller: 'schnee.abpraller',
@@ -42,14 +57,13 @@ type Avatar = {
   char: Character;
   label: Phaser.GameObjects.Text;
   hat: Phaser.GameObjects.Sprite | null;
-  held: Phaser.GameObjects.Sprite | null;
   anim: string;
   dir: Facing;
   /** Last seen invulnerability: a rise means the player was just hit. */
   invulnMs: number;
   hitUntil: number;
 };
-type BallView = { ball: Phaser.GameObjects.Sprite | null; shadow: Phaser.GameObjects.Sprite | null; range: number };
+type BallView = { ball: Phaser.GameObjects.Sprite | null; shadow: Phaser.GameObjects.Sprite | null };
 
 export class SnowballView implements MiniGameView<SnowState> {
   private readonly arena: Arena;
@@ -64,7 +78,8 @@ export class SnowballView implements MiniGameView<SnowState> {
   private readonly hud: SnowballHud;
   /** Shove cooldown ring under the own figure. */
   private readonly ring: Phaser.GameObjects.Graphics;
-  private charge: number | null = null;
+  /** Own crosshair at the pointer (replaces the hidden system cursor). */
+  private readonly crosshair: Phaser.GameObjects.Graphics;
   // Prediction (clients): same scheme as Münzjagd, with the arena movement of the host.
   private readonly reconciler = new Reconciler<Mover>((m, input, dt) => stepMover(m, input, dt, this.arena, this.solids));
   private solids: Solid[];
@@ -91,17 +106,41 @@ export class SnowballView implements MiniGameView<SnowState> {
       const char = new Character(scene, assets, p.look, p.slot);
       const label = txt(scene, 0, 0, p.name, 10, key === selfKey ? '#fff4a8' : '#ffffff');
       const hat = pivotSprite(scene, 'schnee.eiszapfenmuetze.down', 0, 0)?.setVisible(false) ?? null;
-      const held = pivotSprite(scene, 'held.schneeball', 0, 0)?.setVisible(false) ?? null;
-      this.avatars.set(key, { char, label, hat, held, anim: 'idle', dir: 'down', invulnMs: 0, hitUntil: 0 });
-      this.objects.push(char, label, ...[hat, held].filter((o) => o !== null));
+      this.avatars.set(key, { char, label, hat, anim: 'idle', dir: 'down', invulnMs: 0, hitUntil: 0 });
+      this.objects.push(char, label, ...(hat ? [hat] : []));
     }
     this.ring = scene.add.graphics();
     this.objects.push(this.ring);
+    const self = players.find((p) => p.key === selfKey);
+    this.crosshair = this.drawCrosshair(self ? playerColor(scene, self.slot) : '#ffffff');
+    this.objects.push(this.crosshair);
     this.hud = new SnowballHud(scene, players);
   }
 
-  setCharge(charge: number | null): void {
-    this.charge = charge;
+  private drawCrosshair(color: string): Phaser.GameObjects.Graphics {
+    const fill = Number.parseInt(color.replace('#', ''), 16);
+    const g = this.scene.add.graphics().setDepth(CROSSHAIR_DEPTH).setVisible(false);
+    g.fillStyle(CROSSHAIR_OUTLINE, 1);
+    for (const [, [x, y, w, h]] of CROSSHAIR_ARMS) g.fillRect(x, y, w, h);
+    g.fillStyle(Number.isFinite(fill) ? fill : 0xffffff, 1);
+    for (const [[x, y, w, h]] of CROSSHAIR_ARMS) g.fillRect(x, y, w, h);
+    return g;
+  }
+
+  /** Crosshair on the pointer's world pixel; dimmed while the own player cannot throw, hidden off the canvas. */
+  private updateCrosshair(self: SnowPlayer | undefined): void {
+    const input = this.scene.input;
+    if (!input?.manager || !input.isOver) {
+      this.crosshair.setVisible(false);
+      return;
+    }
+    const p = input.activePointer;
+    const w = this.scene.cameras.main.getWorldPoint(p.x, p.y);
+    const blocked = !self || self.balls < 1 || self.down || self.stun || self.strongCdMs > 0;
+    this.crosshair
+      .setPosition(Math.floor(w.x), Math.floor(w.y))
+      .setAlpha(blocked ? CROSSHAIR_DIM : 1)
+      .setVisible(true);
   }
 
   /** Arena solids without broken snowmen (what the host collides with). */
@@ -127,8 +166,8 @@ export class SnowballView implements MiniGameView<SnowState> {
     this.lastLatest = latest;
     const solids = this.solidsOf(latest);
     const base: Mover = { x: server.x, y: server.y, vx: server.vx, vy: server.vy, dir: server.dir };
-    if (server.stun) {
-      // Being shoved: the host moves us, input does nothing.
+    if (server.stun || server.down) {
+      // Being shoved or lying after a hit: the host moves us (or not), input does nothing.
       this.reconciler.clear();
       this.target = base;
       this.off = { x: 0, y: 0 };
@@ -165,15 +204,14 @@ export class SnowballView implements MiniGameView<SnowState> {
       const p = key === selfKey && this.pred ? { ...sp, ...this.pred } : sp;
       const x = Math.round(p.x + ARENA_OFFSET.x);
       const y = Math.round(p.y + ARENA_OFFSET.y);
+      // A rise of the invulnerability without a knockdown = hat-blocked hit: short 'hit' pose.
       if (sp.invulnMs > a.invulnMs) a.hitUntil = now + HIT_ANIM_MS;
       a.invulnMs = sp.invulnMs;
-      // The own charge follows the local button at once; others show what the host saw.
-      const charging = key === selfKey ? this.charge !== null : sp.charging;
       const moving = Math.hypot(p.vx, p.vy) > 1;
-      const anim = sp.stun ? 'stumble'
+      const anim = sp.down ? 'fall'
+        : sp.stun ? 'stumble'
         : now < a.hitUntil ? 'hit'
         : sp.throwAnimMs > 0 || sp.swing ? 'throw'
-        : charging ? 'charge'
         : sp.reloading ? 'scoop'
         : moving ? (tileAt(this.arena, p.x, p.y) === 'j' ? 'slip' : 'run')
         : 'idle';
@@ -186,20 +224,16 @@ export class SnowballView implements MiniGameView<SnowState> {
       a.char.setPosition(x, y).setDepth(y).setAlpha(alpha);
       a.label.setPosition(x, y - 46).setDepth(y + 0.5);
       this.attach(a, a.hat, sp.hat, 'head', `schnee.eiszapfenmuetze.${p.dir === 'left' ? 'side' : p.dir}`, x, y, y + 0.2, alpha);
-      const heldName = sp.extra === 'riesenball' && sp.extraLeft > 0 ? 'held.riesenschneeball' : 'held.schneeball';
-      this.attach(a, a.held, charging && !sp.stun, 'hand', heldName, x, y, p.dir === 'up' ? y - 0.1 : y + 0.3, alpha);
-      if (key === selfKey) {
-        drawShoveRing(this.ring, x, y, sp.shoveCdMs);
-        this.hud.drawCharge(x, y, sp.stun ? null : this.charge);
-      }
+      if (key === selfKey) drawShoveRing(this.ring, x, y, sp.shoveCdMs);
     }
+    this.updateCrosshair(s.players[selfKey]);
     this.renderBalls(s.balls);
     this.renderWorld(s);
     this.renderFx(s.fx);
     this.hud.update(s, selfKey);
   }
 
-  /** Hat / held ball on a body anchor of the figure (hidden when off or the frame has no anchor). */
+  /** Hat on a body anchor of the figure (hidden when off or the frame has no anchor). */
   private attach(
     a: Avatar, s: Phaser.GameObjects.Sprite | null, on: boolean, anchor: 'head' | 'hand',
     name: string, x: number, y: number, depth: number, alpha: number,
@@ -228,14 +262,14 @@ export class SnowballView implements MiniGameView<SnowState> {
         v = {
           ball: pivotSprite(this.scene, BALL_SPRITE[b.kind], 0, 0),
           shadow: pivotSprite(this.scene, 'schnee.ball.schatten', 0, 0),
-          range: Math.max(1, b.left),
         };
         this.balls.set(b.id, v);
       }
-      const progress = Math.min(1, Math.max(0, 1 - b.left / v.range));
+      // The arc is 0 at the throw and at the landing point, so the ball ends exactly on the aim.
+      const progress = b.total > 0 ? Math.min(1, Math.max(0, 1 - b.left / b.total)) : 1;
       const lift = Math.sin(Math.PI * progress) * ARC_PX;
       const x = Math.round(b.x + ARENA_OFFSET.x);
-      // Shadow on the ground below the ball (balls fly BALL_LIFT above the feet line).
+      // Shadow on the ground below the path (the path runs BALL_LIFT above the feet line).
       const ground = Math.round(b.y + BALL_LIFT + ARENA_OFFSET.y);
       v.shadow?.setPosition(x, ground).setDepth(ground - 0.5);
       v.ball?.setPosition(x, Math.round(b.y + ARENA_OFFSET.y - lift)).setDepth(ground);

@@ -97,7 +97,7 @@ export function runClientEvening(session: ClientSession, backToStart: () => void
   // Focus lost / tab hidden: send released keys at once (the host also expires stale input); counters stay.
   const keyboard = createKeyboard({
     onIdle: () => {
-      pointer.button.cancel();
+      pointer.releaseAll();
       session.sendInput(pointer.merge(keyboard.state()));
     },
   });
