@@ -98,6 +98,11 @@ export function createSnowballHost(
   const strongTaps: Record<PlayerKey, Edge> = {};
   const downMs: Record<PlayerKey, number> = {};
   const sinceThrowMs: Record<PlayerKey, number> = {};
+  /**
+   * A left press that came too early (inside throwGapMs or a strong cooldown) is kept this long and
+   * fires as soon as the player can throw: a quick double click gives two balls, not one.
+   */
+  const pendingMs: Record<PlayerKey, number> = {};
   const reloadMs: Record<PlayerKey, number> = {};
   const history: Record<PlayerKey, { ms: number; x: number; y: number }[]> = {};
   for (const gp of gamePlayers) {
@@ -112,6 +117,7 @@ export function createSnowballHost(
     strongTaps[gp.key] = new Edge();
     downMs[gp.key] = 0;
     sinceThrowMs[gp.key] = Infinity;
+    pendingMs[gp.key] = 0;
     reloadMs[gp.key] = 0;
     history[gp.key] = [{ ms: 0, x, y }];
   }
@@ -300,12 +306,14 @@ export function createSnowballHost(
         spawnTimerMs -= c.spawnMs;
         if (pickups.length < c.maxPickups) spawnPickup(solids);
       }
-      // 3. Throws (one per tick at most; presses without ammo or too early are dropped) and 4. reload.
+      // 3. Throws (one per tick at most; an early left press waits up to throwGapMs, presses without
+      // ammo are dropped) and 4. reload.
       for (const k of keys) {
         const p = players[k];
         const inp = inputs[k];
         // Disconnected (no input this tick): no edge is taken, so a reconnect fires no phantom throw.
         if (!inp) {
+          pendingMs[k] = 0;
           p.reloading = false;
           reloadMs[k] = 0;
           continue;
@@ -315,17 +323,22 @@ export function createSnowballHost(
         const strong = strongTaps[k].take(inp.secondaryTaps);
         // Stumbling after a shove or lying after a hit: no throw, no reload.
         if (p.stun || p.down) {
+          pendingMs[k] = 0;
           p.reloading = false;
           reloadMs[k] = 0;
           continue;
         }
         // Left and right in the same tick: the strong throw wins, the normal press is dropped.
         // throwGapMs only spaces normal throws; after a strong throw strongCooldownMs blocks both.
+        if (normal > 0) pendingMs[k] = c.throwGapMs;
         const ready = p.balls >= 1 && p.strongCdMs <= 0;
-        if (ready && (strong > 0 || (normal > 0 && sinceThrowMs[k] >= c.throwGapMs))) {
+        if (ready && (strong > 0 || (pendingMs[k] > 0 && sinceThrowMs[k] >= c.throwGapMs))) {
+          // A strong throw also uses up a pending left press (left + right together = one ball).
+          pendingMs[k] = 0;
           throwBall(k, inp.aimX, inp.aimY, strong > 0, solids);
           continue;
         }
+        pendingMs[k] = Math.max(0, pendingMs[k] - ms);
         const held = inp.up || inp.down || inp.left || inp.right;
         const still = Math.hypot(p.vx, p.vy) < 1 && !held;
         const canReload = still && tileAt(arena, p.x, p.y) !== 'j' && p.balls < c.maxBalls;

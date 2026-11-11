@@ -241,6 +241,23 @@ describe('schneeball host', () => {
     expect(ids.size).toBe(2);
   });
 
+  it('a quick double click throws twice: the early press waits for the gap', () => {
+    const d = driver(['p0', 'p2']);
+    const ids = new Set<number>();
+    const look = () => { for (const b of d.snap().balls) ids.add(b.id); };
+    d.tap('p2', 300, 60);
+    d.tick();
+    look();
+    d.tick(2);
+    d.tap('p2', 300, 60); // ~100 ms later: inside throwGapMs
+    d.tick();
+    look();
+    expect(ids.size).toBe(1);
+    for (let i = 0; i < Math.ceil(C.throwGapMs / 1000 / DT); i++) { d.tick(); look(); }
+    expect(ids.size).toBe(2);
+    expect(d.snap().players.p2.balls).toBe(C.maxBalls - 2);
+  });
+
   it('left and right in the same tick throw one strong ball', () => {
     const d = driver(['p0', 'p2']);
     const ids = new Set<number>();
@@ -778,7 +795,7 @@ describe('schneeball definition', () => {
     expect(snowball).toMatchObject({
       id: 'schneeball',
       title: 'Schneeball-Schlacht',
-      rule: 'Triff die anderen! Treffer +2, getroffen −1.',
+      rule: 'Triff die anderen! Treffer +2, getroffen −1. Stehen bleiben lädt Schneebälle nach.',
       controls: 'WASD laufen · Maus zielen · Linksklick werfen · Rechtsklick fest werfen · Leertaste schubsen',
       durationMs: C.durationMs,
       aimOffset: { x: 5, y: 26 },

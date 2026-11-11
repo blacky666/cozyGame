@@ -47,6 +47,15 @@ const CROSSHAIR_ARMS: ReadonlyArray<readonly [readonly number[], readonly number
   [[0, 2, 2, 5], [-1, 2, 4, 6]],
   [[0, -6, 2, 5], [-1, -7, 4, 6]],
 ];
+/** Ammo dots under the crosshair: 3x3 px each (1 px outline), 6 px apart, this far below the pointer. */
+const AMMO_DOT = 3;
+const AMMO_STEP = 6;
+const AMMO_Y = 9;
+const AMMO_FULL = 0xffffff;
+/** Hint above the own figure after a click without balls. */
+export const EMPTY_HINT = 'Keine Bälle – stehen bleiben!';
+const EMPTY_HINT_MS = 1600;
+
 const BALL_SPRITE: Record<Ball['kind'], string> = {
   normal: 'schnee.ball.flug',
   abpraller: 'schnee.abpraller',
@@ -90,9 +99,18 @@ export class SnowballView implements MiniGameView<SnowState> {
   private canThrow = true;
   /** Own ammo from the last rendered state (a click without a ball clicks empty). */
   private ammo = 1;
+  private reloading = false;
+  /** Ammo dots drawn for this state (ammo, reloading): redrawn only on change. */
+  private dotsFor = '';
+  private readonly dots: Phaser.GameObjects.Graphics;
+  private readonly hint: Phaser.GameObjects.Text;
+  private hintUntil = 0;
   private readonly sounds: SnowSounds;
   private readonly onPress = (p: Phaser.Input.Pointer) => {
-    if ((p.button === 0 || p.button === 2) && this.ammo < 1) sound.play(`${PKG}.munition_leer`);
+    if ((p.button !== 0 && p.button !== 2) || this.ammo >= 1) return;
+    sound.play(`${PKG}.munition_leer`);
+    this.hintUntil = this.scene.time.now + EMPTY_HINT_MS;
+    this.hud.flashEmpty();
   };
   // Prediction (clients): same scheme as Münzjagd, with the arena movement of the host.
   private readonly reconciler = new Reconciler<Mover>((m, input, dt) => stepMover(m, input, dt, this.arena, this.solids));
@@ -128,6 +146,9 @@ export class SnowballView implements MiniGameView<SnowState> {
     const self = players.find((p) => p.key === selfKey);
     this.crosshair = this.drawCrosshair(self ? playerColor(scene, self.slot) : '#ffffff');
     this.objects.push(this.crosshair);
+    this.dots = scene.add.graphics().setDepth(CROSSHAIR_DEPTH).setVisible(false);
+    this.hint = txt(scene, 0, 0, EMPTY_HINT, 10, '#ffe08a').setDepth(CROSSHAIR_DEPTH - 1).setVisible(false);
+    this.objects.push(this.dots, this.hint);
     this.hud = new SnowballHud(scene, players);
     this.sounds = new SnowSounds(selfKey, (x, y) => tileAt(this.arena, x, y) === 'j');
     scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPress);
@@ -148,6 +169,7 @@ export class SnowballView implements MiniGameView<SnowState> {
     const input = this.scene.input;
     if (!input?.manager || !input.isOver) {
       this.crosshair.setVisible(false);
+      this.dots.setVisible(false);
       return;
     }
     const p = input.activePointer;
@@ -156,6 +178,24 @@ export class SnowballView implements MiniGameView<SnowState> {
       .setPosition(Math.floor(w.x), Math.floor(w.y))
       .setAlpha(this.canThrow ? 1 : CROSSHAIR_DIM)
       .setVisible(true);
+    this.drawDots();
+    this.dots.setPosition(Math.floor(w.x), Math.floor(w.y)).setVisible(true);
+  }
+
+  /** One dot per ball under the crosshair: filled = ready, hollow = empty, half = loading right now. */
+  private drawDots(): void {
+    const key = `${this.ammo}|${this.reloading}`;
+    if (key === this.dotsFor) return;
+    this.dotsFor = key;
+    const g = this.dots.clear();
+    const n = CONFIG.snowball.maxBalls;
+    const x0 = -Math.floor((n * AMMO_STEP - 1) / 2);
+    for (let i = 0; i < n; i++) {
+      const x = x0 + i * AMMO_STEP;
+      g.fillStyle(CROSSHAIR_OUTLINE, 1).fillRect(x - 1, AMMO_Y - 1, AMMO_DOT + 2, AMMO_DOT + 2);
+      if (i < this.ammo) g.fillStyle(AMMO_FULL, 1).fillRect(x, AMMO_Y, AMMO_DOT, AMMO_DOT);
+      else if (i === this.ammo && this.reloading) g.fillStyle(AMMO_FULL, 0.45).fillRect(x, AMMO_Y, AMMO_DOT, AMMO_DOT);
+    }
   }
 
   /** Arena solids without broken snowmen (what the host collides with). */
@@ -239,11 +279,18 @@ export class SnowballView implements MiniGameView<SnowState> {
       a.char.setPosition(x, y).setDepth(y).setAlpha(alpha);
       a.label.setPosition(x, y - 46).setDepth(y + 0.5);
       this.attach(a, a.hat, sp.hat, 'head', `schnee.eiszapfenmuetze.${p.dir === 'left' ? 'side' : p.dir}`, x, y, y + 0.2, alpha);
-      if (key === selfKey) drawShoveRing(this.ring, x, y, sp.shoveCdMs);
+      if (key === selfKey) {
+        drawShoveRing(this.ring, x, y, sp.shoveCdMs);
+        // Gone as soon as a ball is back (or after EMPTY_HINT_MS).
+        const show = now < this.hintUntil && sp.balls < 1;
+        this.hint.setVisible(show);
+        if (show) this.hint.setPosition(x, y - 58);
+      }
     }
     const me: SnowPlayer | undefined = s.players[selfKey];
     this.canThrow = !!me && me.balls >= 1 && !me.down && !me.stun && me.strongCdMs <= 0;
     this.ammo = me?.balls ?? 1;
+    this.reloading = !!me?.reloading;
     for (const c of this.sounds.update(s, now)) sound.play(c.name.includes('.') ? c.name : `${PKG}.${c.name}`, c);
     const music = SnowSounds.music(s);
     sound.setMusic(music && `${PKG}.${music}`);

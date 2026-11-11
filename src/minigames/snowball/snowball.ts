@@ -58,7 +58,7 @@ export function snowballBotView(s: SnowState, key: PlayerKey): BotView | null {
 export const snowball: MiniGame<SnowState> = {
   id: 'schneeball',
   title: 'Schneeball-Schlacht',
-  rule: 'Triff die anderen! Treffer +2, getroffen −1.',
+  rule: 'Triff die anderen! Treffer +2, getroffen −1. Stehen bleiben lädt Schneebälle nach.',
   controls: 'WASD laufen · Maus zielen · Linksklick werfen · Rechtsklick fest werfen · Leertaste schubsen',
   durationMs: CONFIG.snowball.durationMs,
   aimOffset: ARENA_OFFSET,

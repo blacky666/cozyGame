@@ -31,6 +31,13 @@ function timings(): { host: EveningTiming; stage: StageTiming } {
   return { host, stage };
 }
 
+/** All games, or only the one from the dev flag `game=<id>` (if it exists). */
+const devGames = () => {
+  const only = devFlags(location.search).game;
+  const one = MINIGAMES.filter((g) => g.id === only);
+  return one.length > 0 ? one : MINIGAMES;
+};
+
 const keyFor = (players: { id: string; slot: 0 | 1 | 2 | 3 }[], id: string | null): PlayerKey => {
   const p = players.find((x) => x.id === id);
   return p ? playerKey(p.slot) : 'p?';
@@ -54,7 +61,7 @@ export function runHostEvening(
   const host = new EveningHost({
     session,
     rounds,
-    games: MINIGAMES,
+    games: devGames(),
     localInput: () => pointer.merge(keyboard.state()),
     assets,
     timing: t.host,
