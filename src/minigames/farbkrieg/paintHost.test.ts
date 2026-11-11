@@ -308,11 +308,12 @@ describe('Farbkrieg host', () => {
     expect(d.snap().timeLeftMs).toBe(50);
     d.tick();
     expect(d.snap().timeLeftMs).toBe(0);
-    expect(d.g.result()).toEqual([['p0'], ['p1'], ['p2']]);
+    // The finale bomb lands in the colour of the present player with the fewest tiles (p1), so p1 wins.
+    expect(d.g.result()).toEqual([['p1'], ['p0'], ['p2']]);
     // Ties share a place; nothing moves any more.
-    const e = driver(['p0', 'p1', 'p2'], { absent: ['p2'] });
+    const e = driver(['p0', 'p1', 'p2'], { absent: ['p1', 'p2'] });
     e.tick(1799);
-    expect(e.g.result()).toEqual([['p0', 'p1'], ['p2']]);
+    expect(e.g.result()).toEqual([['p0'], ['p1', 'p2']]);
     const before = e.snap();
     e.set('p0', { right: true });
     e.tick(5);
@@ -329,6 +330,350 @@ describe('Farbkrieg host', () => {
     expect(speedOf(base)).toBe(F.walkSpeed);
     expect(speedOf({ ...base, rollMs: 1 })).toBe(F.walkSpeed * F.rollFactor);
     expect(speedOf({ ...base, rollMs: 1, slowMs: 1 })).toBe(F.walkSpeed * F.rollFactor * F.slowFactor);
+  });
+});
+
+/** Row-major indices of the paintable tiles: the order the host picks pickup spots from. */
+const paintableList: number[] = [];
+for (let i = 0; i < grid.owner.length; i++) if (grid.paintable[i]) paintableList.push(i);
+const KINDS = ['farbbombe', 'wischmopp', 'rollschuhe'] as const;
+type Kind = (typeof KINDS)[number];
+/** Fraction for a scripted rand that makes the host pick tile (col, row). */
+const spotFrac = (col: number, row: number) => (paintableList.indexOf(row * COLS + col) + 0.5) / paintableList.length;
+const kindFrac = (kind: Kind) => (KINDS.indexOf(kind) + 0.5) / KINDS.length;
+const scripted = (...q: number[]) => () => (q.length > 0 ? q.shift()! : 0.5);
+type Driver = ReturnType<typeof driver>;
+/** Right click at (aimX, aimY). */
+const rclick = (d: Driver, k: string, aimX: number, aimY: number) => {
+  d.inputs[k] = { ...d.inputs[k], aimX, aimY, secondaryTaps: d.inputs[k].secondaryTaps + 1 };
+};
+/** p0 walks onto a pickup (tile 5,4: centre 88,72) once it exists and takes it. */
+function takeWithP0(d: Driver, kind: Kind) {
+  expect(d.snap().pickups).toEqual([expect.objectContaining({ x: 88, y: 72, kind })]);
+  d.set('p0', { right: true });
+  for (let i = 0; i < 40 && d.snap().pickups.length > 0; i++) d.tick();
+  d.set('p0', {});
+  expect(d.snap().players.p0.extra).toBe(kind);
+}
+/** Driver whose p0 holds `kind` (pickup spawned at 8 s, taken at once). */
+function armed(kind: Kind) {
+  const d = driver(['p0', 'p1'], { rand: scripted(spotFrac(5, 4), kindFrac(kind)) });
+  d.tick(159); // 8000 ms in total with the baseline tick
+  takeWithP0(d, kind);
+  return d;
+}
+
+describe('Farbkrieg extras', () => {
+  it('pickups spawn every 8 s on paintable tiles, at most 2', () => {
+    const d = driver(['p0', 'p1']);
+    d.tick(158);
+    expect(d.snap().pickups.length).toBe(0);
+    d.tick();
+    expect(d.snap().pickups.length).toBe(1);
+    d.tick(160);
+    expect(d.snap().pickups.length).toBe(2);
+    d.tick(160);
+    const s = d.snap();
+    expect(s.pickups.length).toBe(2);
+    expect(new Set(s.pickups.map((p) => p.id)).size).toBe(2);
+    for (const pk of s.pickups) {
+      expect(grid.paintable[Math.floor(pk.y / T) * COLS + Math.floor(pk.x / T)]).toBe(1);
+      expect((pk.x - T / 2) % T).toBe(0);
+      expect(KINDS).toContain(pk.kind);
+    }
+  });
+
+  it('a pickup spawns at least 24 px from every present player; absent players are ignored', () => {
+    const a = driver(['p0', 'p1'], { rand: () => spotFrac(2, 4) }); // on top of present p0
+    a.tick(159);
+    expect(a.snap().pickups).toEqual([]);
+    const b = driver(['p0', 'p1'], { rand: () => spotFrac(23, 4), absent: ['p1'] }); // on top of absent p1
+    b.tick(159);
+    expect(b.snap().pickups.length).toBe(1);
+    b.tick(20);
+    expect(b.snap().pickups.length).toBe(1); // the absent player cannot take it
+    expect(b.snap().players.p1.extra).toBeNull();
+  });
+
+  it('a player already holding an extra does not take a second one; it stays on the map', () => {
+    const d = driver(['p0', 'p1'], {
+      rand: scripted(spotFrac(5, 4), kindFrac('farbbombe'), spotFrac(9, 4), kindFrac('wischmopp')),
+    });
+    d.tick(159);
+    takeWithP0(d, 'farbbombe');
+    d.tick(160); // second pickup at 16 s, ahead of p0
+    expect(d.snap().pickups).toEqual([expect.objectContaining({ x: 152, y: 72, kind: 'wischmopp' })]);
+    d.set('p0', { right: true });
+    d.tick(60); // p0 walks over it
+    const s = d.snap();
+    expect(s.players.p0.x).toBeGreaterThan(152 + F.pickupTouchPx);
+    expect(s.players.p0.extra).toBe('farbbombe');
+    expect(s.pickups.length).toBe(1);
+  });
+
+  it('Farbbombe: right click throws it to the mouse and paints r 48; the slot empties', () => {
+    const d = armed('farbbombe');
+    const p = d.snap().players.p0;
+    rclick(d, 'p0', p.x + 60, p.y);
+    const seen = new Set<number>();
+    const kinds: string[] = [];
+    let hit: { x: number; y: number; r: number } | null = null;
+    for (let i = 0; i < 20; i++) {
+      d.tick();
+      for (const f of d.snap().fx) {
+        if (seen.has(f.id) || !['bombe_wurf', 'bombe', 'wurf', 'platsch'].includes(f.kind)) continue;
+        seen.add(f.id);
+        kinds.push(f.kind);
+        if (f.kind === 'bombe') hit = f;
+      }
+    }
+    expect(kinds).toEqual(['bombe_wurf', 'bombe']);
+    expect(hit).toEqual(expect.objectContaining({ r: F.bombPaintR }));
+    expect(hit!.x).toBe(Math.round(p.x + 60));
+    const s = d.snap();
+    expect(s.players.p0.extra).toBeNull();
+    expect(s.players.p0.klecksCdMs).toBe(0);
+    const disc = discTiles(hit!.x, hit!.y, F.bombPaintR - 0.5);
+    expect(disc.length).toBeGreaterThan(20);
+    for (const i of disc) expect(s.grid[i]).toBe('1');
+  });
+
+  it('Farbbombe hitting a player getüncht them too', () => {
+    const d = armed('farbbombe');
+    d.set('p1', { left: true });
+    d.tick(80); // 376 -> 120
+    d.set('p1', {});
+    const v = d.snap().players.p1;
+    rclick(d, 'p0', v.x, v.y);
+    let hit: { who: PlayerKey | null; r: number } | null = null;
+    for (let i = 0; i < 20 && !hit; i++) {
+      d.tick();
+      hit = d.snap().fx.find((f) => f.kind === 'getuencht') ?? null;
+    }
+    expect(hit).toEqual(expect.objectContaining({ who: 'p1', r: F.bombPaintR }));
+    expect(d.snap().players.p1.slowMs).toBe(F.slowMs);
+  });
+
+  /** p1 painted its trail from 376 to 120; the pickup spawned and p0 holds a Wischmopp. */
+  function moppSetup() {
+    const d = driver(['p0', 'p1'], { rand: scripted(spotFrac(5, 4), kindFrac('wischmopp')) });
+    d.set('p1', { left: true });
+    d.tick(80);
+    d.set('p1', {});
+    d.tick(79); // 8000 ms in total: the pickup spawns
+    takeWithP0(d, 'wischmopp');
+    return d;
+  }
+
+  it('Wischmopp: for 4 s foreign tiles under the feet become neutral, own and neutral tiles unchanged', () => {
+    const d = moppSetup();
+    expect(ownerAt(d.snap(), 200, 72)).toBe('2');
+    expect(ownerAt(d.snap(), 56, 72)).toBe('1');
+    rclick(d, 'p0', 0, 0);
+    d.tick();
+    expect(d.snap().players.p0.moppMs).toBe(F.moppMs);
+    expect(d.snap().players.p0.extra).toBeNull();
+    d.set('p0', { right: true });
+    d.tick(60); // ~190 px: well over p1's trail
+    const s = d.snap();
+    expect(s.players.p0.moppMs).toBeGreaterThan(0);
+    expect(s.players.p0.x).toBeGreaterThan(260);
+    expect(ownerAt(s, 200, 72)).toBe('0'); // foreign -> neutral
+    expect(ownerAt(s, 260, 72)).toBe('0');
+    expect(ownerAt(s, 104, 72)).toBe('0'); // neutral stays neutral, nothing painted
+    expect(ownerAt(s, 56, 72)).toBe('1'); // own stays
+    expect(ownerAt(s, s.players.p0.x, s.players.p0.y)).toBe('0');
+    // After 4 s the mopp is gone and walking paints again.
+    d.tick(40);
+    expect(d.snap().players.p0.moppMs).toBe(0);
+    d.tick(5);
+    const e = d.snap();
+    expect(ownerAt(e, e.players.p0.x, e.players.p0.y)).toBe('1');
+  });
+
+  it('mopp and painter on one tile: painted, then neutralized', () => {
+    const d = moppSetup();
+    const p1 = d.snap().players.p1;
+    expect(ownerAt(d.snap(), p1.x, p1.y)).toBe('2');
+    rclick(d, 'p0', 0, 0);
+    d.set('p0', { right: true });
+    for (let i = 0; i < 40 && Math.floor(d.snap().players.p0.x / T) < Math.floor(p1.x / T); i++) d.tick();
+    d.set('p0', {});
+    d.tick(5);
+    const s = d.snap();
+    expect(Math.floor(s.players.p0.x / T)).toBe(Math.floor(p1.x / T));
+    expect(s.players.p0.moppMs).toBeGreaterThan(0);
+    // p1 claims its tile every tick (painters first), then p0's mopp turns it neutral: never '2' at the end.
+    expect(ownerAt(s, p1.x, p1.y)).toBe('0');
+  });
+
+  it('Rollschuhe: 4 s at ×1.5 speed, painting the 3×3 tiles around the feet', () => {
+    const d = armed('rollschuhe');
+    rclick(d, 'p0', 0, 0);
+    d.tick();
+    expect(d.snap().players.p0.rollMs).toBe(F.rollMs);
+    expect(d.snap().players.p0.extra).toBeNull();
+    const x0 = d.snap().players.p0.x;
+    d.set('p0', { right: true });
+    d.tick(20); // 1 s at 96 px/s
+    const s = d.snap();
+    expect(s.players.p0.x - x0).toBeCloseTo(F.walkSpeed * F.rollFactor, 3);
+    const c0 = Math.floor(s.players.p0.x / T);
+    const r0 = Math.floor(s.players.p0.y / T);
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        const i = (r0 + dr) * COLS + c0 + dc;
+        if (grid.paintable[i]) expect(s.grid[i]).toBe('1');
+      }
+    }
+    expect(ownerAt(s, s.players.p0.x, s.players.p0.y - T)).toBe('1');
+    // The rollers wear off after 4 s; after that only the feet tile is painted.
+    d.set('p0', {});
+    d.tick(60);
+    expect(d.snap().players.p0.rollMs).toBe(0);
+    d.set('p0', { right: true });
+    d.tick(20);
+    const e = d.snap();
+    expect(e.players.p0.x - s.players.p0.x).toBeCloseTo(F.walkSpeed, 3);
+    expect(ownerAt(e, e.players.p0.x, e.players.p0.y)).toBe('1');
+    expect(ownerAt(e, e.players.p0.x, e.players.p0.y - T)).toBe('0');
+  });
+
+  it('right click with an empty slot does nothing', () => {
+    const d = driver(['p0', 'p1']);
+    rclick(d, 'p0', 100, 72);
+    d.tick(5);
+    const s = d.snap();
+    expect(s.players.p0.extra).toBeNull();
+    expect(s.players.p0.moppMs).toBe(0);
+    expect(s.players.p0.rollMs).toBe(0);
+    expect(s.blobs).toEqual([]);
+    expect(s.fx).toEqual([]);
+  });
+
+  it('no extra use after the end', () => {
+    const d = armed('farbbombe');
+    while (d.snap().timeLeftMs > 0) d.tick();
+    expect(d.g.result()).not.toBeNull();
+    const before = d.snap();
+    expect(before.players.p0.extra).toBe('farbbombe');
+    rclick(d, 'p0', 150, 72);
+    d.tick(5);
+    expect(d.snap()).toEqual(before);
+  });
+});
+
+describe('Farbkrieg finale', () => {
+  /** Ticks until timeLeftMs first is at most `ms`. */
+  const toTimeLeft = (d: Driver, ms = F.finaleMs) => {
+    while (d.snap().timeLeftMs > ms) d.tick();
+  };
+
+  it('last 15 s: Klecks paints r 48', () => {
+    const d = driver(['p0', 'p1']);
+    toTimeLeft(d);
+    expect(d.snap().timeLeftMs).toBe(F.finaleMs);
+    const [x, y] = PAINT_SPAWNS[0];
+    d.tap('p0', x + 60, y);
+    let land: { x: number; y: number; r: number } | null = null;
+    for (let i = 0; i < 20 && !land; i++) {
+      d.tick();
+      land = d.snap().fx.find((f) => f.kind === 'platsch') ?? null;
+    }
+    expect(land).toEqual(expect.objectContaining({ r: F.klecksPaintR * 2 }));
+    const s = d.snap();
+    const disc = discTiles(land!.x, land!.y, F.klecksPaintR * 2 - 0.5);
+    expect(disc.length).toBeGreaterThan(20);
+    for (const i of disc) expect(s.grid[i]).toBe('1');
+  });
+
+  it('the Klecks is still r 24 shortly before the last 15 s', () => {
+    const d = driver(['p0', 'p1']);
+    toTimeLeft(d, F.finaleMs + 500);
+    const [x, y] = PAINT_SPAWNS[0];
+    d.tap('p0', x + 20, y);
+    d.tick(4);
+    expect(d.snap().fx.find((f) => f.kind === 'platsch')).toEqual(expect.objectContaining({ r: F.klecksPaintR }));
+  });
+
+  it('finale bomb falls at T−15 s and explodes 2 s later at the centre in the colour of the player with the fewest tiles', () => {
+    const d = driver(['p0', 'p1']);
+    d.set('p0', { right: true });
+    d.tick(20); // p0 has more tiles than p1
+    d.set('p0', {});
+    toTimeLeft(d);
+    expect(d.snap().finale.phase).toBe('wait');
+    const kinds: string[] = [];
+    const seen = new Set<number>();
+    const watch = () => {
+      for (const f of d.snap().fx) {
+        if (seen.has(f.id) || (f.kind !== 'finale_fall' && f.kind !== 'finale')) continue;
+        seen.add(f.id);
+        kinds.push(f.kind);
+        if (f.kind === 'finale_fall') expect([f.x, f.y]).toEqual([208, 104]);
+        if (f.kind === 'finale') expect(f).toEqual(expect.objectContaining({ x: 208, y: 104, who: 'p1', r: F.finalePaintR }));
+      }
+    };
+    d.tick();
+    watch();
+    expect(d.snap().finale).toEqual({ phase: 'fall', fallLeftMs: F.finaleFallMs, x: 208, y: 104 });
+    for (let i = 0; i < 39; i++) { d.tick(); watch(); }
+    expect(d.snap().finale.phase).toBe('fall');
+    for (let i = 0; i < 4; i++) { d.tick(); watch(); }
+    const s = d.snap();
+    expect(s.finale.phase).toBe('done');
+    expect(kinds).toEqual(['finale_fall', 'finale']);
+    const disc = discTiles(208, 104, F.finalePaintR);
+    expect(disc.length).toBeGreaterThan(30);
+    for (const i of disc) expect(s.grid[i]).toBe('2');
+  });
+
+  it('finale: all tied → one of them by rand; an absent last player is skipped', () => {
+    const run = (r: number, keys: string[], absent: string[] = []) => {
+      const d = driver(keys, { rand: () => r, absent });
+      toTimeLeft(d);
+      d.tick(45);
+      return d.snap();
+    };
+    const centre = (s: PaintState) => ownerAt(s, 208, 104);
+    expect(centre(run(0, ['p0', 'p1']))).toBe('1');
+    expect(centre(run(0.99, ['p0', 'p1']))).toBe('2');
+    // p2 is absent with 0 tiles (the fewest) but is skipped; p0 and p1 tie with 1 tile.
+    const s = run(0.99, ['p0', 'p1', 'p2'], ['p2']);
+    expect(centre(s)).toBe('2');
+    expect(count(s.grid, '3')).toBe(0);
+    // Nobody present: nothing is painted.
+    const n = run(0.5, ['p0', 'p1'], ['p0', 'p1']);
+    expect(n.finale.phase).toBe('done');
+    expect([...n.grid].every((ch) => ch === '0')).toBe(true);
+  });
+
+  it('fast mode: with durationMs 18000 the finale starts at 3 s left', () => {
+    const d = driver(['p0', 'p1'], { durationMs: 18000 });
+    expect(d.snap().durationMs).toBe(18000);
+    toTimeLeft(d, 3000);
+    expect(d.snap().finale.phase).toBe('wait');
+    d.tick();
+    expect(d.snap().finale.phase).toBe('fall');
+    d.tick(41);
+    expect(d.snap().finale.phase).toBe('done');
+  });
+
+  it('the finale fires once even if the round ends during the fall', () => {
+    const d = driver(['p0', 'p1'], { durationMs: 2500 });
+    const kinds: string[] = [];
+    const seen = new Set<number>();
+    for (let i = 0; i < 80; i++) {
+      d.tick();
+      for (const f of d.snap().fx) {
+        if (seen.has(f.id)) continue;
+        seen.add(f.id);
+        kinds.push(f.kind);
+      }
+    }
+    expect(d.g.result()).not.toBeNull();
+    expect(kinds.filter((k) => k === 'finale').length).toBeLessThanOrEqual(1);
+    expect(kinds.filter((k) => k === 'finale_fall').length).toBe(1);
   });
 });
 

@@ -60,6 +60,9 @@ export type PaintState = {
 };
 
 const START_DIR: Facing = 'down';
+const PICKUP_KINDS: readonly ExtraKind[] = ['farbbombe', 'wischmopp', 'rollschuhe'];
+/** Tiles around the feet tile that rollers paint (1 = the 3x3 block). */
+const ROLL_REACH = 1;
 /** Float slack for timers that count down in tick steps. */
 const EPS = 1e-6;
 /** Length of the throw arm animation (as the shove swing). */
@@ -89,13 +92,12 @@ export function createPaintHost(
   durationMs: number = CONFIG.farbkrieg.durationMs,
 ): MiniGameHost<PaintState> {
   const c = CONFIG.farbkrieg;
-  // rand drives the extras and the finale colour (Task 3).
-  void rand;
   const keys = gamePlayers.map((p) => p.key);
   const slotOf: Record<PlayerKey, number> = {};
   const players: Record<PlayerKey, PaintPlayer> = {};
   const shove: Record<PlayerKey, ShoveSlot> = {};
   const taps: Record<PlayerKey, Edge> = {};
+  const extraTaps: Record<PlayerKey, Edge> = {};
   for (const gp of gamePlayers) {
     const [x, y] = PAINT_SPAWNS[gp.slot];
     players[gp.key] = {
@@ -105,6 +107,7 @@ export function createPaintHost(
     slotOf[gp.key] = gp.slot;
     shove[gp.key] = newShoveSlot();
     taps[gp.key] = new Edge();
+    extraTaps[gp.key] = new Edge();
   }
   const grid = createGrid(arena);
   /** Grid owner value of a player (0 is neutral). */
@@ -114,6 +117,14 @@ export function createPaintHost(
   const finale: PaintState['finale'] = { phase: 'wait', fallLeftMs: 0, x: arena.w / 2, y: arena.h / 2 };
   let fx: (PaintFx & { atMs: number })[] = [];
   let elapsedMs = 0;
+  /** Centres of all paintable tiles (pickup spawn spots). */
+  const spots: { x: number; y: number }[] = [];
+  for (let i = 0; i < grid.owner.length; i++) {
+    if (!grid.paintable[i]) continue;
+    spots.push({ x: ((i % grid.cols) + 0.5) * grid.tile, y: (Math.floor(i / grid.cols) + 0.5) * grid.tile });
+  }
+  let spawnMs = 0;
+  let nextPickupId = 1;
   let nextBlobId = 1;
   let nextFxId = 1;
 
@@ -121,22 +132,46 @@ export function createPaintHost(
     fx.push({ id: nextFxId++, kind, x: Math.round(x), y: Math.round(y), who, r, atMs: elapsedMs });
   };
 
+  /** Paintable tiles under k's feet: the feet tile, or the 3x3 block around it on rollers. */
+  const feetTiles = (k: PlayerKey): number[] => {
+    const p = players[k];
+    const i = tileIndex(grid, p.x, p.y);
+    if (i === null) return [];
+    if (p.rollMs <= 0) return grid.paintable[i] ? [i] : [];
+    const col = i % grid.cols;
+    const row = Math.floor(i / grid.cols);
+    const out: number[] = [];
+    for (let r = row - ROLL_REACH; r <= row + ROLL_REACH; r++) {
+      for (let cc = col - ROLL_REACH; cc <= col + ROLL_REACH; cc++) {
+        if (cc < 0 || r < 0 || cc >= grid.cols || r >= grid.rows) continue;
+        if (grid.paintable[r * grid.cols + cc]) out.push(r * grid.cols + cc);
+      }
+    }
+    return out;
+  };
+
   /**
-   * Feet paint: each present player claims the tile under its feet. A tile owned by one of its
-   * claimants stays; otherwise the claimant with the lowest slot gets it.
+   * Feet paint: each present player without a mopp claims its feet area. A tile owned by one of its
+   * claimants stays; otherwise the claimant with the lowest slot gets it. Then the mopp claimants
+   * turn the foreign tiles of their feet area neutral (own and neutral tiles stay, nothing is painted).
    */
   const paintFeet = (present: PlayerKey[]) => {
     const claims = new Map<number, PlayerKey[]>();
     for (const k of present) {
-      const i = tileIndex(grid, players[k].x, players[k].y);
-      if (i === null || !grid.paintable[i]) continue;
-      const list = claims.get(i);
-      if (list) list.push(k); else claims.set(i, [k]);
+      if (players[k].moppMs > 0) continue;
+      for (const i of feetTiles(k)) {
+        const list = claims.get(i);
+        if (list) list.push(k); else claims.set(i, [k]);
+      }
     }
     for (const [i, ks] of claims) {
       if (ks.some((k) => grid.owner[i] === colour(k))) continue;
       const winner = ks.reduce((a, b) => (slotOf[b] < slotOf[a] ? b : a));
       paintTile(grid, i, colour(winner));
+    }
+    for (const k of present) {
+      if (players[k].moppMs <= 0) continue;
+      for (const i of feetTiles(k)) if (grid.owner[i] !== 0 && grid.owner[i] !== colour(k)) paintTile(grid, i, 0);
     }
   };
 
@@ -163,7 +198,43 @@ export function createPaintHost(
     addFx(kind === 'bombe' ? 'bombe_wurf' : 'wurf', p.x, p.y, k);
   };
 
-  const paintR = (kind: Blob['kind']) => (kind === 'bombe' ? c.bombPaintR : c.klecksPaintR);
+  /** True from finaleAt(durationMs) before the end: bigger Klecks, finale bomb. */
+  const inFinale = () => durationMs - elapsedMs <= finaleAt(durationMs) + EPS;
+  const paintR = (kind: Blob['kind']) => (kind === 'bombe' ? c.bombPaintR : inFinale() ? c.klecksPaintR * 2 : c.klecksPaintR);
+  const pick = <T>(list: readonly T[]): T => list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
+
+  /** One new pickup on a free paintable tile far from every present player, or none after pickupTries tries. */
+  const spawnPickup = (present: PlayerKey[]) => {
+    for (let i = 0; i < c.pickupTries && spots.length > 0; i++) {
+      const spot = pick(spots);
+      if (pickups.some((pk) => pk.x === spot.x && pk.y === spot.y)) continue;
+      if (present.some((k) => Math.hypot(players[k].x - spot.x, players[k].y - spot.y) < c.pickupClearPx)) continue;
+      pickups.push({ id: nextPickupId++, x: spot.x, y: spot.y, kind: pick(PICKUP_KINDS) });
+      return;
+    }
+  };
+
+  /** Right click: use the held extra. */
+  const useExtra = (k: PlayerKey, aimX: number, aimY: number) => {
+    const p = players[k];
+    const extra = p.extra;
+    if (extra === null) return;
+    p.extra = null;
+    if (extra === 'farbbombe') throwBlob(k, aimX, aimY, 'bombe');
+    else if (extra === 'wischmopp') p.moppMs = c.moppMs;
+    else p.rollMs = c.rollMs;
+  };
+
+  /** Finale bomb: lands in the colour of the present player with the fewest tiles (ties by rand). */
+  const explodeFinale = (present: PlayerKey[]) => {
+    finale.phase = 'done';
+    const counts = tileCounts(grid);
+    const fewest = Math.min(...present.map((k) => counts[colour(k)]));
+    const losers = present.filter((k) => counts[colour(k)] === fewest);
+    const who = losers.length > 0 ? pick(losers) : null;
+    if (who !== null) paintDisc(grid, finale.x, finale.y, c.finalePaintR, colour(who));
+    addFx('finale', finale.x, finale.y, who, c.finalePaintR);
+  };
 
   return {
     tick(dt, inputs) {
@@ -190,7 +261,7 @@ export function createPaintHost(
           p.vx = 0;
           p.vy = 0;
         } else {
-          Object.assign(p, stepWalker(p, inputs[k] ?? neutralInput(), sec, arena, speedOf(p)));
+          Object.assign(p, stepWalker(p, inputs[k] ?? neutralInput(), sec, arena, speedOf(p), c.bodyRadius));
         }
         p.stun = sh.stunMs > 0;
         p.swing = sh.swingMs > 0;
@@ -216,7 +287,31 @@ export function createPaintHost(
         throwBlob(k, inp.aimX, inp.aimY, 'klecks');
       }
 
-      // 5. Extras (Task 3): pickups and right-click use.
+      // 5. Extras: pickups spawn every pickupSpawnMs; present players without an extra take them by
+      // touch; then right clicks use the held extra (not while stunned; absent players take no edge).
+      spawnMs += ms;
+      if (spawnMs >= c.pickupSpawnMs - EPS) {
+        spawnMs = 0;
+        if (pickups.length < c.maxPickups) spawnPickup(present);
+      }
+      for (const pk of [...pickups]) {
+        let taker: PlayerKey | null = null;
+        let takerD = c.pickupTouchPx;
+        for (const k of present) {
+          if (players[k].extra !== null) continue;
+          const d = Math.hypot(players[k].x - pk.x, players[k].y - pk.y);
+          if (d <= takerD) { taker = k; takerD = d; }
+        }
+        if (!taker) continue;
+        pickups.splice(pickups.indexOf(pk), 1);
+        players[taker].extra = pk.kind;
+        addFx('pickup', pk.x, pk.y, taker);
+      }
+      for (const k of present) {
+        const inp = inputs[k];
+        if (extraTaps[k].take(inp.secondaryTaps) === 0 || players[k].stun) continue;
+        useExtra(k, inp.aimX, inp.aimY);
+      }
 
       // 6. Blobs in id order (a later blob paints over an earlier one). Absent players are not hit.
       const targets: BlobTarget[] = present.map((k) => ({ key: k, x: players[k].x, y: players[k].y }));
@@ -235,7 +330,15 @@ export function createPaintHost(
       }
       blobs = flying;
 
-      // 7. Finale (Task 3): finale bomb from finaleAt(durationMs).
+      // 7. Finale: from finaleAt(durationMs) the bomb falls for finaleFallMs, then explodes once.
+      if (finale.phase === 'wait' && inFinale()) {
+        finale.phase = 'fall';
+        finale.fallLeftMs = c.finaleFallMs;
+        addFx('finale_fall', finale.x, finale.y, null);
+      } else if (finale.phase === 'fall') {
+        finale.fallLeftMs = countDown(finale.fallLeftMs, ms);
+        if (finale.fallLeftMs <= 0) explodeFinale(present);
+      }
 
       // 8. Tile counts from the grid.
       const counts = tileCounts(grid);
