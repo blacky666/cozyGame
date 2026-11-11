@@ -32,7 +32,18 @@ export type Ramps = {
   player?: { player: number | string; symbol: string; c: string; C: string }[];
 };
 
+export type MapDef = {
+  w: number;
+  h: number;
+  tile: number;
+  raster: string[];
+  layers: { boden: string[][]; flaechen: (string | null)[][]; rand: (string | null)[][] };
+  objects: { sprite: string; x: number; y: number }[];
+  hinweis?: string;
+};
+
 export type AssetFile = {
+  maps?: Record<string, MapDef>;
   palette: Record<string, string>;
   recolor: Record<string, RecolorSlot>;
   ramps?: Ramps;
