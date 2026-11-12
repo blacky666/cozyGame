@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import type { AssetFile } from '../gfx/assetTypes';
 import type { InputState } from '../net/protocol';
+import type { FeatId } from '../progress/feats';
 import type { Look } from '../save/profile';
 
 export type { InputState };
@@ -33,6 +34,8 @@ export interface MiniGameHost<S> {
   snapshot(): S;
   /** Non-null = finished; tie groups of player keys, best first. */
   result(): PlayerKey[][] | null;
+  /** Achievements earned this round; read once when result() is non-null. */
+  feats?(): Record<PlayerKey, FeatId[]>;
 }
 
 export interface MiniGameView<S> {

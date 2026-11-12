@@ -84,3 +84,16 @@ describe('nextReward', () => {
     expect(nextReward(xp)).toEqual(r);
   });
 });
+
+describe('feat config', () => {
+  it('config featXp has exactly the FEAT_IDS keys and values in 5..10', async () => {
+    const { FEAT_IDS, featLabel } = await import('./feats');
+    expect(Object.keys(CONFIG.progress.featXp).sort()).toEqual([...FEAT_IDS].sort());
+    for (const id of FEAT_IDS) {
+      expect(CONFIG.progress.featXp[id]).toBeGreaterThanOrEqual(5);
+      expect(CONFIG.progress.featXp[id]).toBeLessThanOrEqual(10);
+      expect(featLabel(id).length).toBeGreaterThan(0);
+    }
+    expect(FEAT_IDS).toHaveLength(11);
+  });
+});

@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { eveningXp, type RoundRecord, type XpLine } from '../progress/xp';
 import { pickMinigames } from './picker';
 import { finalRanking, roundPoints } from './scoring';
 
@@ -6,13 +7,21 @@ export type EveningPhase =
   | { kind: 'lobby' }
   | { kind: 'intro'; round: number; game: string; double: boolean }
   | { kind: 'playing'; round: number; game: string }
-  | { kind: 'standings'; round: number; points: Record<string, number>; totals: Record<string, number>; tieOrder: string[] }
-  | { kind: 'podium'; ranking: string[][]; totals: Record<string, number>; tieOrder: string[] }
+  | {
+      kind: 'standings'; round: number; points: Record<string, number>; totals: Record<string, number>; tieOrder: string[];
+      /** XP lines of every player so far (no gesamt lines); each client applies only its own. */
+      eveningId: string; xp: Record<string, XpLine[]>;
+    }
+  | {
+      kind: 'podium'; ranking: string[][]; totals: Record<string, number>; tieOrder: string[];
+      /** XP lines of the whole evening, gesamt lines included. */
+      eveningId: string; xp: Record<string, XpLine[]>;
+    }
   | { kind: 'ended'; reason: 'host_left' };
 
 export type EveningEvent =
   | { type: 'introDone' }
-  | { type: 'gameResult'; placements: string[][] }
+  | { type: 'gameResult'; placements: string[][]; feats?: Record<string, string[]> }
   | { type: 'standingsDone' };
 
 /** Evening state machine, keyed by stable player keys. Starts at intro of round 1. */
@@ -23,12 +32,16 @@ export class Evening {
   private readonly tieOrder: string[];
   private totals: Record<string, number> = {};
   private wins: Record<string, number> = {};
+  /** Placements and feats of every finished round (for the XP lines). */
+  private readonly records: RoundRecord[] = [];
 
   constructor(
     private readonly players: string[],
     private readonly rounds: number,
     games: string[],
     rand: () => number,
+    /** Random per evening; clients settle the XP of one evening exactly once. */
+    readonly id: string = newEveningId(),
   ) {
     if (players.length < CONFIG.players.min) throw new Error('evening needs at least 2 players');
     if (!Number.isInteger(rounds) || rounds < CONFIG.rounds.min || rounds > CONFIG.rounds.max) {
@@ -81,6 +94,17 @@ export class Evening {
     return out;
   }
 
+  /** Known players only, string feat ids only (eveningXp drops unknown ids). */
+  private sanitizeFeats(feats: Record<string, string[]> | undefined): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    if (typeof feats !== 'object' || feats === null) return out;
+    for (const k of this.players) {
+      const list: unknown = feats[k];
+      if (Array.isArray(list)) out[k] = list.filter((f): f is string => typeof f === 'string');
+    }
+    return out;
+  }
+
   advance(event: EveningEvent): EveningPhase {
     const ph = this.phase;
     if (event.type === 'introDone' && ph.kind === 'intro') {
@@ -91,10 +115,16 @@ export class Evening {
       const points = roundPoints(placements, this.players.length, last ? CONFIG.lastRoundMultiplier : 1);
       for (const p of this.players) this.totals[p] += points[p] ?? 0;
       for (const p of placements[0] ?? []) if (p in this.wins) this.wins[p] += 1;
+      this.records.push({ placements, feats: this.sanitizeFeats(event.feats) });
       const totals = { ...this.totals };
-      this.phase = last
-        ? { kind: 'podium', ranking: this.byTieOrder(finalRanking(totals, this.wins)), totals, tieOrder: this.tieOrder }
-        : { kind: 'standings', round: ph.round, points, totals, tieOrder: this.tieOrder };
+      if (last) {
+        const ranking = this.byTieOrder(finalRanking(totals, this.wins));
+        const xp = eveningXp(this.players, this.records, ranking);
+        this.phase = { kind: 'podium', ranking, totals, tieOrder: this.tieOrder, eveningId: this.id, xp };
+      } else {
+        const xp = eveningXp(this.players, this.records, null);
+        this.phase = { kind: 'standings', round: ph.round, points, totals, tieOrder: this.tieOrder, eveningId: this.id, xp };
+      }
     } else if (event.type === 'standingsDone' && ph.kind === 'standings') {
       this.phase = this.intro(ph.round + 1);
     } else {
@@ -102,4 +132,13 @@ export class Evening {
     }
     return this.phase;
   }
+}
+
+/** Random evening id; randomUUID needs a secure context, so plain http (LAN dev) falls back to getRandomValues. */
+function newEveningId(): string {
+  const c = globalThis.crypto;
+  if (typeof c.randomUUID === 'function') return c.randomUUID();
+  const b = new Uint8Array(16);
+  c.getRandomValues(b);
+  return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }

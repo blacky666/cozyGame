@@ -85,3 +85,40 @@ describe('Evening', () => {
     expect([...orders[0]].sort()).toEqual(P);
   });
 });
+
+describe('Evening XP', () => {
+  const play = (ev: Evening, placements: string[][], feats?: Record<string, string[]>) => {
+    ev.advance({ type: 'introDone' });
+    return ev.advance({ type: 'gameResult', placements, feats });
+  };
+  it('standings carry the evening id and the XP lines so far', () => {
+    const ev = new Evening(P, CONFIG.rounds.min, games, rand, 'abend-1');
+    expect(ev.id).toBe('abend-1');
+    const st = play(ev, [['p0'], ['p1'], ['p2'], ['p3']], { p1: ['schubser'], p7: ['schubser'] });
+    if (st.kind !== 'standings') throw new Error('expected standings');
+    expect(st.eveningId).toBe(ev.id);
+    expect(st.xp.p0[0]).toEqual({ kind: 'teilnahme', xp: 50 });
+    expect(st.xp.p0).toContainEqual({ kind: 'platz', round: 1, place: 1, xp: 25 });
+    expect(st.xp.p1).toContainEqual({ kind: 'erfolg', round: 1, feat: 'schubser', xp: 5 });
+    expect(Object.values(st.xp).flat().some((l) => l.kind === 'gesamt')).toBe(false);
+  });
+  it('the podium carries the gesamt lines', () => {
+    const ev = new Evening(P, CONFIG.rounds.min, games, rand, 'abend-2');
+    let ph = play(ev, [['p0'], ['p1'], ['p2'], ['p3']]);
+    while (ph.kind === 'standings') {
+      ev.advance({ type: 'standingsDone' });
+      ph = play(ev, [['p0'], ['p1'], ['p2'], ['p3']]);
+    }
+    if (ph.kind !== 'podium') throw new Error('expected podium');
+    expect(ph.eveningId).toBe('abend-2');
+    expect(ph.xp.p0).toContainEqual({ kind: 'gesamt', place: 1, xp: 40 });
+    expect(ph.xp.p1).toContainEqual({ kind: 'gesamt', place: 2, xp: 20 });
+    expect(ph.xp.p0.filter((l) => l.kind === 'platz')).toHaveLength(CONFIG.rounds.min);
+  });
+  it('gets a random id by default', () => {
+    const a = new Evening(P, CONFIG.rounds.min, games, rand);
+    const b = new Evening(P, CONFIG.rounds.min, games, rand);
+    expect(a.id).toMatch(/^[0-9a-f-]{16,}$/);
+    expect(a.id).not.toBe(b.id);
+  });
+});

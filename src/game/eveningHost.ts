@@ -156,7 +156,7 @@ export class EveningHost {
     }
     if (result) {
       this.game = null;
-      this.enter(ev.advance({ type: 'gameResult', placements: result }));
+      this.enter(ev.advance({ type: 'gameResult', placements: result, feats: game.feats?.() ?? {} }));
     }
   }
 

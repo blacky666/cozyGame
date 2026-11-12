@@ -64,6 +64,33 @@ function setup(games: MiniGame[] = [game as MiniGame]) {
 }
 
 describe('EveningHost', () => {
+  it('passes the game feats into the standings XP lines', async () => {
+    const featGame: MiniGame<SandboxState> = {
+      ...game,
+      id: 'featjagd',
+      createHost: (players, rand, o) => ({
+        ...createSandboxHost(players, rand, o?.durationMs ?? 2000),
+        feats: () => ({ p0: ['schubser'] }),
+      }),
+    };
+    const s = setup([featGame as MiniGame]);
+    createClient(s.hub.join(), prof('Gast'));
+    await flush();
+    const sent: Array<[string, unknown]> = [];
+    const orig = s.session.setPhase.bind(s.session);
+    s.session.setPhase = (kind: string, data?: unknown) => {
+      sent.push([kind, data]);
+      orig(kind as never, data as never);
+    };
+    s.evening.start();
+    for (let i = 0; i < 10 && s.evening.phase.kind !== 'standings'; i++) s.tick(1);
+    const st = sent.find(([k]) => k === 'standings')?.[1] as Extract<EveningPhase, { kind: 'standings' }>;
+    expect(st.xp.p0).toContainEqual({ kind: 'erfolg', round: 1, feat: 'schubser', xp: 5 });
+    expect(st.xp.p1.some((l) => l.kind === 'erfolg')).toBe(false);
+    expect(typeof st.eveningId).toBe('string');
+  });
+
+
   it('start with fewer than 2 connected players throws and leaves the session recoverable', () => {
     const s = setup();
     expect(() => s.evening.start()).toThrow();
