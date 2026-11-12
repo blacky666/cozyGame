@@ -2,6 +2,7 @@ import { CONFIG } from '../../config';
 import { neutralInput } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
+import { countShoves, FeatTracker } from '../common/feats';
 import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import { stepWalker } from '../kartoffel/spudMove';
 import type { Mover } from '../common/mover';
@@ -113,6 +114,7 @@ export function createPaintHost(
     extraTaps[gp.key] = new Edge();
   }
   const grid = createGrid(arena);
+  const feats = new FeatTracker();
   /** Grid owner value of a player (0 is neutral). */
   const colour = (k: PlayerKey) => slotOf[k] + 1;
   let blobs: Blob[] = [];
@@ -260,7 +262,7 @@ export function createPaintHost(
       const present = keys.filter((k) => inputs[k] !== undefined);
 
       // 1. Shoves (present players only).
-      resolveShoves(present, players, shove, inputs);
+      countShoves(feats, resolveShoves(present, players, shove, inputs));
 
       // 2. Movement at speedOf; stunned players slide.
       for (const k of keys) {
@@ -338,6 +340,9 @@ export function createPaintHost(
         if (ev.kind === 'player') {
           players[ev.victim].slowMs = c.slowMs;
           addFx('getuencht', ev.x, ev.y, ev.victim, r, b.owner);
+          if (ev.victim !== b.owner && feats.count(b.owner, 'farb_tuencher') >= CONFIG.progress.feats.tuencher) {
+            feats.award(b.owner, 'farb_tuencher');
+          }
         } else {
           addFx(b.kind === 'bombe' ? 'bombe' : 'platsch', ev.x, ev.y, b.owner, r);
         }
@@ -359,8 +364,13 @@ export function createPaintHost(
       const counts = tileCounts(grid);
       for (const k of keys) players[k].tiles = counts[colour(k)];
 
-      // 9. Timer.
+      // 9. Timer; the area feat is judged once, in the tick the round ends (from the final counts).
       elapsedMs += ms;
+      if (elapsedMs >= durationMs - EPS) {
+        for (const k of keys) {
+          if (players[k].tiles >= CONFIG.progress.feats.areaFrac * grid.count) feats.award(k, 'farb_flaeche');
+        }
+      }
     },
     snapshot() {
       const ps: Record<PlayerKey, PaintPlayer> = {};
@@ -381,6 +391,9 @@ export function createPaintHost(
       const counts: Record<PlayerKey, number> = {};
       for (const k of keys) counts[k] = players[k].tiles;
       return rankByCount(counts);
+    },
+    feats() {
+      return feats.result();
     },
   };
 }

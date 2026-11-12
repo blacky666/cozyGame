@@ -756,6 +756,80 @@ describe('schneeball extras', () => {
   });
 });
 
+describe('schneeball feats', () => {
+  const WAIT = Math.ceil(C.invulnMs / 1000 / DT) + 1;
+  /** One scoring hit from -> to (waits out the victim's invulnerability first). */
+  const hit = (d: ReturnType<typeof driver>, from: string, to: string) => {
+    d.tick(WAIT);
+    const before = d.snap().players[from].score;
+    d.tap(from, ...body(d.snap().players[to]));
+    d.tick(20);
+    expect(d.snap().players[from].score).toBe(before + C.hitPoints);
+  };
+  const feats = (d: ReturnType<typeof driver>) => d.g.feats?.() ?? {};
+
+  it('three hits in a row give schnee_serie', () => {
+    const d = driver(['p0', 'p1', 'p2']);
+    p2ToMiddle(d);
+    hit(d, 'p2', 'p0');
+    hit(d, 'p2', 'p0');
+    expect(feats(d).p2 ?? []).not.toContain('schnee_serie');
+    hit(d, 'p2', 'p0');
+    expect(feats(d).p2).toContain('schnee_serie');
+  });
+  it('hit, get hit, two hits do not give schnee_serie', () => {
+    const d = driver(['p0', 'p1', 'p2']);
+    p2ToMiddle(d);
+    hit(d, 'p2', 'p0');
+    hit(d, 'p0', 'p2');
+    hit(d, 'p2', 'p0');
+    hit(d, 'p2', 'p0');
+    expect(feats(d).p2 ?? []).not.toContain('schnee_serie');
+  });
+  it('the first scoring hit gives schnee_erster to that thrower only', () => {
+    const d = driver(['p0', 'p1', 'p2']);
+    p2ToMiddle(d);
+    hit(d, 'p2', 'p0');
+    hit(d, 'p0', 'p2');
+    expect(feats(d).p2).toContain('schnee_erster');
+    expect(feats(d).p0 ?? []).not.toContain('schnee_erster');
+  });
+  it('breaking a snowman gives schnee_schneemann to the thrower', () => {
+    const d = driver(['p0', 'p1']);
+    d.set('p0', { down: true });
+    while (d.snap().players.p0.y < 124) d.tick();
+    d.set('p0', {});
+    d.tick();
+    const y = d.snap().players.p0.y;
+    for (let i = 0; i < 2; i++) {
+      d.tap('p0', 200, y - BALL_LIFT);
+      d.tick(20);
+    }
+    expect(feats(d).p0 ?? []).not.toContain('schnee_schneemann');
+    d.tap('p0', 200, y - BALL_LIFT);
+    d.tick(20);
+    expect(d.snap().snowmen.find((sm) => sm.id === 'obj60')!.state).toBe('kaputt');
+    expect(feats(d).p0).toContain('schnee_schneemann');
+    expect(feats(d).p1).toBeUndefined();
+  });
+  it('three shoves landed give schubser', () => {
+    const d = driver(['p0', 'p2']);
+    p2ToMiddle(d);
+    for (let i = 0; i < 3; i++) {
+      expect(feats(d).p2 ?? []).not.toContain('schubser');
+      d.set('p2', { left: true });
+      while (d.snap().players.p2.x - d.snap().players.p0.x > 12) d.tick();
+      d.set('p2', {});
+      while (d.snap().players.p2.shoveCdMs > 0 || d.snap().players.p0.stun) d.tick();
+      d.tick(Math.ceil(CONFIG.shove.immuneMs / 1000 / DT));
+      d.inputs.p2 = { ...d.inputs.p2, shoves: d.inputs.p2.shoves + 1 };
+      d.tick();
+      expect(d.snap().players.p0.stun).toBe(true);
+    }
+    expect(feats(d).p2).toContain('schubser');
+  });
+});
+
 describe('schneeball definition', () => {
   const player = (x: number, y: number) => ({
     x, y, vx: 0, vy: 0, dir: 'down' as const, score: 0, balls: 5, reloading: false, invulnMs: 0, down: false,

@@ -743,3 +743,92 @@ describe('Heiße Kartoffel host', () => {
     });
   });
 });
+
+describe('Heiße Kartoffel feats', () => {
+  const feats = (d: ReturnType<typeof driver>) => d.g.feats?.() ?? {};
+  /**
+   * rand () => 0: p0 gets the real potato with a 12 s fuse. p1 waits 16 px away, then steps in once
+   * about `leftMs` of the fuse are left (the potato was dealt in the baseline tick).
+   */
+  const passWithLeft = (leftMs: number) => {
+    const d = driver(['p0', 'p1'], { rand: () => 0 });
+    expect(d.holder()).toBe('p0');
+    d.approach('p1', 'p0', K.touchPx + 3);
+    expect(d.holder()).toBe('p0');
+    while (d.snap().elapsedMs < K.fuseMinMs - leftMs) d.tick();
+    d.approach('p1', 'p0', 8);
+    expect(d.holder()).toBe('p1');
+    expect(d.snap().bang).toBe(0);
+    return d;
+  };
+
+  it('passing the real potato with about 1.3 s fuse left gives kartoffel_knapp', () => {
+    const d = passWithLeft(1300);
+    expect(feats(d).p0).toContain('kartoffel_knapp');
+    expect(feats(d).p1).toBeUndefined();
+  });
+  it('passing it with 2 s left does not', () => {
+    const d = passWithLeft(2000);
+    expect(feats(d).p0 ?? []).not.toContain('kartoffel_knapp');
+  });
+  it('passing a fake in its last second never gives kartoffel_knapp', () => {
+    // Deal with r ~ 1 (p2 gets a ~20 s real potato), then r = 0: the first pickup is a fake with 6 s left.
+    let r = 0.999;
+    const d = driver(['p0', 'p1', 'p2'], { rand: () => r });
+    expect(d.holder()).toBe('p2');
+    r = 0;
+    while (d.snap().pickups.length === 0) d.tick();
+    const pk = d.snap().pickups[0];
+    expect(pk.kind).toBe('fake');
+    for (let n = 0; n < 600 && d.snap().pickups.length > 0; n++) {
+      const me = d.snap().players.p0;
+      if (Math.abs(me.y - pk.y) > 1.1) d.set('p0', me.y < pk.y ? { down: true } : { up: true });
+      else d.set('p0', me.x < pk.x ? { right: true } : { left: true });
+      d.tick();
+    }
+    d.set('p0', {});
+    const fake = d.snap().potatoes.find((p) => p.holder === 'p0');
+    expect(fake).toBeDefined();
+    const pickedAt = d.snap().elapsedMs;
+    d.approach('p1', 'p0', K.touchPx + 3);
+    expect(d.snap().potatoes.find((p) => p.id === fake!.id)?.holder).toBe('p0');
+    while (d.snap().elapsedMs < pickedAt + K.fakeFuseMinMs - 1000) d.tick();
+    d.approach('p1', 'p0', 8);
+    expect(d.snap().potatoes.find((p) => p.id === fake!.id)?.holder).toBe('p1');
+    expect(feats(d).p0 ?? []).not.toContain('kartoffel_knapp');
+  });
+  it('three passes give kartoffel_pass', () => {
+    const d = driver(['p0', 'p1', 'p2'], { rand: () => 0 });
+    expect(d.holder()).toBe('p0');
+    d.approach('p1', 'p0', 8);
+    expect(d.holder()).toBe('p1');
+    // Standing together the potato goes back and forth once per noBackMs.
+    let gives = 1;
+    let last = d.holder();
+    for (let n = 0; n < 300 && gives < 3; n++) {
+      d.tick();
+      const h = d.holder();
+      if (last === 'p0' && h === 'p1') gives++;
+      if (gives < 3) expect(feats(d).p0 ?? []).not.toContain('kartoffel_pass');
+      last = h;
+    }
+    expect(d.snap().bang).toBe(0);
+    expect(gives).toBe(3);
+    expect(feats(d).p0).toContain('kartoffel_pass');
+    expect(feats(d).p1 ?? []).not.toContain('kartoffel_pass');
+  });
+  it('three shoves landed give schubser', () => {
+    const d = driver(['p0', 'p1'], { rand: () => 0 });
+    for (let i = 0; i < 3; i++) {
+      expect(feats(d).p1 ?? []).not.toContain('schubser');
+      d.approach('p1', 'p0', 10);
+      while (d.snap().players.p1.shoveCdMs > 0 || d.snap().players.p0.stun) d.tick();
+      d.tick(Math.ceil(CONFIG.shove.immuneMs / TICK_MS));
+      d.approach('p1', 'p0', 10);
+      d.shove('p1');
+      d.tick();
+      expect(d.snap().players.p0.stun).toBe(true);
+    }
+    expect(feats(d).p1).toContain('schubser');
+  });
+});

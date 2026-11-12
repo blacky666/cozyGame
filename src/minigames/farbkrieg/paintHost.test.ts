@@ -863,3 +863,72 @@ describe('advanceBlob', () => {
     expect(ev!.y).toBeGreaterThanOrEqual(32 + F.blobRadius - 0.5);
   });
 });
+
+describe('Farbkrieg feats', () => {
+  const feats = (d: ReturnType<typeof driver>) => d.g.feats?.() ?? {};
+  const COOLDOWN_TICKS = Math.ceil(F.klecksCooldownMs / 1000 / DT) + 1;
+
+  it('three getüncht hits give farb_tuencher', () => {
+    const d = driver(['p0', 'p1']);
+    d.set('p1', { left: true });
+    d.tick(80);
+    d.set('p1', {});
+    const seen = new Set<number>();
+    for (let n = 0; n < 3; n++) {
+      expect(feats(d).p0 ?? []).not.toContain('farb_tuencher');
+      const v = d.snap().players.p1;
+      d.tap('p0', v.x, v.y);
+      for (let i = 0; i < COOLDOWN_TICKS; i++) {
+        d.tick();
+        for (const fx of d.snap().fx) if (fx.kind === 'getuencht') seen.add(fx.id);
+      }
+      expect(seen.size).toBe(n + 1);
+    }
+    expect(feats(d).p0).toContain('farb_tuencher');
+    expect(feats(d).p1).toBeUndefined();
+  });
+
+  it('owning at least a third of the paintable tiles at the end gives farb_flaeche', () => {
+    // Normal length: in the last 15 s every Klecks paints r 48, so p0 throws around itself from its spawn.
+    const d = driver(['p0', 'p1'], { absent: ['p1'] });
+    const aims: [number, number][] = [[90, 60], [140, 100], [70, 140], [160, 50], [180, 150], [110, 170], [40, 120], [130, 40]];
+    const ticks = Math.round(F.durationMs / 1000 / DT);
+    for (let i = 1, a = 0; i < ticks; i++) {
+      const finale = d.snap().timeLeftMs <= finaleAt(F.durationMs);
+      if (finale && i % COOLDOWN_TICKS === 0) {
+        const [x, y] = aims[a++ % aims.length];
+        d.tap('p0', x, y);
+      }
+      d.tick();
+      if (d.g.result() === null) expect(feats(d).p0 ?? []).not.toContain('farb_flaeche');
+    }
+    expect(d.g.result()).not.toBeNull();
+    expect(d.snap().players.p0.tiles).toBeGreaterThanOrEqual(Math.ceil(grid.count / 3));
+    expect(feats(d).p0).toContain('farb_flaeche');
+    expect(feats(d).p1).toBeUndefined();
+  });
+
+  it('fewer tiles than a third at the end give no farb_flaeche', () => {
+    const d = driver(['p0', 'p1'], { durationMs: 18000, absent: ['p1'] });
+    d.tick(Math.round(18 / DT));
+    expect(d.g.result()).not.toBeNull();
+    expect(d.snap().players.p0.tiles).toBeLessThan(grid.count / 3);
+    expect(feats(d).p0 ?? []).not.toContain('farb_flaeche');
+  });
+
+  it('three shoves landed give schubser', () => {
+    const d = driver(['p0', 'p1']);
+    for (let i = 0; i < 3; i++) {
+      expect(feats(d).p1 ?? []).not.toContain('schubser');
+      d.set('p1', { left: true });
+      while (d.snap().players.p1.x - d.snap().players.p0.x > 12) d.tick();
+      d.set('p1', {});
+      while (d.snap().players.p1.shoveCdMs > 0 || d.snap().players.p0.stun) d.tick();
+      d.tick(Math.ceil(CONFIG.shove.immuneMs / 1000 / DT));
+      d.inputs.p1 = { ...d.inputs.p1, shoves: d.inputs.p1.shoves + 1 };
+      d.tick();
+      expect(d.snap().players.p0.stun).toBe(true);
+    }
+    expect(feats(d).p1).toContain('schubser');
+  });
+});

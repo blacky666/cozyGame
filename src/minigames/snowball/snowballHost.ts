@@ -2,6 +2,7 @@ import { CONFIG } from '../../config';
 import { neutralInput } from '../../net/protocol';
 import { moveCircle, tileAt, type Arena, type Solid } from '../common/arena';
 import { Edge } from '../common/edges';
+import { countShoves, FeatTracker } from '../common/feats';
 import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
 import { advanceBall, BALL_LIFT, ballOverlaps, spawnIgnores, throwPower, type BallTarget } from './snowballBalls';
@@ -91,6 +92,9 @@ export function createSnowballHost(
 ): MiniGameHost<SnowState> {
   const c = CONFIG.snowball;
   const keys = gamePlayers.map((p) => p.key);
+  const feats = new FeatTracker();
+  /** Someone already scored a hit this round (schnee_erster). */
+  let anyHit = false;
   const remote: Record<PlayerKey, boolean> = {};
   const players: Record<PlayerKey, SnowPlayer> = {};
   const shove: Record<PlayerKey, ShoveSlot> = {};
@@ -226,15 +230,17 @@ export function createSnowballHost(
     }
   };
 
-  const hitSnowman = (sm: Snowman) => {
-    if (sm.state === 'kaputt' || sm.state === 'aufbau') return;
+  /** Returns whether this hit broke the snowman. */
+  const hitSnowman = (sm: Snowman): boolean => {
+    if (sm.state === 'kaputt' || sm.state === 'aufbau') return false;
     sm.hits += 1;
     if (sm.hits >= c.snowmanHits) {
       sm.state = 'kaputt';
       sm.rebuildMs = c.snowmanRebuildMs;
-    } else {
-      sm.state = DAMAGE[Math.min(sm.hits, DAMAGE.length - 1)];
+      return true;
     }
+    sm.state = DAMAGE[Math.min(sm.hits, DAMAGE.length - 1)];
+    return false;
   };
 
   const stepSnowmen = (ms: number) => {
@@ -267,7 +273,7 @@ export function createSnowballHost(
       // Only players with an input this tick (= connected) take part: absent ones can neither shove nor be shoved.
       // Down players neither shove nor can be shoved; their presses are consumed, not queued.
       for (const k of keys) if (players[k].down && inputs[k]) shove[k].edge.take(inputs[k].shoves);
-      resolveShoves(keys.filter((k) => inputs[k] && !players[k].down), players, shove, inputs);
+      countShoves(feats, resolveShoves(keys.filter((k) => inputs[k] && !players[k].down), players, shove, inputs));
       // 2. Movement.
       for (const k of keys) {
         const p = players[k];
@@ -381,6 +387,13 @@ export function createSnowballHost(
           }
           const thrower = players[b.owner];
           if (thrower) thrower.score += c.hitPoints;
+          if (thrower && b.owner !== ev.victim) {
+            if (!anyHit) feats.award(b.owner, 'schnee_erster');
+            anyHit = true;
+            if (feats.count(b.owner, 'schnee_serie') >= CONFIG.progress.feats.serie) feats.award(b.owner, 'schnee_serie');
+          }
+          // A scoring hit taken breaks the victim's streak (ice hat and invulnerable blocks do not).
+          feats.reset(ev.victim, 'schnee_serie');
           v.score = Math.max(0, v.score - c.hitPenalty);
           v.invulnMs = c.invulnMs;
           // Knocked down: lies on the ground, cannot act; the shove slide (if any) stops.
@@ -395,7 +408,7 @@ export function createSnowballHost(
         }
         const sm = ev.kind === 'solid' && ev.solid ? snowmanById.get(ev.solid.id) : undefined;
         if (sm) {
-          hitSnowman(sm);
+          if (hitSnowman(sm) && players[b.owner]) feats.award(b.owner, 'schnee_schneemann');
           if (sm.state === 'kaputt') solids = solidsNow();
         }
         if (ev.kind === 'solid' && b.kind === 'abpraller' && b.bounces < c.bounces) {
@@ -429,6 +442,9 @@ export function createSnowballHost(
       if (elapsedMs < durationMs) return null;
       const scores = [...new Set(keys.map((k) => players[k].score))].sort((a, b) => b - a);
       return scores.map((s) => keys.filter((k) => players[k].score === s));
+    },
+    feats() {
+      return feats.result();
     },
   };
 }

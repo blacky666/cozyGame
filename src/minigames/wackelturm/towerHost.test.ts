@@ -631,6 +631,29 @@ describe('Wackel-Turm host', () => {
       if (action === 'fies') rightClick(d, k);
     };
 
+    it('a wind at another plot gives turm_aerger; a cancelled click does not', () => {
+      const d = driver(['p0', 'p1'], { rand: always('kurz') });
+      charge(d, 'p0', 0, 2);
+      arm(d, 'p0', 'wind');
+      click(d, 'p0', 0);
+      expect(d.snap().players.p0.charges).toBe(2);
+      expect(d.g.feats?.().p0 ?? []).not.toContain('turm_aerger');
+      arm(d, 'p0', 'wind');
+      click(d, 'p0', 1);
+      expect(d.snap().players.p0.charges).toBe(1);
+      expect(d.g.feats?.().p0).toContain('turm_aerger');
+      expect(d.g.feats?.().p1).toBeUndefined();
+    });
+
+    it('a Fieser Klotz at another plot gives turm_aerger too', () => {
+      const d = driver(['p0', 'p1'], { rand: always('kurz') });
+      charge(d, 'p0', 0);
+      arm(d, 'p0', 'fies');
+      click(d, 'p0', 1);
+      expect(d.snap().players.p0.charges).toBe(0);
+      expect(d.g.feats?.().p0).toContain('turm_aerger');
+    });
+
     it('columnAt maps aim x to the plot index or null', () => {
       expect(columnAt(layout, AIM(1))).toBe(1);
       expect(columnAt(layout, layout.plots[0].minX - 1)).toBeNull();
@@ -844,3 +867,34 @@ function fill40(d: Driver) {
     }
   }
 }
+
+describe('Wackel-Turm feats', () => {
+  it('10 placed blocks give turm_zehn', () => {
+    const d = driver(['p0', 'p1'], { rand: always('kurz') });
+    const row = (dxs: number[], y: number) => {
+      for (const dx of dxs) spawnBlock(d.world('p0'), 'kurz', P0.centre + dx, y, 0);
+    };
+    const settle = () => d.tick(ticksFor(C.restHoldMs + 1000));
+    row([-40, -24, -8, 8, 24, 40], layout.surfaceY - 8);
+    settle();
+    row([-40, -24, -8], layout.surfaceY - 24);
+    settle();
+    expect(d.snap().players.p0.placed).toBe(9);
+    expect(d.g.feats?.().p0 ?? []).not.toContain('turm_zehn');
+    row([8], layout.surfaceY - 24);
+    settle();
+    expect(d.snap().players.p0.placed).toBe(10);
+    expect(d.g.feats?.().p0).toContain('turm_zehn');
+    expect(d.g.feats?.().p1).toBeUndefined();
+  });
+
+  it('the goal winner gets turm_ziel', () => {
+    const d = driver(['p0', 'p1'], { rand: always('kurz') });
+    stack(d, 'p0', 0, 'lang', 12);
+    stack(d, 'p1', 1, 'kurz', 2);
+    for (let i = 0; i < 300 && d.g.result() === null; i++) d.tick();
+    expect(d.snap().winner).toBe('p0');
+    expect(d.g.feats?.().p0).toContain('turm_ziel');
+    expect(d.g.feats?.().p1 ?? []).not.toContain('turm_ziel');
+  });
+});

@@ -2,6 +2,7 @@ import { CONFIG } from '../../config';
 import { neutralInput } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
+import { countShoves, FeatTracker } from '../common/feats';
 import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import type { Mover } from '../common/mover';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
@@ -105,6 +106,8 @@ export function createSpudHost(
   const safetyMs = opts.safetyMs ?? c.safetyMs;
   const keys = gamePlayers.map((p) => p.key);
   const isLeader = new Set(opts.leaders ?? []);
+  const feats = new FeatTracker();
+  const F = CONFIG.progress.feats;
   const players: Record<PlayerKey, SpudPlayer> = {};
   const shove: Record<PlayerKey, ShoveSlot> = {};
   const taps: Record<PlayerKey, Edge> = {};
@@ -264,7 +267,7 @@ export function createSpudHost(
 
       // 1. Shoves (living players with input). Ghost presses are consumed, never queued.
       for (const k of keys) if (players[k].ghost && inputs[k]) shove[k].edge.take(inputs[k].shoves);
-      resolveShoves(active, players, shove, inputs);
+      countShoves(feats, resolveShoves(active, players, shove, inputs));
 
       // 2. Movement at speedOf; stunned players slide.
       for (const k of keys) {
@@ -345,6 +348,9 @@ export function createSpudHost(
         if (best) {
           const to = players[best];
           addFx('uebergabe', (h.x + to.x) / 2, (h.y + to.y) / 2, best);
+          // Feats go to the giver: any pass counts, the last second only with the real potato.
+          if (feats.count(pot.holder, 'kartoffel_pass') >= F.passes) feats.award(pot.holder, 'kartoffel_pass');
+          if (!pot.fake && pot.fuseMs - pot.burnMs <= F.lastSecondMs) feats.award(pot.holder, 'kartoffel_knapp');
           pot.noBackFrom = pot.holder;
           pot.noBackMs = c.noBackMs;
           pot.holder = best;
@@ -408,6 +414,9 @@ export function createSpudHost(
       if (alive.length > 0) groups.push(alive);
       for (let i = out.length - 1; i >= 0; i--) groups.push([out[i]]);
       return groups;
+    },
+    feats() {
+      return feats.result();
     },
   };
 }

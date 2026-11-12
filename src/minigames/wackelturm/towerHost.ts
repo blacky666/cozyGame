@@ -2,6 +2,7 @@ import Matter from 'matter-js';
 import { CONFIG } from '../../config';
 import type { InputState } from '../../net/protocol';
 import { Edge } from '../common/edges';
+import { FeatTracker } from '../common/feats';
 import { rankByCount } from '../farbkrieg/paintGrid';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
 import type { Plot, TowerLayout } from './towerLayout';
@@ -217,6 +218,7 @@ export function createTowerHost(
   let reachers: PlayerKey[] = [];
   let nextBlockId = 1;
   let nextFxId = 1;
+  const feats = new FeatTracker();
 
   const pick = <T>(list: readonly T[]): T => list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
   const kindAt = (i: number): Kind => {
@@ -305,6 +307,8 @@ export function createTowerHost(
     const t = players[target];
     if (action === 'wind' && t.windImmuneMs > 0) return;
     p.charges--;
+    // Fired at another plot (a cancel returned above).
+    feats.award(k, 'turm_aerger');
     const x = plotOf(target).centre;
     if (action === 'wind') {
       const w = slots[target].world;
@@ -378,6 +382,7 @@ export function createTowerHost(
       if (!m.placed && still) {
         m.placed = true;
         p.placed++;
+        if (p.placed >= CONFIG.progress.feats.towerBlocks) feats.award(k, 'turm_zehn');
         if (p.placed % c.chargeEvery === 0) p.charges = Math.min(c.chargeCap, p.charges + 1);
       }
       // A placed block re-anchors its top whenever it has been still again (it may settle higher or lower)
@@ -514,6 +519,7 @@ export function createTowerHost(
       reachers = keys.filter((k) => slots[k].goalMs >= c.goalHoldMs - EPS).sort((a, b) => slotOf[a] - slotOf[b]);
       if (reachers.length > 0) {
         winner = reachers[0];
+        feats.award(winner, 'turm_ziel');
         addFx('ziel', winner, plotOf(winner).centre, layout.surfaceY - c.goalPx);
       }
 
@@ -550,6 +556,9 @@ export function createTowerHost(
       for (const k of keys) if (!reachers.includes(k)) heights[k] = players[k].heightPx;
       const rest = rankByCount(heights);
       return reachers.length > 0 ? [[...reachers], ...rest] : rest;
+    },
+    feats() {
+      return feats.result();
     },
     __world(k) {
       return slots[k].world;
