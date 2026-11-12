@@ -266,6 +266,10 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
           roster.setReady(p.id, p.isBot);
         }
       }
+      // Every client starts the next evening with a fresh keyboard (counters from 0): rejoin offsets
+      // from this evening would swallow its first presses.
+      offsets.clear();
+      rebase.clear();
       phase = LOBBY;
       toAll('phase', data === undefined ? { phase: LOBBY } : { phase: LOBBY, data });
       rosterChanged();

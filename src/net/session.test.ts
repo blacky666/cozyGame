@@ -356,6 +356,14 @@ describe('session', () => {
     await flush();
     expect(host.input(t2.selfId)).toEqual({ ...neutralInput(), shoves: 4, pranks: 3, emotes: 1 });
     expect(fired(t2.selfId)).toBe(2);
+
+    // "Nochmal?": the next evening the client starts a fresh keyboard (counters from 0); no offset may
+    // swallow its presses.
+    host.resetForLobby();
+    host.setPhase('playing');
+    c2.sendInput({ ...neutralInput(), emotes: 1 });
+    await flush();
+    expect(host.input(t2.selfId).emotes).toBe(1);
   });
 
   it('host close() sends bye and the client reports the host lost immediately', async () => {
