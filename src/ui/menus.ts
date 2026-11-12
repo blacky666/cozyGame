@@ -12,6 +12,8 @@ import type { Profile } from '../save/profile';
 import { SOUND_PACKAGES } from '../audio/packages';
 import { sound } from '../audio/sound';
 import { mountSoundButton } from '../audio/soundButton';
+import { mountFullscreenButton } from './fullscreenButton';
+import { mountFocusHint } from './focusHint';
 import { mountClickSounds, uiSound } from '../audio/uiSounds';
 import { loadSelection, saveSelection } from '../minigames/catalog';
 import { showLobby } from './lobbyScreen';
@@ -45,6 +47,8 @@ export function startMenus(root: HTMLElement): void {
   let profile: Profile = loadProfile();
   void getAssets();
   mountSoundButton();
+  mountFullscreenButton();
+  mountFocusHint();
   mountClickSounds();
   for (const p of SOUND_PACKAGES) void sound.loadPackage(p);
 

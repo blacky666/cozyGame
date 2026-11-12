@@ -1,4 +1,5 @@
 import { neutralInput, type InputState } from '../net/protocol';
+import { isTyping as typing } from '../ui/typing';
 
 const UP = ['KeyW', 'ArrowUp'];
 const DOWN = ['KeyS', 'ArrowDown'];
@@ -9,11 +10,6 @@ export const SHOVE_KEY = 'Space';
 const TURN_CCW = 'KeyQ';
 const TURN_CW = 'KeyE';
 const ALL = new Set([...UP, ...DOWN, ...LEFT, ...RIGHT, SHOVE_KEY, TURN_CCW, TURN_CW]);
-
-/** Typing into a text field must never trigger game keys. */
-const typing = (t: EventTarget | null): boolean =>
-  typeof HTMLElement !== 'undefined' && t instanceof HTMLElement &&
-  (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
 
 /** Build an InputState from pressed key codes (WASD; arrows as a fallback) and the shove count. */
 export function inputFromKeys(

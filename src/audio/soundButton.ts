@@ -1,6 +1,7 @@
 import { h } from '../ui/dom';
 import { sound } from './sound';
 import type { SoundSettings } from './settings';
+import { isTyping as typing } from '../ui/typing';
 
 export const MUTE_KEY = 'KeyM';
 
@@ -29,10 +30,6 @@ function icon(muted: boolean): SVGSVGElement {
   return svg;
 }
 
-/** Typing into a text field must never toggle mute. */
-const typing = (t: EventTarget | null): boolean =>
-  t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-
 const slider = (label: string, value: number, on: (v: number) => void) => {
   const input = h('input', {
     type: 'range', min: 0, max: 100, step: 5, value: Math.round(value * 100), class: 'cg-slider', 'aria-label': label,
@@ -50,10 +47,17 @@ export function mountSoundButton(): () => void {
   const music = slider('Musik', s.music, (v) => sound.update({ music: v }));
   const sfx = slider('Effekte', s.sfx, (v) => sound.update({ sfx: v }));
   const mute = h('button', { class: 'cg-btn cg-secondary cg-sound-mute' });
-  mute.addEventListener('click', () => sound.toggleMute());
+  mute.addEventListener('click', () => {
+    sound.toggleMute();
+    mute.blur();
+  });
   const panel = h('div', { class: 'cg-sound-panel', hidden: true }, music.row, sfx.row, mute);
   const btn = h('button', { class: 'cg-sound-btn', 'aria-haspopup': 'true' });
-  btn.addEventListener('click', () => (panel.hidden = !panel.hidden));
+  btn.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    // Never keep focus: a later Space (shove/drop) must not press this button again.
+    btn.blur();
+  });
   const box = h('div', { class: 'cg-sound' }, btn, panel);
   document.body.append(box);
 
