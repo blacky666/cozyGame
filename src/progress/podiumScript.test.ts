@@ -41,7 +41,7 @@ describe('podiumScript', () => {
     expect(bars[0].ms).toBe(P.barMs);
 
     const iUp = s.findIndex((x) => x.kind === 'levelUp');
-    expect(s[iUp]).toEqual({ at: bars[0].at + P.barMs, kind: 'levelUp', level: 2 });
+    expect(s[iUp]).toEqual({ at: bars[0].at + P.barMs, kind: 'levelUp', level: 2, need: 160 });
     expect(s[iUp + 1]).toMatchObject({ kind: 'unlock', item: 'emote.zunge' });
     expect(bars[1].at).toBeGreaterThanOrEqual(s[iUp + 1].at + P.unlockMs);
     expect(s[s.length - 1].kind).toBe('tip');
@@ -77,5 +77,12 @@ describe('podiumScript', () => {
   it('a box with every pool item owned gives only the star', () => {
     const r = report(prof({ xp: 19720, lastPlayDay: TODAY }), [{ kind: 'teilnahme', xp: 1000 }], [...CONFIG.progress.boxPool]);
     expect(of(podiumScript(r, { tip: false }), 'box')).toMatchObject([{ item: null }]);
+  });
+
+  it('exactly on a level boundary the level-up step carries the new level and its need (bar resets to 0/need)', () => {
+    const r = report(prof({ xp: 0, lastPlayDay: TODAY }), [{ kind: 'teilnahme', xp: 120 }]);
+    const s = podiumScript(r, { tip: false });
+    expect(of(s, 'bar')).toMatchObject([{ level: 1, from: 0, to: 120, need: 120 }]);
+    expect(of(s, 'levelUp')).toEqual([{ at: expect.any(Number), kind: 'levelUp', level: 2, need: 160 }]);
   });
 });

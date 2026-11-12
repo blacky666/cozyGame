@@ -121,6 +121,8 @@ export class XpPanel {
       case 'levelUp': {
         this.clearCard();
         this.levelText.setText(`Level ${s.level}`);
+        this.fillTween?.stop();
+        this.setBar(0, s.need); // label and numbers agree after a level-up
         this.add(nineSlice(sc, 'ui.panel.karte', X + 2, ROW_Y - 6, W - 4, LEVEL_Y - ROW_Y - 2), true);
         const rays = assetSprite(sc, 'ui.levelup.strahlen', CX, CARD_Y);
         if (rays) this.add(rays, true);

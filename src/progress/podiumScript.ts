@@ -10,7 +10,7 @@ const P = CONFIG.progress;
 export type PodiumStep =
   | { at: number; kind: 'item'; label: string; xp: number }
   | { at: number; kind: 'bar'; level: number; from: number; to: number; need: number; ms: number }
-  | { at: number; kind: 'levelUp'; level: number }
+  | { at: number; kind: 'levelUp'; level: number; need: number }
   | { at: number; kind: 'unlock'; item: ItemId }
   | { at: number; kind: 'box'; item: ItemId | null }
   | { at: number; kind: 'tip' };
@@ -48,7 +48,7 @@ export function podiumScript(r: SettleReport, o: { tip: boolean }): PodiumStep[]
     if (segEnd === end) {
       if (x < capXp) {
         const level = info.level + 1;
-        out.push({ at: t, kind: 'levelUp', level });
+        out.push({ at: t, kind: 'levelUp', level, need: levelInfo(xpToReach(level)).need });
         const item = unlockAt.get(level);
         if (item) out.push({ at: t, kind: 'unlock', item });
         t += P.podium.unlockMs;
