@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_IDS, type RoundCard } from '../flow/cards';
+import { CARD_IDS, type CardId, type RoundCard } from '../flow/cards';
 import type { EveningPhase } from '../flow/evening';
 import { mulberry32 } from '../flow/rng';
 import { neutralInput, type InputState } from '../net/protocol';
@@ -8,7 +8,7 @@ import { createLocalHub } from '../net/transport';
 import { createSandboxHost, type SandboxState } from '../minigames/sandbox/sandboxHost';
 import type { GamePlayer, MiniGame } from '../minigames/types';
 import { defaultProfile } from '../save/profile';
-import { EveningHost, type SnapPayload } from './eveningHost';
+import { EveningHost, type EveningHostOptions, type SnapPayload } from './eveningHost';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await new Promise<void>((r) => setImmediate(r));
@@ -35,7 +35,7 @@ const game: MiniGame<SandboxState> = {
   botView: (s, k) => (s.players[k] ? { self: s.players[k], targets: [] } : null),
 };
 
-function setup(games: MiniGame[] = [game as MiniGame]) {
+function setup(games: MiniGame[] = [game as MiniGame], extra: Partial<EveningHostOptions> = {}) {
   const hub = createLocalHub();
   const ht = hub.join();
   const session = createHost(ht, prof('Host'));
@@ -57,6 +57,7 @@ function setup(games: MiniGame[] = [game as MiniGame]) {
       return () => void stopped++;
     },
     onPhase: (p) => phases.push(p),
+    ...extra,
   });
   const tick = (sec: number) => {
     for (let t = 0; t < sec; t += 0.05) ticker?.(0.05);
@@ -412,5 +413,111 @@ describe('EveningHost cards', () => {
     await flush();
     s.tick(0.35);
     expect(phaseOf(s)).toMatchObject({ kind: 'reveal', random: true });
+  });
+});
+
+describe('EveningHost pranks', () => {
+  type Log = { round: number; inputs: Record<string, InputState> }[];
+  /**
+   * Fake game: records the (masked) inputs it gets, exposes prankBodies (p0 at x 100, p1 at 150, …),
+   * ends with `order` after runMs(round).
+   */
+  const prankSetup = async (o: { order: string[][]; runMs: (round: number) => number; bots?: number; forceCard?: CardId }) => {
+    const log: Log = [];
+    let rounds = 0;
+    const fake: MiniGame = {
+      ...(game as MiniGame),
+      botView: () => ({ self: { x: 0, y: 0 }, targets: [] }),
+      createHost: (players) => {
+        const round = ++rounds;
+        let elapsed = 0;
+        return {
+          tick(dt, inputs) {
+            elapsed += dt * 1000;
+            log.push({ round, inputs: structuredClone(inputs) });
+          },
+          snapshot: () => ({}),
+          result: () => (elapsed >= o.runMs(round) ? o.order : null),
+          prankBodies: () => players.map((p, i) => ({ key: p.key, x: 100 + 50 * i, y: 100, affectable: true, out: false })),
+        };
+      },
+    };
+    const s = setup([fake], { forceCard: o.forceCard });
+    const botUp = { ...neutralInput(), up: true };
+    for (let i = 0; i < (o.bots ?? 1); i++) {
+      const bot = s.session.addLocalPlayer('Bot ' + i, prof('x').look, { isBot: true })!;
+      s.evening.addBot(bot.id, () => botUp);
+    }
+    await flush();
+    const snaps: SnapPayload[] = [];
+    const sent: Array<[string, unknown]> = [];
+    const origB = s.session.broadcast.bind(s.session);
+    s.session.broadcast = ((kind: string, data: unknown) => {
+      if (kind === 'playing') snaps.push(data as SnapPayload);
+      origB(kind as never, data as never);
+    }) as typeof s.session.broadcast;
+    const origP = s.session.setPhase.bind(s.session);
+    s.session.setPhase = (kind: string, data?: unknown) => {
+      sent.push([kind, data]);
+      origP(kind as never, data as never);
+    };
+    const until = (kind: string, round: number) => {
+      for (let i = 0; i < 400 && !(s.evening.phase.kind === kind && 'round' in s.evening.phase && s.evening.phase.round === round); i++) s.tick(0.05);
+      expect(s.evening.phase).toMatchObject({ kind, round });
+    };
+    return { ...s, log, snaps, sent, until };
+  };
+
+  it('card falle freezes the victim for falleMs at the input layer; others move', async () => {
+    // p1 wins round 1 -> victim p1, chooser p0 (host: timeout -> the forced card).
+    const s = await prankSetup({ order: [['p1'], ['p0']], runMs: (r) => (r === 1 ? 0 : 5000), forceCard: 'falle' });
+    s.local[0] = { ...neutralInput(), up: true };
+    s.evening.start();
+    s.until('playing', 2);
+    expect(s.evening.phase).toMatchObject({ card: { id: 'falle', victim: 'p1', chooser: 'p0' } });
+    expect(s.evening.latestPranks.fx).toMatchObject([{ key: 'p1', kind: 'frozen' }]);
+    s.tick(4);
+    const r2 = s.log.filter((e) => e.round === 2);
+    expect(r2.length).toBeGreaterThan(70);
+    for (const e of r2.slice(0, 55)) expect([e.inputs.p0.up, e.inputs.p1.up]).toEqual([true, false]);
+    for (const e of r2.slice(62)) expect([e.inputs.p0.up, e.inputs.p1.up]).toEqual([true, true]);
+    const first = s.snaps.find((p) => p.round === 2)!;
+    expect(first.pranks.fx).toMatchObject([{ key: 'p1', kind: 'frozen' }]);
+  });
+
+  it('card doppelter_streich gives the chooser two uses', async () => {
+    const s = await prankSetup({
+      order: [['p1'], ['p0'], ['p2']], runMs: (r) => (r === 1 ? 0 : 5000), bots: 2, forceCard: 'doppelter_streich',
+    });
+    s.evening.start();
+    s.until('playing', 2);
+    expect(s.evening.phase).toMatchObject({ card: { id: 'doppelter_streich', chooser: 'p2' } });
+    s.tick(0.2);
+    expect(s.evening.latestPranks.left).toEqual({ p0: 1, p1: 1, p2: 2 });
+  });
+
+  it('a landed prank gives streich_gelandet; snapshots carry pranks; a new round has fresh uses', async () => {
+    const s = await prankSetup({ order: [['p0'], ['p1']], runMs: () => 1500 });
+    s.session.setLocalProfile(s.session.selfId, { ...prof('Host').look, prank: 'furzkissen' }, 1, 0);
+    await flush();
+    s.evening.start();
+    s.until('playing', 1);
+    expect(s.evening.latestPranks.left).toEqual({ p0: 1, p1: 1 });
+    s.local[0] = { ...neutralInput(), aimX: 150, aimY: 100, pranks: 0 };
+    s.tick(0.2);
+    s.local[0] = { ...neutralInput(), aimX: 150, aimY: 100, pranks: 1 };
+    s.tick(0.1);
+    expect(s.evening.latestPranks).toMatchObject({ left: { p0: 0 }, fx: [{ key: 'p1', kind: 'stumble' }] });
+    // Stumbling p1 sends up but the game sees nothing.
+    expect(s.log.at(-1)!.inputs.p1.up).toBe(false);
+    s.until('standings', 1);
+    const st = s.sent.find(([k]) => k === 'standings')?.[1] as Extract<EveningPhase, { kind: 'standings' }>;
+    expect(st.xp.p0).toContainEqual({ kind: 'erfolg', round: 1, feat: 'streich_gelandet', xp: 5 });
+    expect(s.evening.latestPranks).toEqual({ fx: [], bananas: [], left: {}, cues: [] });
+    s.until('playing', 2);
+    s.tick(0.2);
+    expect(s.evening.latestPranks.left.p0).toBe(1);
+    expect(s.snaps.length).toBeGreaterThan(5);
+    expect(s.snaps.every((p) => p.pranks && Array.isArray(p.pranks.fx))).toBe(true);
   });
 });

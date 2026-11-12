@@ -95,7 +95,7 @@ export function runHostEvening(
     pickCard: (card) => void host.pickCard(selfKey(), card),
     hostSnapshot: () =>
       host.phase.kind === 'playing'
-        ? { round: host.phase.round, state: host.latest, acks: {}, emotes: host.latestEmotes, tick: host.latestTick, at: host.latestAt }
+        ? { round: host.phase.round, state: host.latest, acks: {}, emotes: host.latestEmotes, pranks: host.latestPranks, tick: host.latestTick, at: host.latestAt }
         : null,
     playAgain: () => {
       offCard();

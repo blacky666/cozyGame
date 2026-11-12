@@ -6,6 +6,8 @@ import type { PlayerInfo } from '../net/roster';
 import { startHostTicker, type HostSession } from '../net/session';
 import type { AssetFile } from '../gfx/assetTypes';
 import { EmoteHost, type EmoteShow } from '../minigames/common/emotes';
+import { emptyPrankSnap, PrankHost, type PrankSnap } from '../minigames/common/pranks';
+import type { FeatId } from '../progress/feats';
 import { playerKey, type BotView, type GamePlayer, type MiniGame, type MiniGameHost, type PlayerKey } from '../minigames/types';
 
 /*
@@ -23,8 +25,11 @@ export type EveningTiming = {
 /**
  * acks: per player key, the seq of the last input the host processed (for client reconciliation).
  * emotes: the emote bubbles showing right now (game-agnostic, drawn by MinigameScene).
+ * pranks: prank effects, bananas, uses left and one-shot cues of this round (game-agnostic).
  */
-export type SnapPayload = { round: number; state: unknown; acks: Record<PlayerKey, number>; emotes: EmoteShow[] };
+export type SnapPayload = {
+  round: number; state: unknown; acks: Record<PlayerKey, number>; emotes: EmoteShow[]; pranks: PrankSnap;
+};
 export type BotBrain = (view: BotView) => InputState;
 
 export const DEFAULT_TIMING: EveningTiming = {
@@ -57,6 +62,15 @@ export interface EveningHostOptions {
 
 const keyOf = (p: PlayerInfo): PlayerKey => playerKey(p.slot);
 
+/** Per player the union of two feat lists (game feats first). */
+function mergeFeats(a: Record<PlayerKey, FeatId[]>, b: Record<PlayerKey, FeatId[]>): Record<PlayerKey, FeatId[]> {
+  const out: Record<PlayerKey, FeatId[]> = {};
+  for (const src of [a, b]) {
+    for (const [k, list] of Object.entries(src)) out[k] = [...new Set([...(out[k] ?? []), ...list])];
+  }
+  return out;
+}
+
 export class EveningHost {
   phase: EveningPhase = { kind: 'lobby' };
   /** Latest minigame snapshot; the host scene interpolates over (latestTick, latestAt). */
@@ -66,6 +80,8 @@ export class EveningHost {
   latestAt = 0;
   /** Emote bubbles of the latest tick (the host's own stage draws them). */
   latestEmotes: EmoteShow[] = [];
+  /** Prank state of the latest tick (empty outside rounds). */
+  latestPranks: PrankSnap = emptyPrankSnap();
 
   private readonly session: HostSession;
   private readonly timing: EveningTiming;
@@ -84,6 +100,8 @@ export class EveningHost {
   private unsubRoster: (() => void) | null = null;
   /** One per evening: cooldowns and press edges carry over between rounds. */
   private emotes = new EmoteHost();
+  /** One per round: uses, effects and bananas start fresh. */
+  private pranks: PrankHost | null = null;
   /** The chooser's pick in phase `cards`, applied on the next tick. */
   private pendingCard: CardId | null = null;
 
@@ -192,6 +210,7 @@ export class EveningHost {
     const inputs: Record<PlayerKey, InputState> = {};
     const acks: Record<PlayerKey, number> = {};
     const slots = new Map<PlayerKey, readonly (string | null)[]>();
+    const pranks = this.pranks;
     for (const p of s.roster.list()) {
       if (!p.connected) continue;
       inputs[keyOf(p)] = s.input(p.id);
@@ -199,9 +218,12 @@ export class EveningHost {
       slots.set(keyOf(p), p.look.emotes);
     }
 
-    game.tick(dt, inputs);
+    // Pranks resolve on the raw presses, then mask what the game may see (freeze, stumble, slip, reverse).
+    pranks?.tick(dt * 1000, inputs, game);
+    game.tick(dt, pranks ? pranks.mask(inputs) : inputs);
     this.emotes.tick(dt * 1000, inputs, (k) => slots.get(k) ?? []);
     this.latestEmotes = this.emotes.shows();
+    this.latestPranks = pranks?.snap() ?? emptyPrankSnap();
     this.latest = game.snapshot();
     this.latestTick++;
     this.latestAt = this.now();
@@ -210,11 +232,11 @@ export class EveningHost {
     const period = 1 / CONFIG.net.snapshotHz;
     if (this.snapAcc >= period - 1e-6 || result) {
       this.snapAcc = Math.min(this.snapAcc - period, period);
-      s.broadcast('playing', { round: ph.round, state: this.latest, acks, emotes: this.latestEmotes } satisfies SnapPayload);
+      s.broadcast('playing', { round: ph.round, state: this.latest, acks, emotes: this.latestEmotes, pranks: this.latestPranks } satisfies SnapPayload);
     }
     if (result) {
       this.game = null;
-      this.enter(ev.advance({ type: 'gameResult', placements: result, feats: game.feats?.() ?? {} }));
+      this.enter(ev.advance({ type: 'gameResult', placements: result, feats: mergeFeats(game.feats?.() ?? {}, pranks?.feats() ?? {}) }));
     }
   }
 
@@ -224,6 +246,10 @@ export class EveningHost {
     this.pendingCard = null;
     this.snapAcc = 0;
     if (p.kind === 'playing') this.startGame(p.game, p.card);
+    else {
+      this.pranks = null;
+      this.latestPranks = emptyPrankSnap();
+    }
     this.session.setPhase(p.kind, p);
     this.o.onPhase?.(p);
   }
@@ -249,6 +275,11 @@ export class EveningHost {
     this.game = def.createHost(players, this.rand, { durationMs, assets: this.o.assets, leaders, card });
     this.emotes.clear();
     this.latestEmotes = [];
+    const P = CONFIG.pranks;
+    const uses = (k: PlayerKey) => (card?.id === 'doppelter_streich' && k === card.chooser ? P.doubleUses : P.uses);
+    this.pranks = new PrankHost(players.map((p) => ({ key: p.key, prank: p.look.prank })), uses, this.rand);
+    if (card?.id === 'falle' && players.some((p) => p.key === card.victim)) this.pranks.freeze(card.victim, CONFIG.gemeinheit.falleMs);
+    this.latestPranks = this.pranks.snap();
     this.latest = this.game.snapshot();
     this.latestTick = 0;
     this.latestAt = this.now();
