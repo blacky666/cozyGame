@@ -58,8 +58,8 @@ const HUD_DEPTH = 2950;
 const SCREEN_DEPTH = 3500;
 /** Unarmed bananas are drawn half transparent. */
 const UNARMED_ALPHA = 0.5;
-/** Procedural ice block (no asset): size above the feet, colours, fade-out at the end. */
-const ICE = { w: 18, h: 24, fill: 0xbfe8ff, alpha: 0.55, fadeMs: 300 };
+/** Procedural ice block (no asset): size above the feet (body and head, ~34 px figures), colours, fade-out at the end. */
+const ICE = { w: 20, h: 34, fill: 0xbfe8ff, alpha: 0.55, fadeMs: 300 };
 /** Ink: five fixed spots on the 426×240 view, three are used per splash; fade-out at the end. */
 const INK_SPOTS: readonly Pt[] = [{ x: 96, y: 72 }, { x: 318, y: 64 }, { x: 212, y: 128 }, { x: 104, y: 182 }, { x: 330, y: 178 }];
 const INK_FADE_MS = 400;
@@ -69,8 +69,8 @@ const CONFETTI = { count: 60, minSpeed: 30, maxSpeed: 60, swayPx: 6, swayHz: 1.2
 const BUBBLE_MS = 900;
 const POP_MS = 700;
 const INK_FLIGHT_MS = 300;
-/** Own prank HUD: key cap + icon (bottom right). */
-const HUD = { x: 400, y: 222, usedAlpha: 0.35 };
+/** Own prank HUD: key cap + icon, bottom right but left of the page's fullscreen/sound buttons (x ≥ 385). */
+const HUD = { x: 366, y: 229, usedAlpha: 0.35 };
 /** Reversed controls arrows sit higher when the stumble stars already circle the head. */
 const STACK_PX = 10;
 
@@ -217,8 +217,8 @@ export class PrankLayer {
     g.fillStyle(ICE.fill, ICE.alpha).fillRect(x, y, ICE.w, ICE.h);
     g.lineStyle(1, 0xffffff, 1).strokeRect(x + 0.5, y + 0.5, ICE.w - 1, ICE.h - 1);
     g.lineStyle(1, 0xffffff, 0.9);
-    g.lineBetween(x + 3, y + 9, x + 8, y + 4);
-    g.lineBetween(x + 3, y + 16, x + 13, y + 6);
+    g.lineBetween(x + 3, y + 10, x + 9, y + 4);
+    g.lineBetween(x + 3, y + 19, x + 15, y + 7);
     return g;
   }
 
