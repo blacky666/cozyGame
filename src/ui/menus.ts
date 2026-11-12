@@ -52,7 +52,16 @@ export function startMenus(root: HTMLElement): void {
   mountClickSounds();
   for (const p of SOUND_PACKAGES) void sound.loadPackage(p);
 
+  // Create/Join wait for the assets first: a second click meanwhile must not open a second room.
+  let starting = false;
+  const once = (fn: () => Promise<void>) => () => {
+    if (starting) return;
+    starting = true;
+    void fn();
+  };
+
   const toStart = (message?: string): void => {
+    starting = false;
     showStart(root, {
       name: profile.name,
       message,
@@ -60,8 +69,8 @@ export function startMenus(root: HTMLElement): void {
         profile = { ...profile, name };
         saveProfile(profile);
       },
-      onCreate: () => void host(),
-      onJoin: (code) => void join(code),
+      onCreate: once(host),
+      onJoin: (code) => once(() => join(code))(),
       onProfile: () =>
         showProfile(root, profile, (p) => {
           profile = p;
