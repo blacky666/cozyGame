@@ -898,3 +898,16 @@ describe('Wackel-Turm feats', () => {
     expect(d.g.feats?.().p1 ?? []).not.toContain('turm_ziel');
   });
 });
+
+describe('Wackel-Turm cards', () => {
+  it('Turbo-Start: the chooser starts with one Ärger charge', () => {
+    const g = createTowerHost(gp(['p0', 'p1', 'p2']), mulberry32(7), layout, undefined, { card: { id: 'turbo_start', chooser: 'p1', victim: 'p0' } });
+    const s = g.snapshot();
+    expect(s.players.p1.charges).toBe(1);
+    expect(s.players.p0.charges).toBe(0);
+    expect(s.players.p2.charges).toBe(0);
+  });
+  it('a card whose keys are not players does not throw', () => {
+    expect(() => createTowerHost(gp(['p0', 'p1']), mulberry32(7), layout, undefined, { card: { id: 'turbo_start', chooser: 'p3', victim: 'p2' } })).not.toThrow();
+  });
+});

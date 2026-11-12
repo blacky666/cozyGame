@@ -66,7 +66,9 @@ export const snowball: MiniGame<SnowState> = {
   createHost: (players, rand, opts) => {
     const file = opts?.assets?.[ARENA_FILE];
     if (!file) throw new Error(`schneeball: assets missing (${ARENA_FILE}); pass opts.assets to createHost`);
-    return createSnowballHost(players, rand, buildArena(file, ARENA_MAP), opts?.durationMs ?? CONFIG.snowball.durationMs);
+    return createSnowballHost(players, rand, buildArena(file, ARENA_MAP), opts?.durationMs ?? CONFIG.snowball.durationMs, {
+      card: opts?.card,
+    });
   },
   createView: (scene, players, selfKey) => new SnowballView(scene, players, selfKey),
   lerp: lerpSnow,

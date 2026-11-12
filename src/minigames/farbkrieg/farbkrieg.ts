@@ -116,7 +116,7 @@ export const farbkrieg: MiniGame<PaintState> = {
     if (!file) throw new Error(`farbkrieg: assets missing (${ARENA_FILE}); pass opts.assets to createHost`);
     const arena = buildArena(file, ARENA_MAP);
     botPaintable = createGrid(arena).paintable;
-    return createPaintHost(players, rand, arena, opts?.durationMs ?? CONFIG.farbkrieg.durationMs);
+    return createPaintHost(players, rand, arena, opts?.durationMs ?? CONFIG.farbkrieg.durationMs, { card: opts?.card });
   },
   createView: (scene, players, selfKey) => new PaintView(scene, players, selfKey),
   lerp: lerpPaint,

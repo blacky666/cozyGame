@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_IDS, cardText, cardTitle, eligibleCards, isCardId, offerCards } from './cards';
+import { CARD_IDS, cardText, cardTitle, eligibleCards, isCardId, offerCards, startSlot } from './cards';
 import { mulberry32 } from './rng';
 
 describe('cards', () => {
@@ -35,5 +35,21 @@ describe('cards', () => {
     expect(isCardId('falle')).toBe(true);
     expect(isCardId('x')).toBe(false);
     expect(isCardId(3)).toBe(false);
+  });
+});
+
+describe('startSlot', () => {
+  const players = [{ key: 'p0', slot: 0 as const }, { key: 'p1', slot: 1 as const }, { key: 'p2', slot: 2 as const }];
+  const swap = { id: 'rollentausch' as const, chooser: 'p2', victim: 'p0' };
+  it('swaps chooser and victim with Rollentausch', () => {
+    expect(startSlot(players[2], players, swap)).toBe(0);
+    expect(startSlot(players[0], players, swap)).toBe(2);
+    expect(startSlot(players[1], players, swap)).toBe(1);
+  });
+  it('keeps the own slot when a key is missing or for other cards', () => {
+    expect(startSlot(players[2], players.slice(1), swap)).toBe(2);
+    expect(startSlot(players[2], players, { ...swap, id: 'falle' })).toBe(2);
+    expect(startSlot(players[2], players, null)).toBe(2);
+    expect(startSlot(players[2], players, undefined)).toBe(2);
   });
 });

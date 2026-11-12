@@ -1,4 +1,5 @@
 import { CONFIG } from '../../config';
+import { startSlot, type RoundCard } from '../../flow/cards';
 import { neutralInput } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
@@ -100,8 +101,14 @@ export function createSpudHost(
   gamePlayers: GamePlayer[],
   rand: () => number,
   arena: Arena,
-  opts: { leaders?: PlayerKey[]; safetyMs?: number } = {},
+  /** `card`: the Gemeinheit of this round (Turbo-Start, Rollentausch). */
+  opts: { leaders?: PlayerKey[]; safetyMs?: number; card?: RoundCard | null } = {},
 ): MiniGameHost<SpudState> {
+  const card = opts.card ?? null;
+  /** Turbo-Start: this player's sprints leave no cooldown during the first turboSprintMs. */
+  const turboFor = card?.id === 'turbo_start' ? card.chooser : null;
+  /** Rollentausch: the victim gets the first real potato (when living and present). */
+  let firstHolder: PlayerKey | null = card?.id === 'rollentausch' ? card.victim : null;
   const c = CONFIG.kartoffel;
   const safetyMs = opts.safetyMs ?? c.safetyMs;
   const keys = gamePlayers.map((p) => p.key);
@@ -112,7 +119,7 @@ export function createSpudHost(
   const shove: Record<PlayerKey, ShoveSlot> = {};
   const taps: Record<PlayerKey, Edge> = {};
   for (const gp of gamePlayers) {
-    const [x, y] = SPUD_SPAWNS[gp.slot];
+    const [x, y] = SPUD_SPAWNS[startSlot(gp, gamePlayers, card)];
     players[gp.key] = {
       x, y, vx: 0, vy: 0, dir: START_DIR, ghost: false, sprintMs: 0, sprintCdMs: 0, slowMs: 0,
       leader: isLeader.has(gp.key), stun: false, swing: false, shoveCdMs: 0, losses: 0,
@@ -187,7 +194,9 @@ export function createSpudHost(
   const deal = (present: (k: PlayerKey) => boolean) => {
     const alive = living();
     const cands = alive.filter(present);
-    const holder = pick(cands.length > 0 ? cands : alive);
+    const forced = firstHolder !== null && cands.includes(firstHolder) ? firstHolder : null;
+    firstHolder = null;
+    const holder = forced ?? pick(cands.length > 0 ? cands : alive);
     const fuseMs = c.fuseMinMs + rand() * (c.fuseMaxMs - c.fuseMinMs);
     potatoes.push(newPotato(holder, fuseMs, false));
   };
@@ -301,7 +310,7 @@ export function createSpudHost(
         if (taps[k].take(inp.primaryTaps) === 0) continue;
         if (p.ghost || p.stun || p.sprintCdMs > 0) continue;
         p.sprintMs = c.sprintMs;
-        p.sprintCdMs = c.sprintCooldownMs;
+        p.sprintCdMs = k === turboFor && elapsedMs < CONFIG.gemeinheit.turboSprintMs ? 0 : c.sprintCooldownMs;
         addFx('sprint', p.x, p.y, k);
       }
 

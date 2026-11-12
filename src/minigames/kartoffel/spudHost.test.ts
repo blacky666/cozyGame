@@ -832,3 +832,57 @@ describe('Heiße Kartoffel feats', () => {
     expect(feats(d).p1).toContain('schubser');
   });
 });
+
+describe('Kartoffel cards', () => {
+  it('Rollentausch: the victim gets the first real potato and the spawns swap', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const g = createSpudHost(gp(['p0', 'p1', 'p2']), mulberry32(seed), arena, { card: { id: 'rollentausch', chooser: 'p2', victim: 'p0' } });
+      const s0 = g.snapshot();
+      expect([s0.players.p0.x, s0.players.p0.y]).toEqual([...SPUD_SPAWNS[2]]);
+      const inputs: Record<PlayerKey, InputState> = { p0: neutralInput(), p1: neutralInput(), p2: neutralInput() };
+      g.tick(DT, inputs);
+      expect(g.snapshot().potatoes.map((p) => p.holder)).toEqual(['p0']);
+    }
+  });
+  it('Rollentausch with an absent victim deals normally', () => {
+    const g = createSpudHost(gp(['p0', 'p1', 'p2']), () => 0, arena, { card: { id: 'rollentausch', chooser: 'p2', victim: 'p0' } });
+    g.tick(DT, { p1: neutralInput(), p2: neutralInput() });
+    expect(g.snapshot().potatoes.map((p) => p.holder)).toEqual(['p1']);
+  });
+  it('Turbo-Start: the chooser sprints without cooldown during the first turboSprintMs', () => {
+    const sprints = (who: string) => {
+      const g = createSpudHost(gp(['p0', 'p1', 'p2']), mulberry32(3), arena, { card: { id: 'turbo_start', chooser: 'p1', victim: 'p0' } });
+      const inputs: Record<PlayerKey, InputState> = { p0: neutralInput(), p1: neutralInput(), p2: neutralInput() };
+      g.tick(DT, inputs);
+      const seen = new Set<number>();
+      const run = (ms: number) => {
+        for (let t = 0; t < ms; t += TICK_MS) {
+          g.tick(DT, inputs);
+          for (const f of g.snapshot().fx) if (f.kind === 'sprint' && f.who === who) seen.add(f.id);
+        }
+      };
+      inputs[who] = { ...inputs[who], primaryTaps: 1 };
+      run(1000);
+      inputs[who] = { ...inputs[who], primaryTaps: 2 };
+      run(500);
+      return seen.size;
+    };
+    expect(sprints('p1')).toBe(2);
+    expect(sprints('p0')).toBe(1);
+  });
+  it('Turbo-Start ends after turboSprintMs', () => {
+    const g = createSpudHost(gp(['p0', 'p1']), mulberry32(3), arena, { card: { id: 'turbo_start', chooser: 'p1', victim: 'p0' }, safetyMs: 60000 });
+    const inputs: Record<PlayerKey, InputState> = { p0: neutralInput(), p1: neutralInput() };
+    const n = Math.ceil(CONFIG.gemeinheit.turboSprintMs / TICK_MS) + 1;
+    for (let i = 0; i < n; i++) g.tick(DT, inputs);
+    inputs.p1 = { ...inputs.p1, primaryTaps: 1 };
+    g.tick(DT, inputs);
+    const p1 = g.snapshot().players.p1;
+    if (!p1.ghost) expect(p1.sprintCdMs).toBeGreaterThan(0);
+  });
+  it('a card whose keys are not players does not throw', () => {
+    const g = createSpudHost(gp(['p0', 'p1']), mulberry32(3), arena, { card: { id: 'rollentausch', chooser: 'p3', victim: 'p2' } });
+    expect(() => g.tick(DT, { p0: neutralInput(), p1: neutralInput() })).not.toThrow();
+    expect(g.snapshot().potatoes).toHaveLength(1);
+  });
+});

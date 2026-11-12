@@ -1,4 +1,5 @@
 import { CONFIG } from '../../config';
+import { startSlot, type RoundCard } from '../../flow/cards';
 import { neutralInput } from '../../net/protocol';
 import { moveCircle, tileAt, type Arena, type Solid } from '../common/arena';
 import { Edge } from '../common/edges';
@@ -89,7 +90,10 @@ export function createSnowballHost(
   rand: () => number,
   arena: Arena,
   durationMs: number = CONFIG.snowball.durationMs,
+  /** `card`: the Gemeinheit of this round (Turbo-Start, Rollentausch). */
+  opts: { card?: RoundCard | null } = {},
 ): MiniGameHost<SnowState> {
+  const card = opts.card ?? null;
   const c = CONFIG.snowball;
   const keys = gamePlayers.map((p) => p.key);
   const feats = new FeatTracker();
@@ -110,10 +114,13 @@ export function createSnowballHost(
   const reloadMs: Record<PlayerKey, number> = {};
   const history: Record<PlayerKey, { ms: number; x: number; y: number }[]> = {};
   for (const gp of gamePlayers) {
-    const [x, y] = SPAWNS[gp.slot];
+    const [x, y] = SPAWNS[startSlot(gp, gamePlayers, card)];
+    // Turbo-Start: full balls anyway, so the Riesenschneeball is the extra.
+    const turbo = card?.id === 'turbo_start' && card.chooser === gp.key;
     players[gp.key] = {
       x, y, vx: 0, vy: 0, dir: START_DIR, score: 0, balls: c.maxBalls, reloading: false,
-      invulnMs: 0, down: false, strongCdMs: 0, stun: false, swing: false, shoveCdMs: 0, extra: null, extraLeft: 0, hat: false, throwAnimMs: 0,
+      invulnMs: 0, down: false, strongCdMs: 0, stun: false, swing: false, shoveCdMs: 0,
+      extra: turbo ? 'riesenball' : null, extraLeft: turbo ? c.extraThrows : 0, hat: false, throwAnimMs: 0,
     };
     remote[gp.key] = gp.remote;
     shove[gp.key] = newShoveSlot();

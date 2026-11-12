@@ -125,7 +125,7 @@ export const wackelturm: MiniGame<TowerState> = {
     const file = opts?.assets?.[ARENA_FILE];
     if (!file) throw new Error(`wackelturm: assets missing (${ARENA_FILE}); pass opts.assets to createHost`);
     botLayout = readLayout(file);
-    return createTowerHost(players, rand, botLayout, opts?.durationMs ?? CONFIG.wackelturm.durationMs);
+    return createTowerHost(players, rand, botLayout, opts?.durationMs ?? CONFIG.wackelturm.durationMs, { card: opts?.card });
   },
   createView: (scene, players, selfKey) => new TowerView(scene, players, selfKey),
   lerp: lerpTower,

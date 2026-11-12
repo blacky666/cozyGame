@@ -65,3 +65,12 @@ export function offerCards(nextGame: string, rand: () => number, force?: CardId)
   if (force && deck.includes(force)) return [force, ...deck.filter((id) => id !== force).slice(0, n - 1)];
   return deck.slice(0, n);
 }
+
+type Slotted = { key: string; slot: 0 | 1 | 2 | 3 };
+
+/** Start slot of a player this round: Rollentausch swaps chooser and victim when both play; else the own slot. */
+export function startSlot(gp: Slotted, players: readonly Slotted[], card: RoundCard | null | undefined): 0 | 1 | 2 | 3 {
+  if (card?.id !== 'rollentausch' || (gp.key !== card.chooser && gp.key !== card.victim)) return gp.slot;
+  const other = players.find((p) => p.key === (gp.key === card.chooser ? card.victim : card.chooser));
+  return other && players.some((p) => p.key === gp.key) ? other.slot : gp.slot;
+}

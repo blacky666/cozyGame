@@ -77,7 +77,7 @@ export const kartoffel: MiniGame<SpudState> = {
   createHost: (players, rand, opts) => {
     const file = opts?.assets?.[ARENA_FILE];
     if (!file) throw new Error(`kartoffel: assets missing (${ARENA_FILE}); pass opts.assets to createHost`);
-    return createSpudHost(players, rand, buildArena(file, ARENA_MAP, { wallChar: null }), { leaders: opts?.leaders });
+    return createSpudHost(players, rand, buildArena(file, ARENA_MAP, { wallChar: null }), { leaders: opts?.leaders, card: opts?.card });
   },
   createView: (scene, players, selfKey) => new SpudView(scene, players, selfKey),
   lerp: lerpSpud,

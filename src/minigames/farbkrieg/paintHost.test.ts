@@ -932,3 +932,20 @@ describe('Farbkrieg feats', () => {
     expect(feats(d).p1).toContain('schubser');
   });
 });
+
+describe('Farbkrieg cards', () => {
+  it('Turbo-Start: the chooser holds a Farbbombe', () => {
+    const g = createPaintHost(gp(['p0', 'p1', 'p2']), mulberry32(7), arena, undefined, { card: { id: 'turbo_start', chooser: 'p1', victim: 'p0' } });
+    expect(g.snapshot().players.p1.extra).toBe('farbbombe');
+    expect(g.snapshot().players.p0.extra).toBeNull();
+  });
+  it('Rollentausch: chooser and victim swap spawns', () => {
+    const g = createPaintHost(gp(['p0', 'p1', 'p2']), mulberry32(7), arena, undefined, { card: { id: 'rollentausch', chooser: 'p2', victim: 'p0' } });
+    const s = g.snapshot();
+    expect([s.players.p2.x, s.players.p2.y]).toEqual([...PAINT_SPAWNS[0]]);
+    expect([s.players.p0.x, s.players.p0.y]).toEqual([...PAINT_SPAWNS[2]]);
+  });
+  it('a card whose keys are not players does not throw', () => {
+    expect(() => createPaintHost(gp(['p0', 'p1']), mulberry32(7), arena, undefined, { card: { id: 'turbo_start', chooser: 'p3', victim: 'p2' } })).not.toThrow();
+  });
+});

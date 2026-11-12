@@ -1,5 +1,6 @@
 import Matter from 'matter-js';
 import { CONFIG } from '../../config';
+import type { RoundCard } from '../../flow/cards';
 import type { InputState } from '../../net/protocol';
 import { Edge } from '../common/edges';
 import { FeatTracker } from '../common/feats';
@@ -203,7 +204,10 @@ export function createTowerHost(
   rand: () => number,
   layout: TowerLayout,
   durationMs: number = CONFIG.wackelturm.durationMs,
+  /** `card`: the Gemeinheit of this round (Turbo-Start; Rollentausch is never offered: identical plots). */
+  opts: { card?: RoundCard | null } = {},
 ): TowerHost {
+  const turboFor = opts.card?.id === 'turbo_start' ? opts.card.chooser : null;
   const c = CONFIG.wackelturm;
   const sorted = [...gamePlayers].sort((a, b) => a.slot - b.slot);
   const keys = sorted.map((p) => p.key);
@@ -261,7 +265,7 @@ export function createTowerHost(
     };
     players[gp.key] = {
       plot: i, craneX: layout.plots[i].left + layout.hookOffsetX, hangTop: layout.hangTopStart, hang: null, cdMs: 0,
-      heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, present: true, blocks: [],
+      heightPx: 0, bestPx: 0, placed: 0, charges: gp.key === turboFor ? 1 : 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, present: true, blocks: [],
     };
   });
   for (const k of keys) {

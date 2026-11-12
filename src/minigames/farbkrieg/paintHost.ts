@@ -1,4 +1,5 @@
 import { CONFIG } from '../../config';
+import { startSlot, type RoundCard } from '../../flow/cards';
 import { neutralInput } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
@@ -94,7 +95,10 @@ export function createPaintHost(
   rand: () => number,
   arena: Arena,
   durationMs: number = CONFIG.farbkrieg.durationMs,
+  /** `card`: the Gemeinheit of this round (Turbo-Start, Rollentausch). */
+  opts: { card?: RoundCard | null } = {},
 ): MiniGameHost<PaintState> {
+  const card = opts.card ?? null;
   const c = CONFIG.farbkrieg;
   const keys = gamePlayers.map((p) => p.key);
   const slotOf: Record<PlayerKey, number> = {};
@@ -103,9 +107,10 @@ export function createPaintHost(
   const taps: Record<PlayerKey, Edge> = {};
   const extraTaps: Record<PlayerKey, Edge> = {};
   for (const gp of gamePlayers) {
-    const [x, y] = PAINT_SPAWNS[gp.slot];
+    const [x, y] = PAINT_SPAWNS[startSlot(gp, gamePlayers, card)];
+    const turbo = card?.id === 'turbo_start' && card.chooser === gp.key;
     players[gp.key] = {
-      x, y, vx: 0, vy: 0, dir: START_DIR, klecksCdMs: 0, slowMs: 0, extra: null, moppMs: 0, rollMs: 0,
+      x, y, vx: 0, vy: 0, dir: START_DIR, klecksCdMs: 0, slowMs: 0, extra: turbo ? 'farbbombe' : null, moppMs: 0, rollMs: 0,
       stun: false, swing: false, shoveCdMs: 0, tiles: 0, throwAnimMs: 0,
     };
     slotOf[gp.key] = gp.slot;

@@ -895,3 +895,28 @@ describe('snowball botView', () => {
     expect(Math.hypot(t.x - st.players.p1.x, t.y - st.players.p1.y)).toBeCloseTo(60, 5);
   });
 });
+
+describe('Schneeball cards', () => {
+  it('Turbo-Start: the chooser starts with full balls and a Riesenschneeball', () => {
+    const g = createSnowballHost(gp(['p0', 'p1', 'p2']), mulberry32(7), arena, undefined, { card: { id: 'turbo_start', chooser: 'p1', victim: 'p0' } });
+    const s = g.snapshot();
+    expect(s.players.p1).toMatchObject({ extra: 'riesenball', extraLeft: C.extraThrows, balls: C.maxBalls });
+    expect(s.players.p0.extra).toBeNull();
+    expect(s.players.p2.extra).toBeNull();
+  });
+  it('Rollentausch: chooser and victim swap spawns', () => {
+    const g = createSnowballHost(gp(['p0', 'p1', 'p2']), mulberry32(7), arena, undefined, { card: { id: 'rollentausch', chooser: 'p2', victim: 'p0' } });
+    const s = g.snapshot();
+    expect([s.players.p2.x, s.players.p2.y]).toEqual([...SPAWNS[0]]);
+    expect([s.players.p0.x, s.players.p0.y]).toEqual([...SPAWNS[2]]);
+    expect([s.players.p1.x, s.players.p1.y]).toEqual([...SPAWNS[1]]);
+  });
+  it('a card whose keys are not players does not throw', () => {
+    expect(() => createSnowballHost(gp(['p0', 'p1']), mulberry32(7), arena, undefined, { card: { id: 'turbo_start', chooser: 'p3', victim: 'p2' } })).not.toThrow();
+    expect(() => createSnowballHost(gp(['p0', 'p1']), mulberry32(7), arena, undefined, { card: { id: 'rollentausch', chooser: 'p3', victim: 'p0' } })).not.toThrow();
+  });
+  it('the definition forwards opts.card', () => {
+    const g = snowball.createHost(gp(['p0', 'p1']), mulberry32(7), { assets: { 'arena-schneeball': file }, card: { id: 'turbo_start', chooser: 'p0', victim: 'p1' } });
+    expect((g.snapshot() as SnowState).players.p0.extra).toBe('riesenball');
+  });
+});
