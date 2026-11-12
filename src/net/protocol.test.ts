@@ -4,6 +4,7 @@ import { INPUT_COUNTERS, keepCounters, MSG_TYPES, neutralInput, parseInputState,
 describe('MSG_TYPES', () => {
   it("contains 'profile' and every type name is <= 12 bytes", () => {
     expect(MSG_TYPES).toContain('profile');
+    expect(MSG_TYPES).toContain('card');
     for (const t of MSG_TYPES) expect(new TextEncoder().encode(t).length).toBeLessThanOrEqual(12);
   });
 });

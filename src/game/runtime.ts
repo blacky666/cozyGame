@@ -76,7 +76,10 @@ export function runHostEvening(
     assets,
     timing: t.host,
     onPhase: (p) => stage?.setPhase(p),
+    forceCard: devFlags(location.search).card ?? undefined,
   });
+  // The chooser's card message; the host checks phase, chooser and offer. Ends with the evening (playAgain).
+  const offCard = session.onCard((id, card) => host.pickCard(keyFor(session.roster.list(), id), card));
   for (const p of session.roster.list()) {
     if (p.isBot) host.addBot(p.id, createBotInputs(1 + p.slot * 7919, p.look.emotes.flatMap((e, i) => (e ? [i + 1] : []))));
   }
@@ -94,6 +97,7 @@ export function runHostEvening(
         ? { round: host.phase.round, state: host.latest, acks: {}, emotes: host.latestEmotes, tick: host.latestTick, at: host.latestAt }
         : null,
     playAgain: () => {
+      offCard();
       host.backToLobby();
       stage?.destroy();
       onLobby();
@@ -104,6 +108,7 @@ export function runHostEvening(
     host.start();
   } catch (e) {
     // e.g. too few connected players: do not leave a stage or host behind.
+    offCard();
     host.stop();
     stage.destroy();
     throw e;

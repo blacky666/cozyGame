@@ -69,11 +69,13 @@ export type Msg =
   | { type: 'phase'; data: { phase: string; data?: unknown } }
   | { type: 'bye'; data: unknown }
   /** Client -> host, lobby only: own look, level and stars changed. */
-  | { type: 'profile'; data: { look: Look; level: number; stars: number } };
+  | { type: 'profile'; data: { look: Look; level: number; stars: number } }
+  /** Client -> host, phase `cards` only: the chooser's Gemeinheit card id (the host validates it). */
+  | { type: 'card'; data: { card: string } };
 
 export type MsgType = Msg['type'];
 export const MSG_TYPES: readonly MsgType[] = [
-  'hello', 'welcome', 'reject', 'roster', 'ready', 'settings', 'start', 'input', 'snap', 'phase', 'bye', 'profile',
+  'hello', 'welcome', 'reject', 'roster', 'ready', 'settings', 'start', 'input', 'snap', 'phase', 'bye', 'profile', 'card',
 ];
 export type MsgData<T extends MsgType> = Extract<Msg, { type: T }>['data'];
 

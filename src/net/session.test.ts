@@ -486,6 +486,74 @@ describe('session', () => {
   });
 });
 
+describe('session card choice', () => {
+  const setup = async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    const host = createHost(ht, prof('Host'));
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    const got: Array<[string, string]> = [];
+    host.onCard((id, card) => got.push([id, card]));
+    await flush();
+    return { hub, ht, host, ct, client, got };
+  };
+
+  it('card from the client reaches onCard during phase cards', async () => {
+    const s = await setup();
+    s.host.setPhase('cards', {});
+    await flush();
+    s.client.sendCard('falle');
+    await flush();
+    expect(s.got).toEqual([[s.ct.selfId, 'falle']]);
+  });
+
+  it('ignored in phase playing / from an unknown peer / non-string / 40 chars', async () => {
+    const s = await setup();
+    s.host.setPhase('playing', {});
+    await flush();
+    s.client.sendCard('falle');
+    await flush();
+    expect(s.got).toEqual([]);
+    s.host.setPhase('cards', {});
+    const stranger = s.hub.join();
+    await flush();
+    stranger.send('card', { card: 'falle' }, s.host.selfId);
+    s.ct.send('card', { card: 7 } as never, s.host.selfId);
+    s.ct.send('card', { card: 'x'.repeat(40) }, s.host.selfId);
+    s.ct.send('card', null as never, s.host.selfId);
+    await flush();
+    expect(s.got).toEqual([]);
+  });
+
+  it('sendCard sends nothing before welcome', async () => {
+    const hub = createLocalHub();
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    const sent: string[] = [];
+    const orig = ct.send.bind(ct);
+    ct.send = ((type: string, data: unknown, to?: string) => {
+      sent.push(type);
+      orig(type as never, data as never, to);
+    }) as typeof ct.send;
+    client.sendCard('falle');
+    expect(sent).toEqual([]);
+  });
+
+  it('unsubscribing onCard stops delivery', async () => {
+    const s = await setup();
+    const more: string[] = [];
+    const off = s.host.onCard((_id, card) => more.push(card));
+    off();
+    s.host.setPhase('cards', {});
+    await flush();
+    s.client.sendCard('falle');
+    await flush();
+    expect(more).toEqual([]);
+    expect(s.got).toHaveLength(1);
+  });
+});
+
 describe('startHostTicker', () => {
   it('constructs a module worker for tickWorker.ts and forwards ticks as seconds', () => {
     const made: FakeWorker[] = [];

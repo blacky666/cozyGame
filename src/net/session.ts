@@ -38,6 +38,9 @@ const subscribe = <F>(list: F[], cb: F): (() => void) => {
 };
 export type Unsubscribe = () => void;
 
+/** Longest card id the host forwards (real ids are far shorter). */
+const MAX_CARD_ID = 32;
+
 const send = <T extends MsgType>(t: Transport, type: T, data: MsgData<T>, to?: string) => t.send(type, data, to);
 
 export interface HostSession {
@@ -46,6 +49,8 @@ export interface HostSession {
   readonly phase: string;
   onInput(cb: (playerId: string, state: InputState, seq: number) => void): Unsubscribe;
   onRoster(cb: (players: PlayerInfo[]) => void): Unsubscribe;
+  /** Card picks of connected remote players, phase `cards` only (the evening host checks chooser and offer). */
+  onCard(cb: (playerId: string, card: string) => void): Unsubscribe;
   /** Latest input of a player (neutral if none, or if a remote input is older than CONFIG.net.inputStaleMs). */
   input(playerId: string): InputState;
   /** Seq of the last accepted input of a player (0 for local players and unknown ids). */
@@ -77,6 +82,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
   const local = new Set<string>([t.selfId]);
   const inputCbs: Array<(id: string, s: InputState, seq: number) => void> = [];
   const rosterCbs: Array<(players: PlayerInfo[]) => void> = [];
+  const cardCbs: Array<(id: string, card: string) => void> = [];
   let phase = LOBBY;
   let tick = 0;
   let botCounter = 0;
@@ -147,6 +153,14 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     if (roster.setProfile(from, look, cleanLevel(data.level), cleanStars(data.stars))) rosterChanged();
   });
 
+  t.on('card', (data, from) => {
+    const p = roster.get(from);
+    if (phase !== 'cards' || !p || !p.connected || local.has(from) || !isObj(data)) return;
+    const card = data.card;
+    if (typeof card !== 'string' || card.length > MAX_CARD_ID) return;
+    [...cardCbs].forEach((cb) => cb(from, card));
+  });
+
   t.onPeerLeave((id) => {
     if (!roster.get(id) || local.has(id)) return;
     if (phase === LOBBY) roster.remove(id);
@@ -164,6 +178,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     },
     onInput: (cb) => subscribe(inputCbs, cb),
     onRoster: (cb) => subscribe(rosterCbs, cb),
+    onCard: (cb) => subscribe(cardCbs, cb),
     input(id) {
       const s = inputs.get(id);
       if (!s) return neutralInput();
@@ -245,6 +260,8 @@ export interface ClientSession {
   setReady(ready: boolean): void;
   /** Lobby only (the host ignores it otherwise): own look, level and stars changed. */
   sendProfile(look: Look, level: number, stars: number): void;
+  /** Phase `cards`, chooser only (the host ignores it otherwise): the picked Gemeinheit card. */
+  sendCard(card: string): void;
   onRoster(cb: (players: PlayerInfo[]) => void): Unsubscribe;
   onSnapshot(cb: (snap: Snap) => void): Unsubscribe;
   onPhase(cb: (phase: PhaseMsg) => void): Unsubscribe;
@@ -356,6 +373,9 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
       hello.level = level;
       hello.stars = stars;
       if (!done && hostId) send(t, 'profile', { look, level, stars }, hostId);
+    },
+    sendCard(card) {
+      if (!done && hostId) send(t, 'card', { card }, hostId);
     },
     onRoster: (cb) => subscribe(rosterCbs, cb),
     onSnapshot: (cb) => subscribe(snapCbs, cb),
