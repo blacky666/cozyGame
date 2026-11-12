@@ -4,7 +4,7 @@ import { neutralInput } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
 import { countShoves, FeatTracker } from '../common/feats';
-import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
+import { knockSlot, newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import type { Mover } from '../common/mover';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
 import { stepWalker } from './spudMove';
@@ -423,6 +423,12 @@ export function createSpudHost(
       if (alive.length > 0) groups.push(alive);
       for (let i = out.length - 1; i >= 0; i--) groups.push([out[i]]);
       return groups;
+    },
+    prankBodies() {
+      return keys.map((k) => ({ key: k, x: players[k].x, y: players[k].y, affectable: !players[k].ghost, out: players[k].ghost }));
+    },
+    prankKnock(from, to) {
+      if (players[from] && players[to]) knockSlot(shove[to], players[from], players[to]);
     },
     feats() {
       return feats.result();

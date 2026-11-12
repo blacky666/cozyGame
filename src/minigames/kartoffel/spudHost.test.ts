@@ -886,3 +886,21 @@ describe('Kartoffel cards', () => {
     expect(g.snapshot().potatoes).toHaveLength(1);
   });
 });
+
+describe('Kartoffel prank hooks', () => {
+  it('a ghost is out and not affectable; prankKnock stuns a living player', () => {
+    const d = driver(['p0', 'p1', 'p2'], { rand: mulberry32(3) });
+    expect(d.g.prankBodies!().map((b) => [b.key, b.x, b.y, b.affectable, b.out])).toEqual([
+      ['p0', SPUD_SPAWNS[0][0], SPUD_SPAWNS[0][1], true, false],
+      ['p1', SPUD_SPAWNS[1][0], SPUD_SPAWNS[1][1], true, false],
+      ['p2', SPUD_SPAWNS[2][0], SPUD_SPAWNS[2][1], true, false],
+    ]);
+    const h = d.holder()!;
+    d.untilBang();
+    expect(d.g.prankBodies!().find((b) => b.key === h)).toMatchObject({ affectable: false, out: true });
+    const alive = ['p0', 'p1', 'p2'].find((k) => k !== h)!;
+    d.g.prankKnock!(h, alive);
+    d.tick();
+    expect(d.snap().players[alive].stun).toBe(true);
+  });
+});

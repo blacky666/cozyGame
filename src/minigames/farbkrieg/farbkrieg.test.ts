@@ -61,7 +61,7 @@ describe('farbkrieg definition', () => {
       id: 'farbkrieg',
       title: 'Farbkrieg',
       rule: 'Färbe den Boden in deiner Farbe – am Ende zählt die Fläche!',
-      controls: 'WASD laufen · Maus zielen · Linksklick Klecks · Rechtsklick Extra · Leertaste schubsen',
+      controls: 'WASD laufen · Maus zielen · Linksklick Klecks · Rechtsklick Extra · Leertaste schubsen · F Streich',
       durationMs: F.durationMs,
       sounds: 'farbkrieg',
     });

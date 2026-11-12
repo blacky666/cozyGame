@@ -2,7 +2,7 @@ import { CONFIG } from '../../config';
 import { buildArena } from '../common/arena';
 import type { BotView, MiniGame, PlayerKey } from '../types';
 import { createSpudHost, type SpudPlayer, type SpudState } from './spudHost';
-import { ARENA_FILE, ARENA_MAP, SpudView } from './spudView';
+import { ARENA_FILE, ARENA_MAP, ARENA_OFFSET, SpudView } from './spudView';
 
 /** Snapshot interpolation: players move, everything else (potatoes, pickups, fx, phase) comes from `b`. */
 export function lerpSpud(a: SpudState, b: SpudState, t: number): SpudState {
@@ -71,8 +71,11 @@ export const kartoffel: MiniGame<SpudState> = {
   id: 'kartoffel',
   title: 'Heiße Kartoffel',
   rule: 'Gib die Kartoffel durch Berühren weiter – wer sie beim Knall hält, fliegt raus!',
-  controls: 'WASD laufen · Linksklick sprinten · Leertaste schubsen',
+  controls: 'WASD laufen · Linksklick sprinten · Leertaste schubsen · F Streich',
   durationMs: null,
+  // Pointer in simulation coordinates for the pranks' aim; no crosshair, the system cursor stays.
+  aimOffset: ARENA_OFFSET,
+  systemCursor: true,
   sounds: 'kartoffel',
   createHost: (players, rand, opts) => {
     const file = opts?.assets?.[ARENA_FILE];

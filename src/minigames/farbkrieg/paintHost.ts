@@ -4,7 +4,7 @@ import { neutralInput } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
 import { countShoves, FeatTracker } from '../common/feats';
-import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
+import { knockSlot, newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import { stepWalker } from '../kartoffel/spudMove';
 import type { Mover } from '../common/mover';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
@@ -396,6 +396,12 @@ export function createPaintHost(
       const counts: Record<PlayerKey, number> = {};
       for (const k of keys) counts[k] = players[k].tiles;
       return rankByCount(counts);
+    },
+    prankBodies() {
+      return keys.map((k) => ({ key: k, x: players[k].x, y: players[k].y, affectable: true, out: false }));
+    },
+    prankKnock(from, to) {
+      if (players[from] && players[to]) knockSlot(shove[to], players[from], players[to]);
     },
     feats() {
       return feats.result();

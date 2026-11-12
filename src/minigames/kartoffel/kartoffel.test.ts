@@ -36,11 +36,12 @@ describe('kartoffel definition', () => {
       id: 'kartoffel',
       title: 'Heiße Kartoffel',
       rule: 'Gib die Kartoffel durch Berühren weiter – wer sie beim Knall hält, fliegt raus!',
-      controls: 'WASD laufen · Linksklick sprinten · Leertaste schubsen',
+      controls: 'WASD laufen · Linksklick sprinten · Leertaste schubsen · F Streich',
       durationMs: null,
       sounds: 'kartoffel',
     });
-    expect(kartoffel.aimOffset).toBeUndefined();
+    expect(kartoffel.aimOffset).toEqual({ x: 5, y: 26 });
+    expect(kartoffel.systemCursor).toBe(true);
     expect(() => kartoffel.createHost(gp(['p0', 'p1']), mulberry32(1))).toThrow(/assets/);
     const host = kartoffel.createHost(gp(['p0', 'p1']), mulberry32(1), { assets: { 'arena-kartoffel': file }, leaders: ['p1'] });
     const s = host.snapshot();

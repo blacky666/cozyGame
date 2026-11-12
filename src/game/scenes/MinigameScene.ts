@@ -114,7 +114,7 @@ export class MinigameScene extends Phaser.Scene {
    * Left/right mouse button -> the shared PointerInput (every game; games without aiming ignore it).
    * Presses count on pointerdown; window blur releases the held flags; the canvas context menu is
    * suppressed (right click throws); the system cursor is hidden while an aimed game runs (the view
-   * draws its own crosshair). Returns the cleanup for shutdown.
+   * draws its own crosshair) unless the game keeps it (systemCursor). Returns the cleanup for shutdown.
    */
   private wirePointer(): () => void {
     const pointer = this.ctx.pointer;
@@ -141,7 +141,7 @@ export class MinigameScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, wheel);
     window.addEventListener('blur', blur);
     canvas.addEventListener('contextmenu', noMenu);
-    if (this.def?.aimOffset) this.input.setDefaultCursor('none');
+    if (this.def?.aimOffset && !this.def.systemCursor) this.input.setDefaultCursor('none');
     let done = false;
     return () => {
       if (done) return;

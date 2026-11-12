@@ -949,3 +949,16 @@ describe('Farbkrieg cards', () => {
     expect(() => createPaintHost(gp(['p0', 'p1']), mulberry32(7), arena, undefined, { card: { id: 'turbo_start', chooser: 'p3', victim: 'p2' } })).not.toThrow();
   });
 });
+
+describe('Farbkrieg prank hooks', () => {
+  it('everyone is affectable and never out; prankKnock stuns', () => {
+    const d = driver(['p0', 'p1']);
+    expect(d.g.prankBodies!()).toEqual([
+      { key: 'p0', x: PAINT_SPAWNS[0][0], y: PAINT_SPAWNS[0][1], affectable: true, out: false },
+      { key: 'p1', x: PAINT_SPAWNS[1][0], y: PAINT_SPAWNS[1][1], affectable: true, out: false },
+    ]);
+    d.g.prankKnock!('p0', 'p1');
+    d.tick();
+    expect(d.snap().players.p1.stun).toBe(true);
+  });
+});

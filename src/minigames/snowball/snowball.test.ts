@@ -870,7 +870,7 @@ describe('schneeball definition', () => {
       id: 'schneeball',
       title: 'Schneeball-Schlacht',
       rule: 'Triff die anderen! Treffer +2, getroffen −1. Stehen bleiben lädt Schneebälle nach.',
-      controls: 'WASD laufen · Maus zielen · Linksklick werfen · Rechtsklick fest werfen · Leertaste schubsen',
+      controls: 'WASD laufen · Maus zielen · Linksklick werfen · Rechtsklick fest werfen · Leertaste schubsen · F Streich',
       durationMs: C.durationMs,
       aimOffset: { x: 5, y: 26 },
     });
@@ -918,5 +918,41 @@ describe('Schneeball cards', () => {
   it('the definition forwards opts.card', () => {
     const g = snowball.createHost(gp(['p0', 'p1']), mulberry32(7), { assets: { 'arena-schneeball': file }, card: { id: 'turbo_start', chooser: 'p0', victim: 'p1' } });
     expect((g.snapshot() as SnowState).players.p0.extra).toBe('riesenball');
+  });
+});
+
+describe('Schneeball prank hooks', () => {
+  it('prankBodies lists every player at the feet; a hit player is not affectable while invulnerable', () => {
+    const d = driver(['p0', 'p1', 'p2']);
+    expect(d.g.prankBodies!()).toEqual([
+      { key: 'p0', x: SPAWNS[0][0], y: SPAWNS[0][1], affectable: true, out: false },
+      { key: 'p1', x: SPAWNS[1][0], y: SPAWNS[1][1], affectable: true, out: false },
+      { key: 'p2', x: SPAWNS[2][0], y: SPAWNS[2][1], affectable: true, out: false },
+    ]);
+    p2ToMiddle(d);
+    d.tap('p2', 60, 110 - BALL_LIFT);
+    d.tick(15);
+    expect(d.snap().players.p0.invulnMs).toBeGreaterThan(0);
+    expect(d.g.prankBodies!().find((b) => b.key === 'p0')).toMatchObject({ affectable: false, out: false });
+    d.tick(Math.ceil(C.invulnMs / 1000 / DT) + 1);
+    expect(d.g.prankBodies!().find((b) => b.key === 'p0')).toMatchObject({ affectable: true });
+  });
+
+  it('prankKnock stuns the victim and pushes him about pushPx away from the prankster', () => {
+    // p2 walks up next to p0 (open floor to its right), then p0's hammer knocks it away.
+    const d = driver(['p0', 'p1', 'p2']);
+    p2ToMiddle(d);
+    const dist = () => {
+      const s = d.snap();
+      return Math.hypot(s.players.p2.x - s.players.p0.x, s.players.p2.y - s.players.p0.y);
+    };
+    const before = dist();
+    d.g.prankKnock!('p0', 'p2');
+    d.tick();
+    expect(d.snap().players.p2.stun).toBe(true);
+    d.tick(Math.ceil(CONFIG.shove.stunMs / 1000 / DT));
+    expect(d.snap().players.p2.stun).toBe(false);
+    expect(dist() - before).toBeGreaterThan(CONFIG.shove.pushPx - 2);
+    expect(dist() - before).toBeLessThan(CONFIG.shove.pushPx + 2);
   });
 });

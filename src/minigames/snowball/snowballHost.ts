@@ -4,7 +4,7 @@ import { neutralInput } from '../../net/protocol';
 import { moveCircle, tileAt, type Arena, type Solid } from '../common/arena';
 import { Edge } from '../common/edges';
 import { countShoves, FeatTracker } from '../common/feats';
-import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
+import { knockSlot, newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
 import { advanceBall, BALL_LIFT, ballOverlaps, spawnIgnores, throwPower, type BallTarget } from './snowballBalls';
 import { stepMover, type Mover } from './snowballMove';
@@ -449,6 +449,12 @@ export function createSnowballHost(
       if (elapsedMs < durationMs) return null;
       const scores = [...new Set(keys.map((k) => players[k].score))].sort((a, b) => b - a);
       return scores.map((s) => keys.filter((k) => players[k].score === s));
+    },
+    prankBodies() {
+      return keys.map((k) => ({ key: k, x: players[k].x, y: players[k].y, affectable: !players[k].down && players[k].invulnMs <= 0, out: false }));
+    },
+    prankKnock(from, to) {
+      if (players[from] && players[to]) knockSlot(shove[to], players[from], players[to]);
     },
     feats() {
       return feats.result();

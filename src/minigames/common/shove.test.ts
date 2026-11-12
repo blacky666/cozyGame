@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../config';
 import { neutralInput, type InputState } from '../../net/protocol';
-import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from './shove';
+import { knockSlot, newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from './shove';
 
 const DT = 1 / 30;
 const shoves = (n: number): InputState => ({ ...neutralInput(), shoves: n });
@@ -99,5 +99,19 @@ describe('shove', () => {
     const { keys, slots, bodies } = setup({ p0: body(100, 100, 'up'), p1: body(100, 85), p2: body(100, 92), p3: body(101, 100) });
     expect(resolveShoves(keys, bodies, slots, { p0: shoves(1) })).toEqual([{ from: 'p0', to: 'p3' }]);
     expect(slots.p3.dirX).toBeCloseTo(1);
+  });
+});
+
+describe('knockSlot', () => {
+  it('pushes away from the source like a landed shove, ignoring cooldown and immunity', () => {
+    const s = newShoveSlot();
+    s.immuneMs = 999;
+    s.swingMs = 100;
+    knockSlot(s, { x: 0, y: 0 }, { x: 10, y: 0 });
+    expect(s).toMatchObject({ dirX: 1, dirY: 0, stunMs: 400, immuneMs: 1500, swingMs: 0 });
+    const t = newShoveSlot();
+    knockSlot(t, { x: 5, y: 5 }, { x: 5, y: 5 });
+    expect([t.dirX, t.dirY]).toEqual([1, 0]);
+    expect(CONFIG.shove.stunMs).toBe(400);
   });
 });

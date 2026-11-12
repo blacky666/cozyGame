@@ -82,6 +82,21 @@ export function resolveShoves(
 }
 
 /**
+ * Prank knock (Quietsche-Hammer): `slot`'s player is pushed away from `from` exactly like a landed
+ * shove, ignoring cone, cooldown and immunity. Same point: pushed to the right.
+ */
+export function knockSlot(slot: ShoveSlot, from: { x: number; y: number }, to: { x: number; y: number }): void {
+  const c = CONFIG.shove;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const d = Math.hypot(dx, dy);
+  [slot.dirX, slot.dirY] = d > 0.001 ? [dx / d, dy / d] : [1, 0];
+  slot.stunMs = c.stunMs;
+  slot.immuneMs = c.immuneMs;
+  slot.swingMs = 0;
+}
+
+/**
  * Advance a slot's timers by dt seconds. Returns the slide of this step: the push starts fast and
  * eases out, adding up to exactly pushPx over stunMs.
  */

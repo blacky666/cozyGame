@@ -78,6 +78,8 @@ export interface MiniGame<S = unknown> {
    * view draws the map). Also turns the cursor into a crosshair while the game runs.
    */
   aimOffset?: { x: number; y: number };
+  /** Keep the system cursor although aimOffset is set (games without a crosshair, e.g. Kartoffel). */
+  systemCursor?: boolean;
   /** Sound package (public/audio/<name>/, listed in SOUND_PACKAGES): "<name>.countdown_tick" etc. */
   sounds?: string;
   /**
