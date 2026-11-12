@@ -3,7 +3,7 @@ import { neutralInput } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
 import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
-import type { Mover } from '../snowball/snowballMove';
+import type { Mover } from '../common/mover';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
 import { stepWalker } from './spudMove';
 

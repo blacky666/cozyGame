@@ -2,7 +2,7 @@ import { CONFIG } from '../../config';
 import type { InputState } from '../../net/protocol';
 import { moveCircle, type Arena } from '../common/arena';
 import type { Facing } from '../common/shove';
-import type { Mover } from '../snowball/snowballMove';
+import type { Mover } from '../common/mover';
 
 /**
  * One walking step at `speed` px/s (no ice), shared by the host simulation and the client

@@ -1,6 +1,6 @@
 import { CONFIG } from '../../config';
 import type { PlayerKey } from '../types';
-import type { Cue } from '../snowball/snowballSounds';
+import type { Cue } from '../common/cue';
 import { PAINT_TILE } from './paintGrid';
 import { finaleAt, type PaintFx, type PaintState } from './paintHost';
 

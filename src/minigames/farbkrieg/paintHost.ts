@@ -4,7 +4,7 @@ import { moveCircle, type Arena } from '../common/arena';
 import { Edge } from '../common/edges';
 import { newShoveSlot, resolveShoves, stepShove, type Facing, type ShoveSlot } from '../common/shove';
 import { stepWalker } from '../kartoffel/spudMove';
-import type { Mover } from '../snowball/snowballMove';
+import type { Mover } from '../common/mover';
 import type { GamePlayer, MiniGameHost, PlayerKey } from '../types';
 import { advanceBlob, type BlobTarget } from './paintBlobs';
 import { createGrid, encodeGrid, PAINT_SPAWNS, paintDisc, paintTile, rankByCount, tileCounts, tileIndex } from './paintGrid';

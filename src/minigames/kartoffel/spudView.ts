@@ -9,7 +9,7 @@ import { buildArena, type Arena } from '../common/arena';
 import { drawArena } from '../common/arenaView';
 import type { Facing } from '../common/shove';
 import { drawShoveRing } from '../common/shoveRing';
-import type { Mover } from '../snowball/snowballMove';
+import type { Mover } from '../common/mover';
 import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { speedOf, type Potato, type SpudFx, type SpudPickup, type SpudState } from './spudHost';
 import { SpudHud } from './spudHud';

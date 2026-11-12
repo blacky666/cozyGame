@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../config';
-import type { Cue } from '../snowball/snowballSounds';
+import type { Cue } from '../common/cue';
 import { finaleAt, type PaintFx, type PaintPlayer, type PaintState } from './paintHost';
 import { PaintSounds } from './paintSounds';
 

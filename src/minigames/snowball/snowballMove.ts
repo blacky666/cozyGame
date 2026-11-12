@@ -3,8 +3,9 @@ import type { InputState } from '../../net/protocol';
 import { moveCircle, tileAt, type Arena, type Solid } from '../common/arena';
 import type { Facing } from '../common/shove';
 
-/** Position (feet), velocity in px/s and facing of a walking body. */
-export type Mover = { x: number; y: number; vx: number; vy: number; dir: Facing };
+import type { Mover } from '../common/mover';
+
+export type { Mover };
 
 /**
  * One movement step, shared by the host simulation and the client prediction. On snow/path the

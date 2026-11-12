@@ -2,8 +2,9 @@ import { CONFIG } from '../../config';
 import type { PlayerKey } from '../types';
 import type { SnowFx, SnowState } from './snowballHost';
 
-/** A sound to play: name inside the schneeball package, or a full id ("aktion.schubsen") from a shared one. */
-export type Cue = { name: string; volume?: number; pan?: number; delayMs?: number };
+import type { Cue } from '../common/cue';
+
+export type { Cue };
 
 const MAP_WIDTH = 416;
 /** Stereo spread: the arena edges are this far left/right (not fully, it gets tiring). */

@@ -1,6 +1,6 @@
 import { CONFIG } from '../../config';
 import type { PlayerKey } from '../types';
-import type { Cue } from '../snowball/snowballSounds';
+import type { Cue } from '../common/cue';
 import { finaleAt, type TowerFx, type TowerState } from './towerHost';
 
 export type { Cue };

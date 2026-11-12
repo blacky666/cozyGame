@@ -11,7 +11,7 @@ import { CROSSHAIR_DIM, drawCrosshair, pointerPixel } from '../common/crosshair'
 import type { Facing } from '../common/shove';
 import { drawShoveRing } from '../common/shoveRing';
 import { stepWalker } from '../kartoffel/spudMove';
-import type { Mover } from '../snowball/snowballMove';
+import type { Mover } from '../common/mover';
 import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import { createGrid } from './paintGrid';
 import { speedOf, type Blob, type PaintFx, type PaintPickup, type PaintState } from './paintHost';

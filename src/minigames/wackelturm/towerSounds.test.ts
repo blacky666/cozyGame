@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../config';
-import type { Cue } from '../snowball/snowballSounds';
+import type { Cue } from '../common/cue';
 import { finaleAt, type TowerFx, type TowerPlayer, type TowerState } from './towerHost';
 import { TowerSounds } from './towerSounds';
 
