@@ -3,7 +3,9 @@ import type { PlayerInfo } from '../net/roster';
 import { CONFIG } from '../config';
 import { sound } from '../audio/sound';
 import { LOBBY_MUSIC, OWN_SOUND, rosterChange, uiSound } from '../audio/uiSounds';
+import type { Profile } from '../save/profile';
 import { drawCharacter } from './charPreview';
+import { nextRewardRow, showLookEditor } from './lookEditor';
 import { clear, h } from './dom';
 import { lobbyModel } from './lobbyModel';
 import { GAME_CATALOG } from '../minigames/catalog';
@@ -23,11 +25,62 @@ export type LobbyOptions = {
   onGames?(ids: string[]): void;
   /** Host only: remove another player from the lobby. */
   onKick?(playerId: string): void;
+  /** Own profile (next reward, look editor). */
+  profile: Profile;
+  /** The look was changed in the editor (the caller saves and tells the host). */
+  onProfile(p: Profile): void;
 };
 
-/** Renders the lobby; returns an updater to call on each roster change. */
-export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInfo[]): (roster: PlayerInfo[]) => void {
+export type Lobby = {
+  /** Call on each roster change. */
+  update(roster: PlayerInfo[]): void;
+  /** The own profile changed outside the lobby (after an evening): refresh, close the editor. */
+  setProfile(p: Profile): void;
+};
+
+/** Renders the lobby; returns its updaters (roster, own profile). */
+export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInfo[]): Lobby {
   clear(root);
+  let profile = o.profile;
+  let selfSlot = 0;
+  const own = h('div', { class: 'cg-own' });
+  let closeEditor: (() => void) | null = null;
+  const openEditor = () => {
+    closeEditor?.();
+    const host = h('div');
+    const overlay = h(
+      'div',
+      { class: 'cg-overlay', role: 'dialog' },
+      h(
+        'div',
+        { class: 'cg-panel cg-dialog cg-editor-dialog' },
+        h('h2', { class: 'cg-h2', text: 'Aussehen' }),
+        host,
+        h('button', { class: 'cg-btn', text: 'Fertig', onclick: () => closeEditor?.() }),
+      ),
+    );
+    const cleanup = showLookEditor(host, {
+      profile, assets: o.assets, slot: selfSlot,
+      onChange: (p) => {
+        profile = { ...profile, look: p.look };
+        o.onProfile(profile);
+      },
+    });
+    closeEditor = () => {
+      cleanup();
+      overlay.remove();
+      closeEditor = null;
+    };
+    root.append(overlay);
+  };
+  const renderOwn = () => {
+    clear(own);
+    own.append(
+      nextRewardRow(profile.xp, o.assets),
+      h('button', { class: 'cg-btn cg-secondary', text: 'Aussehen ändern', onclick: openEditor }),
+    );
+  };
+  renderOwn();
   sound.setMusic(LOBBY_MUSIC);
   const slotsEl = h('div', { class: 'cg-slots' });
   const hint = h('p', { class: 'cg-hint' });
@@ -89,6 +142,7 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
         h('p', { class: 'cg-label', text: 'Raumcode' }),
         h('div', { class: 'cg-row' }, h('div', { class: 'cg-code', text: o.code }), copy),
         slotsEl,
+        own,
         gamesRow,
         hint,
         h(
@@ -113,6 +167,7 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
     }
     present = now;
     const m = lobbyModel(roster, o.selfId, o.isHost, o.rounds);
+    selfSlot = roster.find((p) => p.id === o.selfId)?.slot ?? selfSlot;
     selfReady = roster.find((p) => p.id === o.selfId)?.ready ?? false;
     readyBtn.textContent = selfReady ? 'Nicht bereit' : 'Bereit';
     startBtn.disabled = !m.canStart;
@@ -129,7 +184,7 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
           { class: `cg-slot${s.isSelf ? ' self' : ''}` },
           o.assets ? drawCharacter(s.look, i, o.assets) : null,
           h('span', { class: 'cg-name', text: s.name }),
-          h('span', { class: 'cg-sub', text: 'Level 1' }),
+          h('span', { class: 'cg-sub', text: `Level ${s.level ?? 1}${(s.stars ?? 0) > 0 ? ` · ★ ${s.stars}` : ''}` }),
           h('span', { class: 'cg-ready', text: !s.connected ? 'getrennt' : s.ready ? '✓ Bereit' : '' }),
           o.isHost && o.onKick && !s.isSelf && !s.isBot
             ? h('button', {
@@ -144,5 +199,12 @@ export function showLobby(root: HTMLElement, o: LobbyOptions, initial: PlayerInf
     });
   };
   update(initial);
-  return update;
+  return {
+    update,
+    setProfile(p) {
+      closeEditor?.();
+      profile = p;
+      renderOwn();
+    },
+  };
 }

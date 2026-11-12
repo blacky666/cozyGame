@@ -28,3 +28,22 @@ export function drawCharacter(look: Look, slot: number, assets: Record<string, A
   }
   return canvas;
 }
+
+/**
+ * A single asset sprite (first frame) on its own canvas, `scale` x its size via CSS pixels
+ * (item previews: emote/prank icons, accessories, the box). Empty canvas when the sprite is unknown.
+ */
+export function drawSprite(name: string, assets: Record<string, AssetFile>, scale = 2): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'cg-sprite';
+  const s = findSprite(assets, name);
+  const frame = s?.def.frames[0];
+  if (!s || !frame) return canvas;
+  canvas.width = s.def.w;
+  canvas.height = s.def.h;
+  canvas.style.width = `${s.def.w * scale}px`;
+  canvas.style.height = `${s.def.h * scale}px`;
+  const data = rasterize(frame, s.file, {});
+  canvas.getContext('2d')?.putImageData(new ImageData(data as Uint8ClampedArray<ArrayBuffer>, s.def.w, s.def.h), 0, 0);
+  return canvas;
+}

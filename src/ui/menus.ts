@@ -2,11 +2,11 @@ import { CONFIG } from '../config';
 import type { AssetFile } from '../gfx/assetTypes';
 import { loadAssets } from '../gfx/textures';
 import { generateRoomCode, normalizeRoomCode } from '../net/roomCode';
-import type { PlayerInfo } from '../net/roster';
 import { createClient, createHost } from '../net/session';
 import type { Transport } from '../net/transport';
 import { joinTrysteroRoom } from '../net/trysteroTransport';
 import type { RejectReason } from '../net/protocol';
+import { levelBadge } from '../progress/levels';
 import { loadProfile, saveProfile } from '../save/storage';
 import type { Profile } from '../save/profile';
 import { SOUND_PACKAGES } from '../audio/packages';
@@ -16,7 +16,7 @@ import { mountFullscreenButton } from './fullscreenButton';
 import { mountFocusHint } from './focusHint';
 import { mountClickSounds, uiSound } from '../audio/uiSounds';
 import { loadSelection, saveSelection } from '../minigames/catalog';
-import { showLobby } from './lobbyScreen';
+import { showLobby, type Lobby } from './lobbyScreen';
 import { showProfile } from './profileScreen';
 import { showConnecting, showStart } from './startScreen';
 import { addDevBots } from '../dev/bots';
@@ -74,11 +74,23 @@ export function startMenus(root: HTMLElement): void {
       onCreate: once(host),
       onJoin: (code) => once(() => join(code))(),
       onProfile: () =>
-        showProfile(root, profile, (p) => {
-          profile = p;
-          toStart();
-        }),
+        void getAssets().then((assets) =>
+          showProfile(root, loadProfile(), assets, (p) => {
+            profile = p;
+            toStart();
+          }),
+        ),
     });
+  };
+
+  /**
+   * A look change from the lobby editor. Starts from the stored profile (an evening may have credited
+   * XP since the lobby was drawn), so only the look is taken over; returns the saved profile.
+   */
+  const saveLook = (p: Profile): Profile => {
+    profile = { ...loadProfile(), look: p.look };
+    saveProfile(profile);
+    return profile;
   };
 
   const host = async (): Promise<void> => {
@@ -100,7 +112,17 @@ export function startMenus(root: HTMLElement): void {
       toStart();
     };
     preloadRuntime();
-    const update = showLobby(
+    const tellHost = (p: Profile) => {
+      const b = levelBadge(p.xp);
+      session.setLocalProfile(session.selfId, p.look, b.level, b.stars);
+    };
+    // After "Nochmal?": the evening saved new XP; show it and put the new level on the own card.
+    const backInLobby = () => {
+      profile = loadProfile();
+      tellHost(profile);
+      lobby.setProfile(profile);
+    };
+    const lobby = showLobby(
       root,
       {
         code, selfId: session.selfId, isHost: true, rounds, assets,
@@ -111,17 +133,20 @@ export function startMenus(root: HTMLElement): void {
           games = ids;
           saveSelection(ids);
         },
-        onStart: () => onStartEvening({ session, transport, profile, isHost: true, rounds, games, assets, root }),
+        onStart: () =>
+          onStartEvening({ session, transport, profile, isHost: true, rounds, games, assets, root, onLobby: backInLobby }),
         onLeave: leave,
         onKick: (id) => {
           uiSound('entfernt');
           void session.kick(id);
         },
+        profile,
+        onProfile: (p) => tellHost(saveLook(p)),
       },
       session.roster.list(),
     );
     uiSound('raum_erstellt');
-    session.onRoster((r) => void (alive && update(r)));
+    session.onRoster((r) => void (alive && lobby.update(r)));
   };
 
   const join = async (rawCode: string): Promise<void> => {
@@ -145,8 +170,17 @@ export function startMenus(root: HTMLElement): void {
     const timer = setTimeout(() => phase === 'connecting' && abort(NOT_FOUND), CONFIG.net.joinTimeoutMs);
     showConnecting(root, () => abort());
 
-    let update: ((r: PlayerInfo[]) => void) | null = null;
-    const evening = attachClientEvening(session, root, () => abort());
+    let lobby: Lobby | null = null;
+    const tellHost = (p: Profile) => {
+      const b = levelBadge(p.xp);
+      session.sendProfile(p.look, b.level, b.stars);
+    };
+    const evening = attachClientEvening(session, root, () => abort(), () => {
+      // Back in the lobby after an evening: the settled XP is in storage now.
+      profile = loadProfile();
+      tellHost(profile);
+      lobby?.setProfile(profile);
+    });
     session.onRejected((reason) => (phase === 'connecting' || reason === 'kicked') && abort(REJECT_TEXT[reason]));
     session.onHostLost(() => {
       if (phase === 'connecting') abort(NOT_FOUND);
@@ -158,7 +192,7 @@ export function startMenus(root: HTMLElement): void {
       if (phase === 'connecting') {
         phase = 'lobby';
         clearTimeout(timer);
-        update = showLobby(
+        lobby = showLobby(
           root,
           {
             code: normalizeRoomCode(rawCode) ?? rawCode, selfId: session.playerId ?? session.selfId, isHost: false,
@@ -167,12 +201,14 @@ export function startMenus(root: HTMLElement): void {
             onRounds: () => {},
             onStart: () => {},
             onLeave: () => abort(),
+            profile,
+            onProfile: (p) => tellHost(saveLook(p)),
           },
           r,
         );
         return;
       }
-      update?.(r);
+      lobby?.update(r);
     });
   };
 

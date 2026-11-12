@@ -26,3 +26,9 @@ export function levelInfo(xp: number): LevelInfo {
   const base = xpToReach(level);
   return { level, into: x - base, need: xpToReach(level + 1) - base, boxes: 0 };
 }
+
+/** Level and stars as shown on the lobby cards. */
+export function levelBadge(xp: number): { level: number; stars: number } {
+  const i = levelInfo(xp);
+  return { level: i.level, stars: i.boxes };
+}

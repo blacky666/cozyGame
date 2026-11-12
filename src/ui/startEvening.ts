@@ -97,8 +97,16 @@ export type ClientEvening = {
   hostLost(): void;
 };
 
-/** Client: switch from the lobby DOM to Phaser on the first non-lobby phase the host sends. */
-export function attachClientEvening(session: ClientSession, root: HTMLElement, backToStart: () => void): ClientEvening {
+/**
+ * Client: switch from the lobby DOM to Phaser on the first non-lobby phase the host sends.
+ * `onLobby` runs when an evening returns to the lobby ("Nochmal?").
+ */
+export function attachClientEvening(
+  session: ClientSession,
+  root: HTMLElement,
+  backToStart: () => void,
+  onLobby?: () => void,
+): ClientEvening {
   let stage: Stage | null = null;
   let loading = false;
   let latest: EveningPhase | null = null;
@@ -115,10 +123,12 @@ export function attachClientEvening(session: ClientSession, root: HTMLElement, b
     const p = asPhase(msg.data);
     if (!p || over) return;
     if (p.kind === 'lobby') {
+      const wasRunning = stage !== null || loading;
       latest = null;
       stage?.destroy();
       stage = null;
       setOverlay(root, true);
+      if (wasRunning) onLobby?.();
       return;
     }
     latest = p;

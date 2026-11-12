@@ -1,6 +1,6 @@
 import { CONFIG } from '../config';
 import { APP_VERSION } from '../version';
-import { levelInfo } from '../progress/levels';
+import { levelBadge as badge } from '../progress/levels';
 import { migrate, type Look, type Profile } from '../save/profile';
 import { keepCounters, neutralInput, parseInputState, type InputState, type MsgData, type MsgType, type RejectReason } from './protocol';
 import { Roster, type PlayerInfo } from './roster';
@@ -23,11 +23,6 @@ type Snap = MsgData<'snap'>;
 type PhaseMsg = MsgData<'phase'>;
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null;
-/** Level and stars as shown on the lobby cards, from the own XP. */
-const badge = (xp: number): { level: number; stars: number } => {
-  const i = levelInfo(xp);
-  return { level: i.level, stars: i.boxes };
-};
 const MAX_STARS = 9999;
 /** Untrusted level/stars from the wire: integers in range, else 1 / 0. */
 const cleanLevel = (x: unknown): number =>
