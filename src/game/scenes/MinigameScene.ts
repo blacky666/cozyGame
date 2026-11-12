@@ -108,7 +108,17 @@ export class MinigameScene extends Phaser.Scene {
     const down = (p: Phaser.Input.Pointer) => pointer.press(p.button);
     const up = (p: Phaser.Input.Pointer) => pointer.release(p.button);
     const wheel = (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => pointer.wheel(dy, this.time.now);
-    const blur = () => pointer.releaseAll();
+    const blur = () => {
+      pointer.releaseAll();
+      // Client: send the released keys through the tracked path, so the prediction knows their seq
+      // (the keyboard already cleared its keys: its blur listener was registered first).
+      if (this.ctx.isHost || !this.view) return;
+      const input = pointer.merge(this.ctx.keyboard.state());
+      const seq = this.ctx.sendInput?.(input) ?? 0;
+      if (seq > 0) this.lastSentSeq = seq;
+      this.lastSent = input;
+      this.lastSentAt = this.time.now;
+    };
     const noMenu = (e: Event) => e.preventDefault();
     const canvas = this.game.canvas;
     this.input.on(Phaser.Input.Events.POINTER_DOWN, down);
