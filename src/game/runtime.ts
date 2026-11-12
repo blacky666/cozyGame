@@ -3,6 +3,8 @@ import { createBotInputs } from '../dev/bots';
 import { devFlags } from '../dev/devFlags';
 import type { ClientSession, HostSession } from '../net/session';
 import { MINIGAMES } from '../minigames/registry';
+import { createEveningProgress } from '../progress/eveningProgress';
+import { loadProfile, saveProfile } from '../save/storage';
 import { playerKey, type PlayerKey } from '../minigames/types';
 import { DEFAULT_TIMING, EveningHost, type EveningTiming } from './eveningHost';
 import type { AssetFile } from '../gfx/assetTypes';
@@ -73,13 +75,15 @@ export function runHostEvening(
   for (const p of session.roster.list()) {
     if (p.isBot) host.addBot(p.id, createBotInputs(1 + p.slot * 7919));
   }
+  const selfKey = () => keyFor(session.roster.list(), session.selfId);
   stage = new Stage({
     isHost: true,
     players: createPlayerCache(() => session.roster.list()),
-    selfKey: () => keyFor(session.roster.list(), session.selfId),
+    selfKey,
     keyboard,
     pointer,
     timing: t.stage,
+    progress: createEveningProgress({ selfKey, load: () => loadProfile(), save: (p) => saveProfile(p) }),
     hostSnapshot: () =>
       host.phase.kind === 'playing'
         ? { round: host.phase.round, state: host.latest, acks: {}, tick: host.latestTick, at: host.latestAt }
@@ -111,13 +115,15 @@ export function runClientEvening(session: ClientSession, backToStart: () => void
       session.sendInput(pointer.merge(keyboard.state()));
     },
   });
+  const selfKey = () => keyFor(session.roster, session.playerId);
   const stage: Stage = new Stage({
     isHost: false,
     players: createPlayerCache(() => session.roster),
-    selfKey: () => keyFor(session.roster, session.playerId),
+    selfKey,
     keyboard,
     pointer,
     timing: timings().stage,
+    progress: createEveningProgress({ selfKey, load: () => loadProfile(), save: (p) => saveProfile(p) }),
     sendInput: (s) => session.sendInput(s),
     backToStart: () => {
       stage.destroy();

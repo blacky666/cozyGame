@@ -2,6 +2,7 @@ import type { EveningPhase } from '../flow/evening';
 import type { InputState } from '../net/protocol';
 import type { PlayerInfo } from '../net/roster';
 import type { PlayerKey } from '../minigames/types';
+import type { EveningProgress } from '../progress/eveningProgress';
 import type { SnapPayload } from './eveningHost';
 import type { KeyboardInput } from './keyboard';
 import type { PointerInput } from './pointer';
@@ -17,6 +18,8 @@ export interface StageCtx {
   /** Mouse state: written by MinigameScene, read by the client's input send and the host's localInput. */
   pointer: PointerInput;
   timing: StageTiming;
+  /** Own XP settlement; the stage feeds it every phase before showing it. */
+  progress: EveningProgress;
   /** Host: latest authoritative minigame snapshot with its tick number and tick time (ms, performance.now clock). */
   hostSnapshot?(): (SnapPayload & { tick: number; at: number }) | null;
   /** Client: subscribe to minigame snapshots (null unsubscribes). */

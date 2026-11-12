@@ -76,6 +76,8 @@ export class Stage {
   /** Show a phase; repeats of the current phase (re-sent after a reconnect) are ignored. */
   setPhase(p: EveningPhase): void {
     if (this.destroyed || p.kind === 'lobby') return;
+    // Repeats too: settlement is idempotent per evening id, and a re-sent podium must still settle once.
+    this.ctx.progress.onPhase(p);
     if (this.current && phaseId(this.current) === phaseId(p)) return;
     this.current = p;
     if (this.ready) this.show(p);
@@ -88,6 +90,8 @@ export class Stage {
   }
 
   hostLeft(): void {
+    // §3.2: the XP earned so far (last standings) is credited.
+    if (!this.destroyed) this.ctx.progress.hostLost();
     this.setPhase({ kind: 'ended', reason: 'host_left' });
   }
 

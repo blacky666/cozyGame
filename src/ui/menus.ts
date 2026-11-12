@@ -62,6 +62,8 @@ export function startMenus(root: HTMLElement): void {
 
   const toStart = (message?: string): void => {
     starting = false;
+    // An evening may have settled XP into storage meanwhile: never save a stale copy over it.
+    profile = loadProfile();
     showStart(root, {
       name: profile.name,
       message,
