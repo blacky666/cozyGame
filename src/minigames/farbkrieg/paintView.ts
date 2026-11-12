@@ -34,6 +34,8 @@ const LOOPS: readonly string[] = [PAINT_LOOP, MOPP_LOOP, ROLL_LOOP];
 const WORKSHOP_BG = 0x5e3b25;
 const FX_DEPTH = 900;
 const LABEL_LIFT = 46;
+/** Gap between the name label and an emote bubble (px). */
+const EMOTE_GAP = 4;
 /** Mopp trail: one stamp at the feet every this many ms, just above the paint. */
 const MOPP_STAMP_MS = 120;
 const MOPP_DEPTH = PAINT_DEPTH + 0.2;
@@ -79,6 +81,8 @@ export class PaintView implements MiniGameView<PaintState> {
   private readonly arena: Arena;
   private readonly layer: PaintLayer;
   private readonly avatars = new Map<PlayerKey, Avatar>();
+  /** Where emote bubbles point: above the name label of the last rendered position (ghosts too). */
+  private readonly anchors = new Map<PlayerKey, { x: number; y: number }>();
   private readonly colorsOf = new Map<PlayerKey, ColorMap>();
   private readonly blobs = new Map<number, Phaser.GameObjects.Sprite | null>();
   private readonly pickups = new Map<number, Phaser.GameObjects.Sprite | null>();
@@ -237,6 +241,7 @@ export class PaintView implements MiniGameView<PaintState> {
       }
       a.char.setPosition(x, y).setDepth(y);
       a.label.setPosition(x, y - LABEL_LIFT).setDepth(y + 0.5);
+      this.anchors.set(key, { x, y: y - LABEL_LIFT - EMOTE_GAP });
       this.renderSkates(a, sp.rollMs > 0, x, y);
       if (a.splat) {
         const on = sp.slowMs > 0;
@@ -366,6 +371,10 @@ export class PaintView implements MiniGameView<PaintState> {
       this.live.delete(s);
       s.destroy();
     });
+  }
+
+  emoteAnchor(key: PlayerKey): { x: number; y: number } | null {
+    return this.anchors.get(key) ?? null;
   }
 
   destroy(): void {

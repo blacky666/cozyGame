@@ -8,6 +8,8 @@ import { playerKey, type GamePlayer, type MiniGame, type MiniGameView } from '..
 import type { SceneData, StageCtx } from '../stageCtx';
 import { shouldSend } from '../inputSend';
 import { assetSprite, txt } from '../ui';
+import { EmoteLayer } from '../../minigames/common/emoteLayer';
+import type { EmoteShow } from '../../minigames/common/emotes';
 
 /** Round-end jingle after the whistle. */
 const ROUND_END_JINGLE_MS = 700;
@@ -32,6 +34,9 @@ export class MinigameScene extends Phaser.Scene {
   private lastSentSeq = 0;
   private lastAimAt = 0;
   private acks: Record<string, number> = {};
+  private emoteLayer: EmoteLayer | null = null;
+  /** Client: emote shows of the latest snapshot (not interpolated). */
+  private emotes: EmoteShow[] = [];
 
   constructor() {
     super('MinigameScene');
@@ -47,12 +52,14 @@ export class MinigameScene extends Phaser.Scene {
     this.lastSentSeq = 0;
     this.lastAimAt = 0;
     this.acks = {};
+    this.emotes = [];
     this.def = getMinigame(phase.game) ?? null;
     if (!this.def) {
       txt(this, CONFIG.view.width / 2, CONFIG.view.height / 2, `Unbekanntes Spiel: ${phase.game}`, 10);
       return;
     }
     this.view = this.def.createView(this, this.gamePlayers(), ctx.selfKey());
+    this.emoteLayer = new EmoteLayer(this);
     const unwirePointer = this.wirePointer();
     // Action counters only grow while this scene runs (not during intro/standings).
     ctx.keyboard.setCounting(true);
@@ -70,6 +77,7 @@ export class MinigameScene extends Phaser.Scene {
         this.buffer.push(tick, at, p.state);
         this.latest = p.state;
         this.acks = p.acks ?? {};
+        this.emotes = Array.isArray(p.emotes) ? p.emotes : [];
       });
     }
     const los = assetSprite(this, 'ui.countdown.los', CONFIG.view.width / 2, CONFIG.view.height / 2)
@@ -91,6 +99,8 @@ export class MinigameScene extends Phaser.Scene {
         // Released buttons, but the counters stay (a drop would make the next host re-base them).
         ctx.sendInput?.(keepCounters(ctx.pointer.merge(ctx.keyboard.state())));
       }
+      this.emoteLayer?.destroy();
+      this.emoteLayer = null;
       this.view?.destroy();
       this.view = null;
     });
@@ -179,6 +189,7 @@ export class MinigameScene extends Phaser.Scene {
         this.hostBuffer.push(snap.tick, snap.at, snap.state);
         const s = this.hostBuffer.sample(performance.now() - 1000 / CONFIG.net.simHz, this.def.lerp ?? stepLerp);
         view.render(s ?? snap.state, self);
+        this.drawEmotes(snap.emotes);
       }
       return;
     }
@@ -192,6 +203,16 @@ export class MinigameScene extends Phaser.Scene {
     }
     view.predict?.(input, delta / 1000, this.latest, this.acks[self] ?? 0, this.lastSentSeq);
     const s = this.buffer.sample(performance.now() - CONFIG.net.interpDelayMs, this.def.lerp ?? stepLerp);
-    if (s !== null) view.render(s, self);
+    if (s !== null) {
+      view.render(s, self);
+      this.drawEmotes(this.emotes);
+    }
+  }
+
+  /** Emote bubbles at the anchors the view reports (after render, so they follow the figures). */
+  private drawEmotes(shows: EmoteShow[]): void {
+    const view = this.view;
+    if (!view || !this.emoteLayer) return;
+    this.emoteLayer.update(shows, (k) => view.emoteAnchor?.(k) ?? null);
   }
 }

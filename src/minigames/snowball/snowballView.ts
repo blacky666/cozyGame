@@ -18,6 +18,9 @@ import { stepMover, type Mover } from './snowballMove';
 
 export const ARENA_FILE = 'arena-schneeball';
 export const ARENA_MAP = 'schneeball.map';
+/** Name label above the feet, and the gap between label and emote bubble (px). */
+const LABEL_LIFT = 46;
+const EMOTE_GAP = 4;
 /** Where the map is drawn: world = map + offset (the 416x208 map below the 16 px HUD bar). */
 export const ARENA_OFFSET: { readonly x: number; readonly y: number } = { x: 5, y: 26 };
 
@@ -68,6 +71,8 @@ type BallView = { ball: Phaser.GameObjects.Sprite | null; shadow: Phaser.GameObj
 export class SnowballView implements MiniGameView<SnowState> {
   private readonly arena: Arena;
   private readonly avatars = new Map<PlayerKey, Avatar>();
+  /** Where emote bubbles point: above the name label of the last rendered position (ghosts too). */
+  private readonly anchors = new Map<PlayerKey, { x: number; y: number }>();
   private readonly balls = new Map<number, BallView>();
   private readonly pickups = new Map<number, Phaser.GameObjects.Sprite | null>();
   private readonly snowmen = new Map<string, Phaser.GameObjects.Sprite>();
@@ -250,7 +255,8 @@ export class SnowballView implements MiniGameView<SnowState> {
       }
       const alpha = sp.invulnMs > 0 && Math.floor(now / BLINK_MS) % 2 === 0 ? 0.4 : 1;
       a.char.setPosition(x, y).setDepth(y).setAlpha(alpha);
-      a.label.setPosition(x, y - 46).setDepth(y + 0.5);
+      a.label.setPosition(x, y - LABEL_LIFT).setDepth(y + 0.5);
+      this.anchors.set(key, { x, y: y - LABEL_LIFT - EMOTE_GAP });
       this.attach(a, a.hat, sp.hat, 'head', `schnee.eiszapfenmuetze.${p.dir === 'left' ? 'side' : p.dir}`, x, y, y + 0.2, alpha);
       if (key === selfKey) {
         drawShoveRing(this.ring, x, y, sp.shoveCdMs);
@@ -357,6 +363,10 @@ export class SnowballView implements MiniGameView<SnowState> {
       if (s.anims.isPlaying) s.once(Phaser.Animations.Events.ANIMATION_COMPLETE, done);
       else this.scene.time.delayedCall(HIT_ANIM_MS, done);
     }
+  }
+
+  emoteAnchor(key: PlayerKey): { x: number; y: number } | null {
+    return this.anchors.get(key) ?? null;
   }
 
   destroy(): void {

@@ -33,6 +33,8 @@ const FX_STILL_MS = 300;
 const MUSH_MS = 1000;
 const GHOST_ALPHA = 0.45;
 const LABEL_LIFT = 46;
+/** Gap between the name label and an emote bubble (px). */
+const EMOTE_GAP = 4;
 /** "Nicht zurück!" sign: its bottom this far above the feet, bobbing by 1 px. */
 const SIGN_LIFT = 52;
 const SIGN_BOB_MS = 150;
@@ -73,6 +75,8 @@ type PotatoView = { bomb: Phaser.GameObjects.Sprite | null; fuse: Phaser.GameObj
 export class SpudView implements MiniGameView<SpudState> {
   private readonly arena: Arena;
   private readonly avatars = new Map<PlayerKey, Avatar>();
+  /** Where emote bubbles point: above the name label of the last rendered position (ghosts too). */
+  private readonly anchors = new Map<PlayerKey, { x: number; y: number }>();
   private readonly potatoes = new Map<number, PotatoView>();
   private readonly pickups = new Map<number, Phaser.GameObjects.Sprite | null>();
   /** "Nicht zurück!" sign per passer. */
@@ -214,6 +218,7 @@ export class SpudView implements MiniGameView<SpudState> {
       a.char.setPosition(x, y).setDepth(y).setAlpha(alpha).setVisible(!mushed);
       a.mush?.setPosition(x, y).setDepth(y).setVisible(mushed);
       a.label.setPosition(x, y - LABEL_LIFT).setDepth(y + 0.5).setAlpha(alpha);
+      this.anchors.set(key, { x, y: y - LABEL_LIFT - EMOTE_GAP });
       if (key === selfKey) drawShoveRing(this.ring, x, y, sp.ghost || mushed ? 0 : sp.shoveCdMs);
     }
   }
@@ -335,6 +340,10 @@ export class SpudView implements MiniGameView<SpudState> {
       if (s.anims.isPlaying) s.once(Phaser.Animations.Events.ANIMATION_COMPLETE, done);
       else this.scene.time.delayedCall(FX_STILL_MS, done);
     }
+  }
+
+  emoteAnchor(key: PlayerKey): { x: number; y: number } | null {
+    return this.anchors.get(key) ?? null;
   }
 
   destroy(): void {

@@ -44,6 +44,11 @@ export interface MiniGameView<S> {
   predict?(input: InputState, dt: number, latest: S | null, ackSeq: number, sentSeq: number): void;
   /** Called every frame while the game scene runs, also before the first snapshot (e.g. the crosshair). */
   frame?(): void;
+  /**
+   * Main-camera world point an emote bubble's tail points at for this player (above the name label;
+   * null hides the bubble).
+   */
+  emoteAnchor?(key: PlayerKey): { x: number; y: number } | null;
   destroy(): void;
 }
 
