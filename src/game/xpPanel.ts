@@ -18,11 +18,13 @@ const LEVEL_Y = Y + 108;
 const BAR_Y = LEVEL_Y + 10;
 const BAR_W = W - 2 * PAD;
 const BAR_H = 10;
-const TIP_Y = Y + H - 9;
+/** Centre of the (two-line) save tip below the bar. */
+const TIP_Y = BAR_Y + BAR_H + 13;
 /** Centre of the level-up / unlock card. */
-const CARD_Y = Y + 66;
+const CARD_Y = Y + 62;
 const GOLD = '#ffd27a';
-const DEPTH = 1500;
+/** Above the podium figures (depth = feet y), below their name labels (500) so a name is never cut. */
+const DEPTH = 450;
 
 /** Shorten a text object with "…" until it fits `max` px. */
 function fit(t: Phaser.GameObjects.Text, max: number): void {
@@ -63,7 +65,7 @@ export class XpPanel {
     const f = assetSprite(scene, 'ui.balken.xp.fuellung', X + PAD + 2, BAR_Y + 2);
     this.fill = add(f ?? scene.add.rectangle(X + PAD + 2, BAR_Y + 2, 1, BAR_H - 4, 0x7ad0ff));
     this.fill.setOrigin(0, 0);
-    this.numbers = add(txt(scene, CX, BAR_Y + BAR_H + 7, '', 10, INK));
+    this.numbers = add(txt(scene, X + W - PAD, LEVEL_Y, '', 10, INK).setOrigin(1, 0.5));
     this.setBar(into, need);
   }
 
@@ -87,7 +89,7 @@ export class XpPanel {
     const frac = need > 0 ? Math.max(0, Math.min(1, into / need)) : 0;
     this.fill.setDisplaySize(Math.max(0.001, (BAR_W - 4) * frac), BAR_H - 4);
     this.fill.setVisible(frac > 0);
-    this.numbers.setText(`${Math.round(into)} / ${need} XP`);
+    this.numbers.setText(`${Math.round(into)}/${need}`);
   }
 
   private clearCard(): void {
@@ -133,7 +135,7 @@ export class XpPanel {
         if (icon) this.add(icon, true);
         const neu = assetSprite(sc, 'ui.icon.neu', CX + 22, CARD_Y - 20);
         if (neu) this.add(neu, true);
-        const t = this.add(txt(sc, CX, CARD_Y + 30, `Neu: ${itemLabel(s.item)}`, 10, GOLD), true);
+        const t = this.add(txt(sc, CX, CARD_Y + 28, `Neu: ${itemLabel(s.item)}`, 10, INK), true);
         fit(t, W - 8);
         this.scene.time.delayedCall(250, () => sound.play('ablauf.freischaltung'));
         return;
@@ -141,20 +143,20 @@ export class XpPanel {
       case 'box': {
         this.clearCard();
         this.add(nineSlice(sc, 'ui.panel.karte', X + 2, ROW_Y - 6, W - 4, LEVEL_Y - ROW_Y - 2), true);
-        const box = assetSprite(sc, 'ui.kiste.wackeln', CX, CARD_Y + 22);
+        const box = assetSprite(sc, 'ui.kiste.wackeln', CX, CARD_Y + 2);
         if (box) this.add(box, true);
         sound.play('ablauf.ueberraschung');
         sc.time.delayedCall(500, () => {
           box?.destroy();
-          const opening = assetSprite(sc, 'ui.kiste.oeffnen', CX, CARD_Y + 22);
+          const opening = assetSprite(sc, 'ui.kiste.oeffnen', CX, CARD_Y + 2);
           if (opening) this.add(opening, true);
           sc.time.delayedCall(450, () => {
             opening?.destroy();
-            const open = assetSprite(sc, 'ui.kiste.offen', CX, CARD_Y + 22);
+            const open = assetSprite(sc, 'ui.kiste.offen', CX, CARD_Y + 2);
             if (open) this.add(open, true);
-            const prize = assetSprite(sc, s.item ? itemSprite(s.item) : 'ui.icon.stern', CX, CARD_Y - 26);
+            const prize = assetSprite(sc, s.item ? itemSprite(s.item) : 'ui.icon.stern', CX, CARD_Y - 28);
             if (prize) this.add(prize, true);
-            const t = this.add(txt(sc, CX, CARD_Y + 32, s.item ? `Neu: ${itemLabel(s.item)}` : 'Bonus-Stern!', 10, GOLD), true);
+            const t = this.add(txt(sc, CX, CARD_Y + 28, s.item ? `Neu: ${itemLabel(s.item)}` : 'Bonus-Stern!', 10, INK), true);
             fit(t, W - 8);
           });
         });
