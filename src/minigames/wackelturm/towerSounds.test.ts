@@ -6,7 +6,7 @@ import { TowerSounds } from './towerSounds';
 
 const C = CONFIG.wackelturm;
 const player = (o: Partial<TowerPlayer> = {}): TowerPlayer => ({
-  plot: 0, craneX: 100, hangTop: 50, hang: { kind: 'kurz', rot: 0 }, cdMs: 0, heightPx: 0, bestPx: 0, placed: 0,
+  plot: 0, craneX: 100, hangTop: 50, hang: { kind: 'kurz', rot: 0, slick: false }, cdMs: 0, heightPx: 0, bestPx: 0, placed: 0,
   charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, present: true, blocks: [], ...o,
 });
 const state = (o: Partial<TowerState> = {}): TowerState => ({
@@ -71,11 +71,11 @@ describe('TowerSounds', () => {
   it('own rotation change plays drehen, a new block does not', () => {
     const t = new TowerSounds('p0');
     t.update(state(), 0);
-    expect(names(t.update(withP0({ hang: { kind: 'kurz', rot: 1 } }), 16))).toEqual(['drehen']);
-    expect(t.update(withP0({ hang: { kind: 'lang', rot: 0 } }), 32)).toEqual([]);
+    expect(names(t.update(withP0({ hang: { kind: 'kurz', rot: 1, slick: false } }), 16))).toEqual(['drehen']);
+    expect(t.update(withP0({ hang: { kind: 'lang', rot: 0, slick: false } }), 32)).toEqual([]);
     expect(t.update(withP0({ hang: null }), 48)).toEqual([]);
     const o = state();
-    o.players.p1.hang = { kind: 'kurz', rot: 2 };
+    o.players.p1.hang = { kind: 'kurz', rot: 2, slick: false };
     expect(t.update(o, 64)).toEqual([]);
   });
 

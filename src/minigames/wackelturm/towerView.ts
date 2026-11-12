@@ -53,6 +53,8 @@ const ANGLE_SCALE = 100;
 const POS_SCALE = 10;
 const STRIDE = 5;
 const QUARTER = Math.PI / 2;
+/** Tint of a slick hanging block (prank Bananenschale). */
+const SLICK_TINT = 0xfff27a;
 
 type Pose = { kind: Kind; x: number; y: number; a: number };
 type Column = {
@@ -279,6 +281,8 @@ export class TowerView implements MiniGameView<TowerState> {
       swapSprite(this.scene, col.hang, name);
     }
     col.hangKind = h.kind;
+    if (h.slick) col.hang.setTint(SLICK_TINT);
+    else col.hang.clearTint();
     const half = shapeSize(h.kind, rot).h / 2;
     col.hang
       .setPosition(Math.round(craneX) + WORLD.x, Math.round(p.hangTop + half) + WORLD.y)

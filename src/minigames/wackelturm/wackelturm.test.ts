@@ -27,7 +27,7 @@ const gp = (keys: string[]): GamePlayer[] =>
   });
 
 const player = (plot: number, extra: Partial<TowerPlayer> = {}): TowerPlayer => ({
-  plot, craneX: layout.plots[plot].centre, hangTop: layout.hangTopStart, hang: { kind: 'kurz', rot: 0 }, cdMs: 0,
+  plot, craneX: layout.plots[plot].centre, hangTop: layout.hangTopStart, hang: { kind: 'kurz', rot: 0, slick: false }, cdMs: 0,
   heightPx: 0, bestPx: 0, placed: 0, charges: 0, armed: null, windMs: 0, windDir: 1, windImmuneMs: 0, present: true, blocks: [], ...extra,
 });
 const state = (players: Record<string, TowerPlayer>, extra: Partial<TowerState> = {}): TowerState => ({
@@ -58,13 +58,13 @@ describe('wackelturm definition', () => {
     });
     const b = state({
       p0: player(0, {
-        craneX: 50, hangTop: 56, heightPx: 32, charges: 1, hang: { kind: 'l', rot: 1 },
+        craneX: 50, hangTop: 56, heightPx: 32, charges: 1, hang: { kind: 'l', rot: 1, slick: false },
         blocks: [1, 0, 520, 980, -310, 3, 2, 700, 900, 50],
       }),
       p1: player(1, { craneX: 160 }),
     }, { timeLeftMs: 59950, winner: 'p0' });
     const s = lerpTower(a, b, 0.5);
-    expect(s.players.p0).toMatchObject({ craneX: 45, hangTop: 61, heightPx: 32, charges: 1, hang: { kind: 'l', rot: 1 } });
+    expect(s.players.p0).toMatchObject({ craneX: 45, hangTop: 61, heightPx: 32, charges: 1, hang: { kind: 'l', rot: 1, slick: false } });
     const bl = s.players.p0.blocks;
     // Block 1 interpolates; block 2 is gone; block 3 is new (as in b).
     expect(bl).toHaveLength(10);
@@ -81,22 +81,22 @@ describe('wackelturm botView', () => {
 
   it('bot turns an l to its long side (rot 3), moves to the target, then drops', () => {
     // placed 4 → offset index 1 → the plot centre.
-    const far = state({ p0: player(0, { craneX: P0.centre - 20, placed: 4, hang: { kind: 'l', rot: 0 } }) });
+    const far = state({ p0: player(0, { craneX: P0.centre - 20, placed: 4, hang: { kind: 'l', rot: 0, slick: false } }) });
     const self = { x: P0.centre - 20, y: 0 };
     expect(towerBotView(far, 'p0', layout)).toEqual({ self, targets: [{ x: P0.centre, y: 0 }], turn: 'cw' });
-    far.players.p0.hang = { kind: 'l', rot: 3 };
+    far.players.p0.hang = { kind: 'l', rot: 3, slick: false };
     expect(towerBotView(far, 'p0', layout)).toEqual({ self, targets: [{ x: P0.centre, y: 0 }] });
-    const near = state({ p0: player(0, { craneX: P0.centre + 2, placed: 4, hang: { kind: 'l', rot: 3 } }) });
+    const near = state({ p0: player(0, { craneX: P0.centre + 2, placed: 4, hang: { kind: 'l', rot: 3, slick: false } }) });
     expect(towerBotView(near, 'p0', layout)).toEqual({
       self: { x: P0.centre + 2, y: 0 }, targets: [{ x: P0.centre, y: 0 }], fire: 'primary',
     });
     // The target steps through −16, 0, +16 with the placed count; a flat lang needs no turn.
-    const lang = state({ p0: player(0, { craneX: P0.centre - 16, placed: 3, hang: { kind: 'lang', rot: 0 } }) });
+    const lang = state({ p0: player(0, { craneX: P0.centre - 16, placed: 3, hang: { kind: 'lang', rot: 0, slick: false } }) });
     expect(towerBotView(lang, 'p0', layout)).toMatchObject({ targets: [{ x: P0.centre - 16, y: 0 }], fire: 'primary' });
     lang.players.p0.placed = 5;
     expect(towerBotView(lang, 'p0', layout)).toEqual({ self: { x: P0.centre - 16, y: 0 }, targets: [{ x: P0.centre + 16, y: 0 }] });
     // An upright lang turns; no block hanging (cooldown): just moves.
-    lang.players.p0.hang = { kind: 'lang', rot: 1 };
+    lang.players.p0.hang = { kind: 'lang', rot: 1, slick: false };
     expect(towerBotView(lang, 'p0', layout)).toMatchObject({ turn: 'cw' });
     lang.players.p0.hang = null;
     expect(towerBotView(lang, 'p0', layout)).toEqual({ self: { x: P0.centre - 16, y: 0 }, targets: [{ x: P0.centre + 16, y: 0 }] });

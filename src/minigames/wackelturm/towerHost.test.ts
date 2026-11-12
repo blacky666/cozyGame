@@ -137,7 +137,7 @@ describe('Wackel-Turm host', () => {
       expect(p.plot).toBe(i);
       expect(p.craneX).toBe(layout.plots[i].left + layout.hookOffsetX);
       expect(p.hangTop).toBe(layout.hangTopStart);
-      expect(p.hang).toEqual({ kind: 'kurz', rot: 0 });
+      expect(p.hang).toEqual({ kind: 'kurz', rot: 0, slick: false });
       expect([p.heightPx, p.bestPx, p.placed, p.charges, p.blocks.length]).toEqual([0, 0, 0, 0, 0]);
       expect(p.armed).toBeNull();
     }
@@ -216,7 +216,7 @@ describe('Wackel-Turm host', () => {
     log.tick(cdTicks - 2);
     expect(p().hang).toBeNull();
     log.tick();
-    expect(p().hang).toEqual({ kind: 'kurz', rot: 0 });
+    expect(p().hang).toEqual({ kind: 'kurz', rot: 0, slick: false });
     d.press('p0', 'primaryTaps');
     log.tick();
     expect(blocks(d.snap(), 'p0')).toHaveLength(2);
@@ -559,7 +559,7 @@ describe('Wackel-Turm host', () => {
     d.tick();
     expect(p().present).toBe(true);
     expect(blocks(d.snap(), 'p1')).toHaveLength(1);
-    expect(p().hang).toEqual({ kind: 'kurz', rot: 0 });
+    expect(p().hang).toEqual({ kind: 'kurz', rot: 0, slick: false });
     d.press('p1', 'turnsCw');
     d.tick();
     expect(p().hang?.rot).toBe(1);
@@ -909,5 +909,84 @@ describe('Wackel-Turm cards', () => {
   });
   it('a card whose keys are not players does not throw', () => {
     expect(() => createTowerHost(gp(['p0', 'p1']), mulberry32(7), layout, undefined, { card: { id: 'turbo_start', chooser: 'p3', victim: 'p2' } })).not.toThrow();
+  });
+});
+
+describe('Wackel-Turm pranks', () => {
+  const T = CONFIG.pranks.tower;
+
+  it('prankPlot: the owner of the column under aimX (as columnAt); own plot and outside → null', () => {
+    const d = driver(['p0', 'p1', 'p2']);
+    expect(d.g.prankPlot?.('p0', layout.plots[1].centre)).toBe('p1');
+    expect(d.g.prankPlot?.('p0', layout.plots[2].centre)).toBe('p2');
+    expect(d.g.prankPlot?.('p0', layout.plots[0].centre)).toBeNull();
+    expect(d.g.prankPlot?.('p0', layout.plots[0].minX - 1)).toBeNull();
+    // A column without a player (3 players, 4 plots).
+    if (layout.plots.length > 3) expect(d.g.prankPlot?.('p0', layout.plots[3].centre)).toBeNull();
+  });
+
+  it('quietsche_hammer: the hanging block drops at once; again with nothing hanging → refused', () => {
+    const d = driver(['p0', 'p1'], { rand: always('kurz') });
+    expect(d.snap().players.p1.hang).not.toBeNull();
+    expect(d.g.prankTower?.('quietsche_hammer', 'p0', 'p1')).toBe(true);
+    d.tick();
+    expect(d.snap().players.p1.hang).toBeNull();
+    expect(d.snap().fx.filter((f) => f.kind === 'drop' && f.who === 'p1')).toHaveLength(1);
+    expect(d.g.prankTower?.('quietsche_hammer', 'p0', 'p1')).toBe(false);
+    expect(d.snap().players.p0.hang).not.toBeNull();
+  });
+
+  it('quietsche_hammer drops even while the crane is still rising', () => {
+    const d = driver(['p0', 'p1'], { rand: always('kurz') });
+    stack(d, 'p1', 1, 'quader', 2);
+    d.tick(3);
+    expect(d.g.prankTower?.('quietsche_hammer', 'p0', 'p1')).toBe(true);
+    expect(d.snap().players.p1.hang).toBeNull();
+  });
+
+  it('bananenschale: the hanging block turns slick; with nothing hanging the next block is slick, the one after not', () => {
+    const d = driver(['p0', 'p1'], { rand: always('kurz') });
+    expect(d.snap().players.p1.hang?.slick).toBe(false);
+    expect(d.g.prankTower?.('bananenschale', 'p0', 'p1')).toBe(true);
+    expect(d.snap().players.p1.hang?.slick).toBe(true);
+    expect(d.snap().players.p0.hang?.slick).toBe(false);
+    // The slick block keeps its low friction as a body.
+    dropReady(d, 'p1');
+    const slickBody = d.world('p1').engine.world.bodies.find((b) => !b.isStatic);
+    expect(slickBody?.friction).toBeCloseTo(C.friction * T.slickFactor, 9);
+    expect(slickBody?.frictionStatic).toBeCloseTo(C.frictionStatic * T.slickFactor, 9);
+    // Nothing hangs right after the drop: the next block gets it.
+    expect(d.snap().players.p1.hang).toBeNull();
+    expect(d.g.prankTower?.('bananenschale', 'p0', 'p1')).toBe(true);
+    for (let i = 0; i < 300 && d.snap().players.p1.hang === null; i++) d.tick();
+    expect(d.snap().players.p1.hang?.slick).toBe(true);
+    dropReady(d, 'p1');
+    for (let i = 0; i < 300 && d.snap().players.p1.hang === null; i++) d.tick();
+    expect(d.snap().players.p1.hang?.slick).toBe(false);
+    // A normal block keeps the normal friction.
+    const normal = d.world('p0').engine.world.bodies.filter((b) => !b.isStatic);
+    expect(normal).toHaveLength(0);
+    dropReady(d, 'p0');
+    const n0 = d.world('p0').engine.world.bodies.find((b) => !b.isStatic);
+    expect(n0?.friction).toBeCloseTo(C.friction, 9);
+  });
+
+  it('furzkissen: the victim tower jolts, other towers stay; without blocks → refused', () => {
+    const d = driver(['p0', 'p1', 'p2'], { rand: always('kurz') });
+    expect(d.g.prankTower?.('furzkissen', 'p0', 'p1')).toBe(false);
+    stack(d, 'p1', 1, 'quader', 3);
+    stack(d, 'p2', 2, 'quader', 3);
+    d.tick(ticksFor(C.restHoldMs + 1000));
+    const before = d.snap();
+    expect(d.g.prankTower?.('furzkissen', 'p0', 'p1')).toBe(true);
+    d.tick(10);
+    const after = d.snap();
+    const moved = (k: string) => {
+      const a = blocks(before, k);
+      const b = blocks(after, k);
+      return a.reduce((s, blk, i) => s + Math.hypot(b[i].x - blk.x, b[i].y - blk.y), 0);
+    };
+    expect(moved('p1')).toBeGreaterThan(0.5);
+    expect(moved('p2')).toBe(0);
   });
 });

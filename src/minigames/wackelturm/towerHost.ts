@@ -21,7 +21,8 @@ export type TowerPlayer = {
   craneX: number;
   /** Top edge of the hanging block (world y); rises with the tower. */
   hangTop: number;
-  hang: { kind: Kind; rot: Rot } | null;
+  /** slick: prank Bananenschale – the block keeps low friction once dropped. */
+  hang: { kind: Kind; rot: Rot; slick: boolean } | null;
   /** > 0: drop cooldown, no block hangs. */
   cdMs: number;
   /** Rested height above the foundation (px) and the best of the round. */
@@ -87,6 +88,8 @@ const QUARTER_TURNS = 4;
 /** rand() below this picks wind direction left. */
 const WIND_LEFT_BELOW = 0.5;
 const TAU = 2 * Math.PI;
+/** Wackel-Turm prank tunables. */
+const P = CONFIG.pranks.tower;
 
 /** Angle in (−π, π]. */
 const wrapAngle = (a: number): number => a - TAU * Math.ceil((a - Math.PI) / TAU);
@@ -196,6 +199,8 @@ type Slot = {
   /** Heights of the last collapseWindowMs (oldest first): a slow topple adds up to an einsturz. */
   recent: { atMs: number; h: number }[];
   edges: Edges;
+  /** Prank Bananenschale while nothing hung: the next block is slick. */
+  slickNext: boolean;
 };
 
 /** Host simulation of "Wackel-Turm". dt in seconds. Players get plots in slot order. */
@@ -261,7 +266,7 @@ export function createTowerHost(
     });
     slotOf[gp.key] = gp.slot;
     slots[gp.key] = {
-      world, metas: new Map(), hits, seqIndex: 0, fiesQueue: [], rising: false, wobbleMs: 0, goalMs: 0, recent: [], edges: newEdges(),
+      world, metas: new Map(), hits, seqIndex: 0, fiesQueue: [], rising: false, wobbleMs: 0, goalMs: 0, recent: [], edges: newEdges(), slickNext: false,
     };
     players[gp.key] = {
       plot: i, craneX: layout.plots[i].left + layout.hookOffsetX, hangTop: layout.hangTopStart, hang: null, cdMs: 0,
@@ -269,7 +274,7 @@ export function createTowerHost(
     };
   });
   for (const k of keys) {
-    players[k].hang = { kind: nextKind(k), rot: 0 };
+    players[k].hang = { kind: nextKind(k), rot: 0, slick: false };
     players[k].craneX = clamp(players[k].craneX, boundsOf(k));
   }
 
@@ -328,7 +333,7 @@ export function createTowerHost(
     if (t.hang) {
       // Swap the hanging block now; the normal one comes right after.
       slots[target].fiesQueue.unshift(t.hang.kind);
-      t.hang = { kind: mean, rot: t.hang.rot };
+      t.hang = { ...t.hang, kind: mean };
       t.craneX = clamp(t.craneX, boundsOf(target));
     } else {
       slots[target].fiesQueue.push(mean);
@@ -341,7 +346,7 @@ export function createTowerHost(
     const hang = p.hang;
     if (!hang) return;
     const y = p.hangTop + shapeSize(hang.kind, hang.rot).h / 2;
-    const body = spawnBlock(slots[k].world, hang.kind, p.craneX, y, hang.rot);
+    const body = spawnBlock(slots[k].world, hang.kind, p.craneX, y, hang.rot, hang.slick ? P.slickFactor : 1);
     track(slots[k], body);
     addFx('drop', k, p.craneX, y);
     p.hang = null;
@@ -512,7 +517,8 @@ export function createTowerHost(
         // 8. A new block after the cooldown, crane x kept and clamped.
         const p = players[k];
         if (!p.hang && p.cdMs <= 0) {
-          p.hang = { kind: nextKind(k), rot: 0 };
+          p.hang = { kind: nextKind(k), rot: 0, slick: slots[k].slickNext };
+          slots[k].slickNext = false;
           p.craneX = clamp(p.craneX, boundsOf(k));
         }
         p.windMs = Math.ceil(slots[k].world.windMs);
@@ -563,6 +569,35 @@ export function createTowerHost(
     },
     feats() {
       return feats.result();
+    },
+    prankPlot(from, aimX) {
+      // Same mapping as the Ärger click (fire): aimX in tower world coordinates.
+      const col = columnAt(layout, aimX);
+      const owner = col === null ? undefined : keys[col];
+      return owner === undefined || owner === from ? null : owner;
+    },
+    prankTower(id, _from, to) {
+      const t = players[to];
+      if (!t || over()) return false;
+      if (id === 'bananenschale') {
+        if (t.hang) t.hang.slick = true;
+        else slots[to].slickNext = true;
+        return true;
+      }
+      if (id === 'quietsche_hammer') {
+        if (!t.hang) return false;
+        drop(to);
+        return true;
+      }
+      // furzkissen: the whole tower jolts upward and to one side.
+      const bodies = slots[to].world.engine.world.bodies.filter((b) => !b.isStatic);
+      if (bodies.length === 0) return false;
+      const side = rand() < WIND_LEFT_BELOW ? -1 : 1;
+      for (const b of bodies) {
+        Matter.Sleeping.set(b, false);
+        Matter.Body.setVelocity(b, { x: b.velocity.x + side * P.bumpSide, y: b.velocity.y - P.bumpSpeed });
+      }
+      return true;
     },
     __world(k) {
       return slots[k].world;

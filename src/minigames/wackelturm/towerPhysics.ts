@@ -74,14 +74,18 @@ export function createTowerWorld(layout: TowerLayout, plotIndex: number): TowerW
   return { engine, plot: { ...plot }, acc: 0, windMs: 0, windDir: 1 };
 }
 
-function material() {
+/** Block material; frictionFactor scales friction and frictionStatic (slick blocks, prank Bananenschale). */
+function material(frictionFactor = 1) {
   const c = CONFIG.wackelturm;
-  return { friction: c.friction, frictionStatic: c.frictionStatic, restitution: c.restitution, density: c.density, slop: c.slop };
+  return {
+    friction: c.friction * frictionFactor, frictionStatic: c.frictionStatic * frictionFactor,
+    restitution: c.restitution, density: c.density, slop: c.slop,
+  };
 }
 
 /** Builds the body at angle 0 with its pivot at (px, py). */
-function buildBody(kind: Kind, px: number, py: number): Matter.Body {
-  const opts = material();
+function buildBody(kind: Kind, px: number, py: number, frictionFactor = 1): Matter.Body {
+  const opts = material(frictionFactor);
   if (kind === 'kugel') return Bodies.circle(px, py, KUGEL_R, opts);
   if (kind === 'dreieck' || kind === 'wackelstein') {
     const pts = kind === 'dreieck' ? DREIECK : WACKELSTEIN;
@@ -126,9 +130,10 @@ function compoundInertia(body: Matter.Body): number {
 /**
  * Adds a block with its pivot (sprite centre) at (pivotX, pivotY), rotated rot × 90° clockwise about the pivot.
  * The body's position is its centre of mass; plugin.pivot keeps the pivot offset in body space.
+ * frictionFactor scales the block's friction for good (a slick block: CONFIG.pranks.tower.slickFactor).
  */
-export function spawnBlock(w: TowerWorld, kind: Kind, pivotX: number, pivotY: number, rot: Rot): Matter.Body {
-  const body = buildBody(kind, pivotX, pivotY);
+export function spawnBlock(w: TowerWorld, kind: Kind, pivotX: number, pivotY: number, rot: Rot, frictionFactor = 1): Matter.Body {
+  const body = buildBody(kind, pivotX, pivotY, frictionFactor);
   body.plugin = { ...(body.plugin ?? {}), kind, pivot: { x: pivotX - body.position.x, y: pivotY - body.position.y } };
   if (rot !== 0) {
     // Rotate about the pivot: turn the body, then swing its centre of mass around the pivot.
