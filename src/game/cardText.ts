@@ -21,11 +21,17 @@ export function cardsHeader(phase: CardsPhase, self: string, name: NameOf): { he
   return { header: `${nameOr(name, phase.chooser)} wählt eine Gemeinheit …`, sub: `Opfer: ${victim}` };
 }
 
+/** The chooser left: his name while the roster still knows it, else a neutral line. */
+function goneLine(name: NameOf, k: string): string {
+  const n = name(k);
+  return n && n !== k ? `${n} ist weg – Zufallskarte!` : 'Zufallskarte!';
+}
+
 /** The three lines of the reveal: who played it (or the timeout), the card title, what it does. */
 export function revealLines(phase: RevealPhase, name: NameOf): { top: string; title: string; effect: string } {
   const c = nameOr(name, phase.chooser);
   const v = nameOr(name, phase.victim);
-  const top = phase.random ? 'Zeit um – Zufallskarte!' : `${c} spielt:`;
+  const top = !phase.random ? `${c} spielt:` : phase.gone ? goneLine(name, phase.chooser) : 'Zeit um – Zufallskarte!';
   let effect: string;
   switch (phase.card) {
     case 'falle':

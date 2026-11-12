@@ -21,9 +21,12 @@ export type EveningPhase =
     }
   /** The overall last place (chooser) picks one of `offer` against the first place (victim); `game` is the next game. */
   | { kind: 'cards'; round: number; game: string; chooser: string; victim: string; offer: CardId[] }
-  /** The picked card for everyone; `totals` already include Punkte-Klau; `random`: the chooser ran out of time. */
+  /**
+   * The picked card for everyone; `totals` already include Punkte-Klau; `random`: the chooser ran out of
+   * time, `gone` (with random): because he left.
+   */
   | {
-      kind: 'reveal'; round: number; game: string; card: CardId; chooser: string; victim: string; random: boolean;
+      kind: 'reveal'; round: number; game: string; card: CardId; chooser: string; victim: string; random: boolean; gone?: true;
       totals: Record<string, number>; tieOrder: string[];
     }
   | { kind: 'ended'; reason: 'host_left' };
@@ -33,7 +36,7 @@ export type EveningEvent =
   | { type: 'gameResult'; placements: string[][]; feats?: Record<string, string[]> }
   /** `present`: connected players (chooser/victim candidates); all players when missing. */
   | { type: 'standingsDone'; present?: string[] }
-  | { type: 'cardPicked'; card: CardId; random: boolean }
+  | { type: 'cardPicked'; card: CardId; random: boolean; gone?: boolean }
   | { type: 'revealDone' };
 
 export type EveningOptions = {
@@ -178,6 +181,7 @@ export class Evening {
         kind: 'reveal', round, game, card: event.card, chooser, victim, random: event.random,
         totals: { ...this.totals }, tieOrder: this.tieOrder,
       };
+      if (event.random && event.gone) this.phase.gone = true;
     } else if (event.type === 'revealDone' && ph.kind === 'reveal') {
       this.phase = this.intro(ph.round + 1, { id: ph.card, chooser: ph.chooser, victim: ph.victim });
     } else {

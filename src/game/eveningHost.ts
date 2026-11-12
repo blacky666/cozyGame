@@ -191,7 +191,7 @@ export class EveningHost {
     if ((bot && !gone && late) || (gone && late) || this.elapsedMs >= this.timing.cardPickMs) {
       const force = this.o.forceCard;
       const card = force && ph.offer.includes(force) ? force : ph.offer[Math.floor(this.rand() * ph.offer.length)];
-      this.enter(ev.advance({ type: 'cardPicked', card, random: !(bot && !gone) }));
+      this.enter(ev.advance({ type: 'cardPicked', card, random: !(bot && !gone), gone }));
     }
   }
 

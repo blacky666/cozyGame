@@ -25,6 +25,10 @@ describe('cardText', () => {
   it('revealLines per card', () => {
     expect(revealLines(reveal({ card: 'punkte_klau' }), name)).toEqual({ top: 'Mo spielt:', title: 'Punkte-Klau', effect: '1 Punkt: Anna → Mo' });
     expect(revealLines(reveal({ random: true }), name).top).toBe('Zeit um – Zufallskarte!');
+    // The chooser left: his name if still known, else a neutral line.
+    expect(revealLines(reveal({ random: true, gone: true }), name).top).toBe('Mo ist weg – Zufallskarte!');
+    expect(revealLines(reveal({ random: true, gone: true, chooser: 'p5' }), name).top).toBe('Zufallskarte!');
+    expect(revealLines(reveal({ random: true, gone: true }), () => '').top).toBe('Zufallskarte!');
     expect(revealLines(reveal({ card: 'falle' }), name).effect).toBe('Anna startet die nächste Runde im Eisblock.');
     expect(revealLines(reveal({ card: 'peinlicher_hut' }), name).effect).toBe('Anna trägt die nächste Runde den Gurken-Hut.');
     expect(revealLines(reveal({ card: 'turbo_start' }), name).effect).toBe('Mo startet die nächste Runde mit einem Extra.');

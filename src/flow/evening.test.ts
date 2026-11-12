@@ -175,7 +175,7 @@ describe('Evening cards', () => {
     const c2 = ev.advance({ type: 'standingsDone' });
     if (c2.kind !== 'cards') throw new Error('expected cards');
     const hut = c2.offer.find((x) => x !== 'punkte_klau')!;
-    ev.advance({ type: 'cardPicked', card: hut, random: true });
+    expect(ev.advance({ type: 'cardPicked', card: hut, random: true, gone: true })).toMatchObject({ kind: 'reveal', random: true, gone: true });
     expect(ev.advance({ type: 'revealDone' })).toMatchObject({ kind: 'intro', round: 3, card: { id: hut, chooser: 'p2', victim: 'p0' } });
     let ph: EveningPhase = ev.phase;
     for (let r = 3; r <= 5; r++) {

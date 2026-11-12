@@ -404,6 +404,7 @@ describe('EveningHost cards', () => {
     expect(phaseOf(s).kind).toBe('cards');
     s.tick(0.15);
     expect(phaseOf(s)).toMatchObject({ kind: 'reveal', random: false });
+    expect(phaseOf(s)).not.toHaveProperty('gone');
   });
 
   it('a disconnected chooser gets a random card after botPickMs', async () => {
@@ -412,7 +413,7 @@ describe('EveningHost cards', () => {
     s.ct!.leave();
     await flush();
     s.tick(0.35);
-    expect(phaseOf(s)).toMatchObject({ kind: 'reveal', random: true });
+    expect(phaseOf(s)).toMatchObject({ kind: 'reveal', random: true, gone: true });
   });
 });
 
