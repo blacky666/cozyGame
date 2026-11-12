@@ -90,16 +90,29 @@ describe('createKeyboard turns and drops', () => {
     kb.destroy();
   });
 
-  it('S press counts a drop and sets down', () => {
+  it('W/Up turn clockwise and S/Down counter-clockwise; movement flags stay set', () => {
     const win = new FakeTarget();
     const kb = createKeyboard({ win, doc: new FakeTarget() });
     kb.setCounting(true);
+    win.dispatchEvent(key('keydown', 'KeyW'));
+    win.dispatchEvent(Object.assign(key('keydown', 'KeyW'), { repeat: true }));
+    expect(kb.state()).toMatchObject({ turnsCw: 1, turnsCcw: 0, up: true, drops: 0 });
+    win.dispatchEvent(key('keyup', 'KeyW'));
+    win.dispatchEvent(key('keydown', 'ArrowUp'));
     win.dispatchEvent(key('keydown', 'KeyS'));
-    win.dispatchEvent(Object.assign(key('keydown', 'KeyS'), { repeat: true }));
-    expect(kb.state()).toMatchObject({ drops: 1, down: true });
     win.dispatchEvent(key('keyup', 'KeyS'));
     win.dispatchEvent(key('keydown', 'ArrowDown'));
-    expect(kb.state().drops).toBe(2);
+    expect(kb.state()).toMatchObject({ turnsCw: 2, turnsCcw: 2, down: true, drops: 0 });
+    kb.destroy();
+  });
+
+  it('Space counts a shove and a drop at once (each game reads the one it uses)', () => {
+    const win = new FakeTarget();
+    const kb = createKeyboard({ win, doc: new FakeTarget() });
+    kb.setCounting(true);
+    win.dispatchEvent(key('keydown', 'Space'));
+    win.dispatchEvent(Object.assign(key('keydown', 'Space'), { repeat: true }));
+    expect(kb.state()).toMatchObject({ shoves: 1, drops: 1 });
     kb.destroy();
   });
 });

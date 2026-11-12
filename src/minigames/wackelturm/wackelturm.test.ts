@@ -40,7 +40,7 @@ describe('wackelturm definition', () => {
       id: 'wackelturm',
       title: 'Wackel-Turm',
       rule: 'Stapelt die Klötze zum höchsten Turm – wer zuerst die Fahne erreicht, gewinnt sofort!',
-      controls: 'A/D Kran schieben · Q/E oder Mausrad drehen · S oder Linksklick fallen lassen · Rechtsklick Ärger-Aktion, dann fremden Bauplatz anklicken',
+      controls: 'A/D Kran schieben · W/S oder Mausrad drehen · Leertaste oder Linksklick fallen lassen · Rechtsklick Ärger-Aktion, dann fremden Bauplatz anklicken',
       durationMs: C.durationMs,
       sounds: 'wackelturm',
     });

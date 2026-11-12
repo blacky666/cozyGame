@@ -63,10 +63,12 @@ export function createKeyboard(o: KeyboardOptions = {}): KeyboardInput {
     if (!ALL.has(code) || typing(e.target)) return;
     // Count fresh presses only: holding the key (auto-repeat) is one shove.
     if (counting && !repeat && !down.has(code)) {
-      if (code === SHOVE_KEY) shoves++;
-      else if (code === TURN_CW) turnsCw++;
-      else if (code === TURN_CCW) turnsCcw++;
-      else if (DOWN.includes(code)) drops++;
+      // Space is both shove (top-down games) and drop (Wackel-Turm); each game reads only its own counter.
+      if (code === SHOVE_KEY) {
+        shoves++;
+        drops++;
+      } else if (code === TURN_CW || UP.includes(code)) turnsCw++;
+      else if (code === TURN_CCW || DOWN.includes(code)) turnsCcw++;
     }
     down.add(code);
     e.preventDefault();
