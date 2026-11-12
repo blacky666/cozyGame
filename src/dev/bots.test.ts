@@ -26,6 +26,12 @@ describe('addDevBots', () => {
       ['Bot Mo', true, true, 2],
     ]);
   });
+
+  it('gives the bots varied levels (one with stars) for the lobby cards', () => {
+    const session = createHost(createLocalHub().join(), defaultProfile('Host'));
+    addDevBots(session, 3);
+    expect(session.roster.list().slice(1).map((p) => [p.level, p.stars])).toEqual([[2, 0], [5, 0], [30, 2]]);
+  });
 });
 
 describe('createBotInputs', () => {

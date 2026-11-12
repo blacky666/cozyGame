@@ -12,6 +12,8 @@ const BOT_LOOKS: Partial<Look>[] = [
   { hair: 'zopf', hairColor: 2, skin: 2, hat: 'zylinder' },
   { hair: 'kurz', hairColor: 3, skin: 3, hat: null, glasses: 'rundbrille' },
 ];
+/** Level / stars per bot, so the lobby cards show variety (Lotte is past the max level). */
+const BOT_BADGES: { level: number; stars: number }[] = [{ level: 2, stars: 0 }, { level: 5, stars: 0 }, { level: 30, stars: 2 }];
 
 /** Dev mode: add up to 3 always-ready bot players to a host session; returns their ids. */
 export function addDevBots(session: HostSession, n: number): string[] {
@@ -20,6 +22,7 @@ export function addDevBots(session: HostSession, n: number): string[] {
     const look: Look = { ...defaultProfile().look, ...BOT_LOOKS[i] };
     const p = session.addLocalPlayer(BOT_NAMES[i], look, { isBot: true });
     if (!p) break;
+    session.setLocalProfile(p.id, look, BOT_BADGES[i].level, BOT_BADGES[i].stars);
     session.setLocalReady(p.id, true);
     ids.push(p.id);
   }

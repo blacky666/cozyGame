@@ -4,6 +4,7 @@ import { defaultProfile } from '../save/profile';
 import { neutralInput, type InputState, type RejectReason } from './protocol';
 import { createClient, createHost, startHostTicker, type TickWorker } from './session';
 import { createLocalHub } from './transport';
+import type { PlayerInfo } from './roster';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await new Promise<void>((r) => setImmediate(r));
@@ -378,6 +379,110 @@ describe('session', () => {
     host.setLocalInput(ht.selfId, s);
     expect(got).toEqual([bot.id, ht.selfId]);
     expect(host.input(bot.id)).toEqual(s);
+  });
+
+  it('hello with level 7 / stars 2 shows up in the roster', async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const raw = hub.join();
+    raw.send('hello', { name: 'Roh', version: APP_VERSION, look: prof('Roh').look, level: 7, stars: 2 }, host.selfId);
+    await flush();
+    expect(host.roster.get(raw.selfId)).toMatchObject({ level: 7, stars: 2 });
+  });
+
+  it('clamps level and stars from a hello (level 99 / 2.5 -> 1, stars -1 -> 0)', async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const cases: [unknown, unknown][] = [[99, -1], [2.5, 3.5], ['5', 'x']];
+    const ids: string[] = [];
+    cases.forEach(([level, stars], i) => {
+      const t = hub.join();
+      ids.push(t.selfId);
+      t.send('hello', { name: `P${i}`, version: APP_VERSION, look: prof('x').look, level, stars }, host.selfId);
+    });
+    await flush();
+    expect(ids.map((id) => host.roster.get(id)).map((p) => [p?.level, p?.stars])).toEqual([[1, 0], [1, 0], [1, 0]]);
+  });
+
+  it('host and client derive level and stars from their XP (stars = boxes after level 30)', async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), { ...prof('Host'), xp: 19720 + 2500 });
+    expect(host.roster.get(host.selfId)).toMatchObject({ level: 30, stars: 2 });
+    const ct = hub.join();
+    createClient(ct, { ...prof('Gast'), xp: 280 });
+    await flush();
+    expect(host.roster.get(ct.selfId)).toMatchObject({ level: 3, stars: 0 });
+  });
+
+  it('profile message in the lobby updates look and level and broadcasts the roster', async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    await flush();
+    const seen: PlayerInfo[][] = [];
+    client.onRoster((r) => seen.push(r));
+    let hostSide = 0;
+    host.onRoster(() => hostSide++);
+    const look = { ...prof('Gast').look, outfit: 'latzhose' };
+    client.sendProfile(look, 4, 1);
+    await flush();
+    expect(host.roster.get(ct.selfId)).toMatchObject({ level: 4, stars: 1, look: { outfit: 'latzhose' } });
+    expect(seen.at(-1)?.find((p) => p.id === ct.selfId)).toMatchObject({ level: 4, look: { outfit: 'latzhose' } });
+    expect(hostSide).toBe(1);
+    // The same profile again changes nothing and broadcasts nothing.
+    client.sendProfile(look, 4, 1);
+    await flush();
+    expect(hostSide).toBe(1);
+  });
+
+  it('profile message while playing is ignored', async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const ct = hub.join();
+    const client = createClient(ct, prof('Gast'));
+    await flush();
+    host.setPhase('playing');
+    await flush();
+    client.sendProfile({ ...prof('Gast').look, outfit: 'latzhose' }, 4, 0);
+    await flush();
+    expect(host.roster.get(ct.selfId)).toMatchObject({ level: 1, look: { outfit: 'tunika' } });
+  });
+
+  it('profile from an unknown peer is ignored', async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const stranger = hub.join();
+    stranger.send('profile', { look: prof('x').look, level: 5, stars: 0 }, host.selfId);
+    await flush();
+    expect(host.roster.list()).toHaveLength(1);
+    expect(host.roster.get(host.selfId)).toMatchObject({ level: 1 });
+  });
+
+  it("a look with hat 'gurke' arrives as bommelmuetze; bad level/stars are clamped", async () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const ct = hub.join();
+    createClient(ct, prof('Gast'));
+    await flush();
+    ct.send('profile', { look: { ...prof('x').look, hat: 'gurke', hairColor: 99 }, level: 99, stars: -3 }, host.selfId);
+    await flush();
+    expect(host.roster.get(ct.selfId)).toMatchObject({ level: 1, stars: 0, look: { hat: 'bommelmuetze', hairColor: 5 } });
+  });
+
+  it("setLocalProfile changes the host's own entry and a bot's", () => {
+    const hub = createLocalHub();
+    const host = createHost(hub.join(), prof('Host'));
+    const bot = host.addLocalPlayer('Bot 1', prof('x').look, { isBot: true })!;
+    let n = 0;
+    host.onRoster(() => n++);
+    host.setLocalProfile(host.selfId, { ...prof('Host').look, hat: 'zylinder' }, 3, 0);
+    expect(host.roster.get(host.selfId)).toMatchObject({ level: 3, look: { hat: 'zylinder' } });
+    host.setLocalProfile(bot.id, prof('x').look, 2, 0);
+    expect(host.roster.get(bot.id)).toMatchObject({ level: 2 });
+    expect(n).toBe(2);
+    host.setLocalProfile('nobody', prof('x').look, 2, 0);
+    expect(n).toBe(2);
   });
 });
 

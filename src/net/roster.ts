@@ -11,6 +11,10 @@ export type PlayerInfo = {
   connected: boolean;
   ready: boolean;
   isBot: boolean;
+  /** Level 1..maxLevel as the player reports it (lobby cards). */
+  level: number;
+  /** Stars (surprise boxes after the max level) as the player reports it. */
+  stars: number;
   disconnectedAt?: number;
 };
 
@@ -27,7 +31,13 @@ export class Roster {
 
   constructor(private readonly graceMs: number = CONFIG.net.reconnectGraceMs) {}
 
-  join(id: string, name: string, look: Look, now: number, opts: { running: boolean; isBot?: boolean }): JoinResult {
+  join(
+    id: string,
+    name: string,
+    look: Look,
+    now: number,
+    opts: { running: boolean; isBot?: boolean; level?: number; stars?: number },
+  ): JoinResult {
     if (this.players.some((p) => p.connected && sameName(p.name, name))) return { ok: false, reason: 'name' };
 
     const old = this.players.find(
@@ -36,6 +46,8 @@ export class Roster {
     if (old) {
       old.id = id;
       old.look = look;
+      old.level = opts.level ?? old.level;
+      old.stars = opts.stars ?? old.stars;
       old.connected = true;
       delete old.disconnectedAt;
       return { ok: true, player: old, reclaimed: true };
@@ -46,7 +58,10 @@ export class Roster {
     const slot = SLOTS.slice(0, max).find((s) => !this.players.some((p) => p.slot === s));
     if (slot === undefined) return { ok: false, reason: 'full' };
 
-    const player: PlayerInfo = { id, slot, name, look, connected: true, ready: false, isBot: opts.isBot ?? false };
+    const player: PlayerInfo = {
+      id, slot, name, look, connected: true, ready: false, isBot: opts.isBot ?? false,
+      level: opts.level ?? 1, stars: opts.stars ?? 0,
+    };
     this.players.push(player);
     this.players.sort((a, b) => a.slot - b.slot);
     return { ok: true, player, reclaimed: false };
@@ -79,6 +94,17 @@ export class Roster {
     const p = this.get(id);
     if (!p || !p.connected || p.ready === ready) return false;
     p.ready = ready;
+    return true;
+  }
+
+  /** Lobby look/level/stars update; true when anything changed. */
+  setProfile(id: string, look: Look, level: number, stars: number): boolean {
+    const p = this.get(id);
+    if (!p) return false;
+    if (p.level === level && p.stars === stars && JSON.stringify(p.look) === JSON.stringify(look)) return false;
+    p.look = look;
+    p.level = level;
+    p.stars = stars;
     return true;
   }
 

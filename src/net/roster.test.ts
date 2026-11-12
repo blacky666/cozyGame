@@ -67,6 +67,27 @@ describe('Roster', () => {
     expect(res).toMatchObject({ ok: true, player: { slot: 1 } });
   });
 
+  it('stores level and stars (default 1 / 0) and setProfile reports changes', () => {
+    const r = new Roster();
+    r.join('a', 'Anna', look, 0, { running: false, level: 7, stars: 2 });
+    r.join('b', 'Bert', look, 0, lobby);
+    expect(r.get('a')).toMatchObject({ level: 7, stars: 2 });
+    expect(r.get('b')).toMatchObject({ level: 1, stars: 0 });
+    const hatless = { ...look, hat: null };
+    expect(r.setProfile('b', hatless, 3, 0)).toBe(true);
+    expect(r.get('b')).toMatchObject({ level: 3, stars: 0, look: { hat: null } });
+    expect(r.setProfile('b', { ...hatless, emotes: [...hatless.emotes] }, 3, 0)).toBe(false);
+    expect(r.setProfile('nobody', look, 3, 0)).toBe(false);
+  });
+
+  it('a reclaimed slot takes the new level and stars', () => {
+    const r = new Roster();
+    r.join('a', 'Anna', look, 0, lobby);
+    r.leave('a', 0);
+    r.join('a2', 'Anna', look, 10, { running: true, level: 4, stars: 1 });
+    expect(r.get('a2')).toMatchObject({ level: 4, stars: 1 });
+  });
+
   it('remove frees a slot immediately and setReady toggles readiness', () => {
     const r = new Roster();
     fill(r, 2);

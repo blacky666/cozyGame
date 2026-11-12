@@ -52,7 +52,7 @@ export type RejectReason = 'full' | 'running' | 'version' | 'name' | 'kicked';
 
 // Type names must stay <= 12 bytes (Trystero action-name limit).
 export type Msg =
-  | { type: 'hello'; data: { name: string; version: string; look: Look } }
+  | { type: 'hello'; data: { name: string; version: string; look: Look; level: number; stars: number } }
   | { type: 'welcome'; data: { id: string; slot: number; roster: PlayerInfo[]; phase: string } }
   | { type: 'reject'; data: { reason: RejectReason } }
   | { type: 'roster'; data: PlayerInfo[] }
@@ -62,11 +62,13 @@ export type Msg =
   | { type: 'input'; data: { seq: number; state: InputState } }
   | { type: 'snap'; data: { tick: number; phase: string; payload: unknown } }
   | { type: 'phase'; data: { phase: string; data?: unknown } }
-  | { type: 'bye'; data: unknown };
+  | { type: 'bye'; data: unknown }
+  /** Client -> host, lobby only: own look, level and stars changed. */
+  | { type: 'profile'; data: { look: Look; level: number; stars: number } };
 
 export type MsgType = Msg['type'];
 export const MSG_TYPES: readonly MsgType[] = [
-  'hello', 'welcome', 'reject', 'roster', 'ready', 'settings', 'start', 'input', 'snap', 'phase', 'bye',
+  'hello', 'welcome', 'reject', 'roster', 'ready', 'settings', 'start', 'input', 'snap', 'phase', 'bye', 'profile',
 ];
 export type MsgData<T extends MsgType> = Extract<Msg, { type: T }>['data'];
 

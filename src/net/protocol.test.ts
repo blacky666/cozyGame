@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { INPUT_COUNTERS, keepCounters, neutralInput, parseInputState } from './protocol';
+import { INPUT_COUNTERS, keepCounters, MSG_TYPES, neutralInput, parseInputState } from './protocol';
+
+describe('MSG_TYPES', () => {
+  it("contains 'profile' and every type name is <= 12 bytes", () => {
+    expect(MSG_TYPES).toContain('profile');
+    for (const t of MSG_TYPES) expect(new TextEncoder().encode(t).length).toBeLessThanOrEqual(12);
+  });
+});
 
 describe('parseInputState', () => {
   it('keeps a valid shove counter', () => {

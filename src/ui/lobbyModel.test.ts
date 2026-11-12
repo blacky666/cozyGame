@@ -11,6 +11,8 @@ const p = (slot: Slot, ready: boolean, connected = true): PlayerInfo => ({
   connected,
   ready,
   isBot: false,
+  level: 1,
+  stars: 0,
 });
 
 describe('lobbyModel', () => {

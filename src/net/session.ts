@@ -1,5 +1,6 @@
 import { CONFIG } from '../config';
 import { APP_VERSION } from '../version';
+import { levelInfo } from '../progress/levels';
 import { migrate, type Look, type Profile } from '../save/profile';
 import { keepCounters, neutralInput, parseInputState, type InputState, type MsgData, type MsgType, type RejectReason } from './protocol';
 import { Roster, type PlayerInfo } from './roster';
@@ -17,11 +18,21 @@ import type { Transport } from './transport';
 export const LOBBY = 'lobby';
 const REJECT_REASONS: readonly RejectReason[] = ['full', 'running', 'version', 'name', 'kicked'];
 
-type ProfileLike = Pick<Profile, 'name' | 'look'>;
+type ProfileLike = Pick<Profile, 'name' | 'look' | 'xp'>;
 type Snap = MsgData<'snap'>;
 type PhaseMsg = MsgData<'phase'>;
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null;
+/** Level and stars as shown on the lobby cards, from the own XP. */
+const badge = (xp: number): { level: number; stars: number } => {
+  const i = levelInfo(xp);
+  return { level: i.level, stars: i.boxes };
+};
+const MAX_STARS = 9999;
+/** Untrusted level/stars from the wire: integers in range, else 1 / 0. */
+const cleanLevel = (x: unknown): number =>
+  typeof x === 'number' && Number.isInteger(x) && x >= 1 && x <= CONFIG.progress.maxLevel ? x : 1;
+const cleanStars = (x: unknown): number => (typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= MAX_STARS ? x : 0);
 /** Add a listener; returns its unsubscribe function. */
 const subscribe = <F>(list: F[], cb: F): (() => void) => {
   list.push(cb);
@@ -49,6 +60,8 @@ export interface HostSession {
   setPhase(phase: string, data?: unknown): void;
   /** Add a player without a transport peer (dev bots). Returns null if the roster refuses. */
   addLocalPlayer(name: string, look: Look, opts?: { isBot?: boolean }): PlayerInfo | null;
+  /** Lobby look/level/stars of the host's own player or a local bot (broadcasts the roster on change). */
+  setLocalProfile(id: string, look: Look, level: number, stars: number): void;
   /** Input for the host's own player (selfId) or a local bot. */
   setLocalInput(playerId: string, state: InputState): void;
   setLocalReady(playerId: string, ready: boolean): void;
@@ -76,7 +89,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
   /** Peers the host removed: their hellos are refused for the rest of the room. */
   const kicked = new Set<string>();
 
-  roster.join(t.selfId, profile.name, profile.look, now(), { running: false });
+  roster.join(t.selfId, profile.name, profile.look, now(), { running: false, ...badge(profile.xp) });
 
   const remotes = () => roster.list().filter((p) => p.connected && !local.has(p.id)).map((p) => p.id);
   const toAll = <T extends MsgType>(type: T, data: MsgData<T>) => {
@@ -104,7 +117,11 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     const existing = roster.get(from);
     const res = existing?.connected
       ? { ok: true as const, player: existing }
-      : roster.join(from, name, migrate({ look: data.look }).look, now(), { running: phase !== LOBBY });
+      : roster.join(from, name, migrate({ look: data.look }).look, now(), {
+          running: phase !== LOBBY,
+          level: cleanLevel(data.level),
+          stars: cleanStars(data.stars),
+        });
     if (!res.ok) return send(t, 'reject', { reason: res.reason }, from);
     lastSeq.delete(from);
     send(t, 'welcome', { id: from, slot: res.player.slot, roster: roster.list(), phase }, from);
@@ -127,6 +144,13 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     if (roster.setReady(from, data.ready)) rosterChanged();
   });
   // `settings` are host-authoritative: client-sent settings are ignored on purpose.
+
+  t.on('profile', (data, from) => {
+    const p = roster.get(from);
+    if (phase !== LOBBY || !p || !p.connected || local.has(from) || !isObj(data)) return;
+    const look = migrate({ look: data.look }).look;
+    if (roster.setProfile(from, look, cleanLevel(data.level), cleanStars(data.stars))) rosterChanged();
+  });
 
   t.onPeerLeave((id) => {
     if (!roster.get(id) || local.has(id)) return;
@@ -171,6 +195,10 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       local.add(id);
       rosterChanged();
       return { ...res.player };
+    },
+    setLocalProfile(id, look, level, stars) {
+      if (!local.has(id)) return;
+      if (roster.setProfile(id, migrate({ look }).look, cleanLevel(level), cleanStars(stars))) rosterChanged();
     },
     setLocalInput(id, state) {
       if (local.has(id) && roster.get(id)) emitInput(id, { ...state }, ++localSeq);
@@ -220,6 +248,8 @@ export interface ClientSession {
   /** Returns the seq it sent (0 if nothing was sent). */
   sendInput(state: InputState): number;
   setReady(ready: boolean): void;
+  /** Lobby only (the host ignores it otherwise): own look, level and stars changed. */
+  sendProfile(look: Look, level: number, stars: number): void;
   onRoster(cb: (players: PlayerInfo[]) => void): Unsubscribe;
   onSnapshot(cb: (snap: Snap) => void): Unsubscribe;
   onPhase(cb: (phase: PhaseMsg) => void): Unsubscribe;
@@ -230,7 +260,9 @@ export interface ClientSession {
 }
 
 export function createClient(t: Transport, profile: ProfileLike, opts: { version?: string } = {}): ClientSession {
-  const hello: MsgData<'hello'> = { name: profile.name, version: opts.version ?? APP_VERSION, look: profile.look };
+  const hello: MsgData<'hello'> = {
+    name: profile.name, version: opts.version ?? APP_VERSION, look: profile.look, ...badge(profile.xp),
+  };
   let hostId: string | null = null;
   let playerId: string | null = null;
   let roster: PlayerInfo[] = [];
@@ -322,6 +354,13 @@ export function createClient(t: Transport, profile: ProfileLike, opts: { version
     },
     setReady(ready) {
       if (!done && hostId) send(t, 'ready', { ready }, hostId);
+    },
+    sendProfile(look, level, stars) {
+      // A reconnect's hello must carry the current profile too.
+      hello.look = look;
+      hello.level = level;
+      hello.stars = stars;
+      if (!done && hostId) send(t, 'profile', { look, level, stars }, hostId);
     },
     onRoster: (cb) => subscribe(rosterCbs, cb),
     onSnapshot: (cb) => subscribe(snapCbs, cb),

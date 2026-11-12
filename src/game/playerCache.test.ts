@@ -4,7 +4,7 @@ import { defaultProfile } from '../save/profile';
 import { createPlayerCache } from './playerCache';
 
 const p = (slot: 0 | 1 | 2 | 3, name: string, connected = true): PlayerInfo => ({
-  id: `id-${name}`, slot, name, look: defaultProfile().look, connected, ready: true, isBot: false,
+  id: `id-${name}`, slot, name, look: defaultProfile().look, connected, ready: true, isBot: false, level: 1, stars: 0,
 });
 
 describe('createPlayerCache', () => {
