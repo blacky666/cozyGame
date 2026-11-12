@@ -1,4 +1,4 @@
-import { defaultProfile, migrate, type Profile } from './profile';
+import { defaultProfile, migrate, PROFILE_VERSION, type Profile } from './profile';
 
 export const PROFILE_KEY = 'cozygame.profile';
 export const BROKEN_KEY = 'cozygame.profile.broken';
@@ -9,6 +9,10 @@ function warnOnce(e: unknown): void {
   warned = true;
   console.warn('cozygame: profile storage unavailable', e);
 }
+
+/** Versions 1..PROFILE_VERSION are migrated; anything else is backed up first. */
+const isKnownVersion = (v: unknown): boolean =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= PROFILE_VERSION;
 
 export function loadProfile(storage?: Storage): Profile {
   let store: Storage;
@@ -29,7 +33,7 @@ export function loadProfile(storage?: Storage): Profile {
       typeof parsed === 'object' &&
       parsed !== null &&
       !Array.isArray(parsed) &&
-      (parsed as { v?: unknown }).v === 1;
+      isKnownVersion((parsed as { v?: unknown }).v);
   } catch {
     valid = false;
   }

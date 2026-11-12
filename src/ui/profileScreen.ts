@@ -1,13 +1,11 @@
 import { sound } from '../audio/sound';
 import { CONFIG } from '../config';
+import { levelInfo } from '../progress/levels';
 import { decodeSave, encodeSave, saveFileName } from '../save/saveFile';
 import { saveProfile } from '../save/storage';
 import type { Profile } from '../save/profile';
 import { confirmDialog } from './dialog';
 import { clear, h } from './dom';
-
-// Level is a placeholder (1) until Plan 6 provides levelFromXp.
-const LEVEL = 1;
 
 export function showProfile(root: HTMLElement, profile: Profile, onBack: (p: Profile) => void): void {
   clear(root);
@@ -21,7 +19,7 @@ export function showProfile(root: HTMLElement, profile: Profile, onBack: (p: Pro
       saveProfile(current);
     },
   });
-  const showStats = () => (stats.textContent = `Level ${LEVEL} · ${current.xp} XP`);
+  const showStats = () => (stats.textContent = `Level ${levelInfo(current.xp).level} · ${current.xp} XP`);
   showStats();
 
   const file = h('input', { type: 'file', accept: '.cozysave', style: 'display:none' });
@@ -38,7 +36,7 @@ export function showProfile(root: HTMLElement, profile: Profile, onBack: (p: Pro
     msg.textContent = '';
     const ok = await confirmDialog(
       root,
-      `Aktuellen Stand Level ${LEVEL} (${current.xp} XP) durch gesicherten Stand Level ${LEVEL} (${res.profile.xp} XP) ersetzen?`,
+      `Aktuellen Stand Level ${levelInfo(current.xp).level} (${current.xp} XP) durch gesicherten Stand Level ${levelInfo(res.profile.xp).level} (${res.profile.xp} XP) ersetzen?`,
     );
     if (!ok) return;
     current = res.profile;

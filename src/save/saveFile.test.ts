@@ -52,7 +52,20 @@ describe('saveFile', () => {
     if (r.ok) {
       expect(r.profile.name).toBe('X');
       expect(r.profile.look.outfit).toBe('tunika');
-      expect(r.profile.v).toBe(1);
+      expect(r.profile.v).toBe(2);
+    }
+  });
+  it('decodes a v1 save file into a v2 profile', async () => {
+    const v1 = {
+      v: 1, name: 'Alt', xp: 500, unlocked: [],
+      look: { outfit: 'latzhose', hair: 'zopf', hairColor: 1, skin: 2, hat: 'zylinder', glasses: null, back: null, emotes: ['winken', 'lachen'], prank: null },
+      settings: { music: 0.5, sfx: 0.5, muted: false }, createdAt: '2026-11-01T00:00:00.000Z',
+    };
+    const r = await decodeSave(await encodeSave(v1 as never));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.profile).toMatchObject({ v: 2, name: 'Alt', xp: 500, lastEveningId: null, lastPlayDay: null });
+      expect(r.profile.look).toMatchObject({ outfit: 'latzhose', hat: 'zylinder', emotes: ['winken', 'lachen', null, null], prank: 'bananenschale' });
     }
   });
   it('builds a sanitized file name', () => {
