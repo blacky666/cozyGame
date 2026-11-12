@@ -4,7 +4,7 @@ import type { FeatId } from '../../progress/feats';
 import type { MiniGameHost, PlayerKey, PrankBody } from '../types';
 import { Edge } from './edges';
 import { FeatTracker } from './feats';
-import { dirOf, InputMask, type Dir8, type FxKind } from './prankInput';
+import { dirOf, InputMask, maskButtons, type Dir8, type FxKind } from './prankInput';
 
 const P = CONFIG.pranks;
 
@@ -135,7 +135,9 @@ export class PrankHost {
         kept.push(b);
         continue;
       }
-      const held = raw[victim.key] ? dirOf(raw[victim.key]) : null;
+      // The direction he actually moves (reversed under Verkehrte Welt), not the raw keys.
+      const input = raw[victim.key];
+      const held = input ? dirOf(maskButtons(input, this.fx.filter((f) => f.key === victim.key))) : null;
       this.addFx(victim.key, 'slip', P.slipMs, held ?? (Math.floor(this.rand() * 8) as Dir8));
       this.cue('rutsch', b.owner, [victim.key]);
       this.featT.award(b.owner, 'streich_gelandet');

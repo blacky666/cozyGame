@@ -156,6 +156,22 @@ describe('PrankHost top-down', () => {
     expect(h.feats()).toEqual({ p0: ['streich_gelandet'] });
   });
 
+  it('a reversed victim slips in the direction he actually moves (Verkehrte Welt)', () => {
+    const b = bodies3();
+    b.p1 = { x: 103, y: 100 };
+    const { game } = topDown(b);
+    const h = new PrankHost(players('bananenschale', 'verkehrte_welt'), () => 1, () => 0);
+    h.tick(DT, raw(0), game);
+    // p0 drops the banana, p2 reverses p1 (aim on p1).
+    h.tick(DT, raw(1, 0, 0, { p2: { pranks: 1, aimX: 103, aimY: 100 } }), game);
+    expect(h.snap().fx).toMatchObject([{ key: 'p1', kind: 'reverse' }]);
+    for (let t = 0; t < 700 && !h.snap().fx.some((f) => f.kind === 'slip'); t += DT) {
+      h.tick(DT, raw(1, 0, 0, { p1: { right: true }, p2: { pranks: 1 } }), game);
+    }
+    // Holding D while reversed moves left (4), so he slips on to the left.
+    expect(h.snap().fx.find((f) => f.kind === 'slip')).toMatchObject({ key: 'p1', dir: 4 });
+  });
+
   it('the owner never slips on his banana; an untouched banana is gone after its life time', () => {
     const b = bodies3();
     const { game } = topDown(b);
