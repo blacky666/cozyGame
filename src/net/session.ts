@@ -2,7 +2,7 @@ import { CONFIG } from '../config';
 import { APP_VERSION } from '../version';
 import { levelBadge as badge } from '../progress/levels';
 import { migrate, type Look, type Profile } from '../save/profile';
-import { keepCounters, neutralInput, parseInputState, type InputState, type MsgData, type MsgType, type RejectReason } from './protocol';
+import { INPUT_COUNTERS, keepCounters, neutralInput, parseInputState, type InputCounter, type InputState, type MsgData, type MsgType, type RejectReason } from './protocol';
 import { Roster, type PlayerInfo } from './roster';
 import type { Transport } from './transport';
 
@@ -79,6 +79,22 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
   const inputs = new Map<string, InputState>();
   const lastSeq = new Map<string, number>();
   const inputAt = new Map<string, number>();
+  /**
+   * Per reclaimed player: what is subtracted from the client's counters. A rejoining client keeps its
+   * keyboard counters (and may have pressed while away), so its first input after the rejoin is taken
+   * as the new baseline: the host-visible counters continue from the last known values and no game
+   * edge (shove, throw, prank, emote ...) fires on its own.
+   */
+  const offsets = new Map<string, Record<InputCounter, number>>();
+  /** Reclaimed players whose next input sets their offset. */
+  const rebase = new Set<string>();
+  const forget = (id: string) => {
+    inputs.delete(id);
+    lastSeq.delete(id);
+    inputAt.delete(id);
+    offsets.delete(id);
+    rebase.delete(id);
+  };
   const local = new Set<string>([t.selfId]);
   const inputCbs: Array<(id: string, s: InputState, seq: number) => void> = [];
   const rosterCbs: Array<(players: PlayerInfo[]) => void> = [];
@@ -116,6 +132,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     if (data.version !== APP_VERSION) return send(t, 'reject', { reason: 'version' }, from);
 
     const existing = roster.get(from);
+    const away = roster.list().filter((p) => !p.connected);
     const res = existing?.connected
       ? { ok: true as const, player: existing }
       : roster.join(from, name, migrate({ look: data.look }).look, now(), {
@@ -125,6 +142,16 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
         });
     if (!res.ok) return send(t, 'reject', { reason: res.reason }, from);
     lastSeq.delete(from);
+    if ('reclaimed' in res && res.reclaimed) {
+      // The slot keeps its last known counters (buttons released) under the new peer id.
+      const prevId = away.find((p) => p.slot === res.player.slot)?.id;
+      const last = (prevId !== undefined ? inputs.get(prevId) : undefined) ?? neutralInput();
+      if (prevId !== undefined) forget(prevId);
+      inputs.set(from, keepCounters(last));
+      inputAt.delete(from);
+      offsets.delete(from);
+      rebase.add(from);
+    }
     send(t, 'welcome', { id: from, slot: res.player.slot, roster: roster.list(), phase }, from);
     rosterChanged();
   });
@@ -136,6 +163,14 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
     if (data.seq <= (lastSeq.get(from) ?? 0)) return; // stale / reordered
     const state = parseInputState(data.state);
     if (!state) return;
+    if (rebase.delete(from)) {
+      const base = inputs.get(from) ?? neutralInput();
+      const off = {} as Record<InputCounter, number>;
+      for (const k of INPUT_COUNTERS) off[k] = state[k] - base[k];
+      offsets.set(from, off);
+    }
+    const off = offsets.get(from);
+    if (off) for (const k of INPUT_COUNTERS) state[k] = Math.max(0, state[k] - off[k]);
     lastSeq.set(from, data.seq);
     emitInput(from, state, data.seq);
   });
@@ -163,10 +198,16 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
 
   t.onPeerLeave((id) => {
     if (!roster.get(id) || local.has(id)) return;
-    if (phase === LOBBY) roster.remove(id);
-    else roster.leave(id, now());
-    inputs.delete(id);
-    lastSeq.delete(id);
+    if (phase === LOBBY) {
+      roster.remove(id);
+      forget(id);
+    } else {
+      // Keep the counters (buttons released) so a rejoin under a new id continues from them.
+      roster.leave(id, now());
+      const last = inputs.get(id);
+      forget(id);
+      if (last) inputs.set(id, keepCounters(last));
+    }
     rosterChanged();
   });
 
@@ -220,8 +261,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       for (const p of roster.list()) {
         if (!p.connected) {
           roster.remove(p.id);
-          inputs.delete(p.id);
-          lastSeq.delete(p.id);
+          forget(p.id);
         } else {
           roster.setReady(p.id, p.isBot);
         }
@@ -236,9 +276,7 @@ export function createHost(t: Transport, profile: ProfileLike, opts: { now?: () 
       kicked.add(id);
       send(t, 'reject', { reason: 'kicked' }, id);
       roster.remove(id);
-      inputs.delete(id);
-      lastSeq.delete(id);
-      inputAt.delete(id);
+      forget(id);
       rosterChanged();
       return true;
     },

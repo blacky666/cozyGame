@@ -324,7 +324,8 @@ export function createSnowballHost(
       for (const k of keys) {
         const p = players[k];
         const inp = inputs[k];
-        // Disconnected (no input this tick): no edge is taken, so a reconnect fires no phantom throw.
+        // Disconnected (no input this tick): no edge is taken. A rejoin fires no phantom throw because the
+        // host session continues the counters from their last known values (see createHost in session.ts).
         if (!inp) {
           pendingMs[k] = 0;
           p.reloading = false;

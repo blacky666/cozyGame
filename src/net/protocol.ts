@@ -45,6 +45,7 @@ export function neutralInput(): InputState {
 
 /** Every growing counter of InputState: validated on the wire, compared, and kept when buttons are released. */
 export const INPUT_COUNTERS = ['shoves', 'primaryTaps', 'secondaryTaps', 'turnsCw', 'turnsCcw', 'drops', 'emotes', 'pranks'] as const;
+export type InputCounter = (typeof INPUT_COUNTERS)[number];
 
 /** A neutral input (all buttons released) that carries the counters of `s`, so a host's edges never re-fire. */
 export function keepCounters(s: InputState): InputState {

@@ -4,6 +4,7 @@ import { defaultProfile } from '../save/profile';
 import { neutralInput, type InputState, type RejectReason } from './protocol';
 import { createClient, createHost, startHostTicker, type TickWorker } from './session';
 import { createLocalHub } from './transport';
+import { Edge } from '../minigames/common/edges';
 import type { PlayerInfo } from './roster';
 
 const flush = async () => {
@@ -313,6 +314,48 @@ describe('session', () => {
     await flush();
     now += CONFIG.net.inputStaleMs + 1;
     expect(host.input(ct.selfId)).toEqual({ ...neutralInput(), shoves: 3, primaryTaps: 2, secondaryTaps: 4 });
+  });
+
+  it('a mid-round reconnect fires no press: counters continue from the last known values', async () => {
+    const hub = createLocalHub();
+    const ht = hub.join();
+    let now = 1000;
+    const host = createHost(ht, prof('Host'), { now: () => now });
+    const t1 = hub.join();
+    const c1 = createClient(t1, prof('Gast'));
+    await flush();
+    host.setPhase('playing');
+    c1.sendInput({ ...neutralInput(), shoves: 3, pranks: 2, emotes: 1 });
+    await flush();
+    const shoves = new Edge();
+    const pranks = new Edge();
+    const emotes = new Edge();
+    const fired = (id: string) => {
+      const s = host.input(id);
+      return shoves.take(s.shoves) + pranks.take(s.pranks) + emotes.take(s.emotes);
+    };
+    expect(fired(t1.selfId)).toBe(0); // baseline
+    t1.leave();
+    await flush();
+    now += 2000;
+    // Same browser rejoins: new peer id, but its keyboard counters kept growing (one more F press).
+    const t2 = hub.join();
+    const c2 = createClient(t2, prof('Gast'));
+    await flush();
+    expect(host.roster.list()[1]).toMatchObject({ id: t2.selfId, connected: true });
+    // Before the first real input the filler keeps the last known counters (no drop to zero).
+    expect(host.input(t2.selfId)).toEqual({ ...neutralInput(), shoves: 3, pranks: 2, emotes: 1 });
+    expect(fired(t2.selfId)).toBe(0);
+    // First real input after the rejoin is the new baseline.
+    c2.sendInput({ ...neutralInput(), right: true, shoves: 3, pranks: 3, emotes: 4 });
+    await flush();
+    expect(host.input(t2.selfId)).toEqual({ ...neutralInput(), right: true, shoves: 3, pranks: 2, emotes: 1 });
+    expect(fired(t2.selfId)).toBe(0);
+    // Later presses count normally.
+    c2.sendInput({ ...neutralInput(), shoves: 4, pranks: 4, emotes: 4 });
+    await flush();
+    expect(host.input(t2.selfId)).toEqual({ ...neutralInput(), shoves: 4, pranks: 3, emotes: 1 });
+    expect(fired(t2.selfId)).toBe(2);
   });
 
   it('host close() sends bye and the client reports the host lost immediately', async () => {
