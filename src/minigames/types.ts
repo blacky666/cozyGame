@@ -42,7 +42,7 @@ export interface MiniGameHost<S> {
   feats?(): Record<PlayerKey, FeatId[]>;
   /**
    * Prank hooks (spec §7.2), all optional. Top-down games: every player's feet; `affectable` = a prank
-   * may hit him now, `out` = he cannot prank (ghost).
+   * may hit him now, `out` = he cannot prank (ghost). PrankHost itself skips absent players (no input).
    */
   prankBodies?(): PrankBody[];
   /** Top-down: push `to` away from `from` like a landed shove (Quietsche-Hammer). */

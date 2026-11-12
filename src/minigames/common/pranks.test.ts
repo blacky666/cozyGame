@@ -172,6 +172,47 @@ describe('PrankHost top-down', () => {
     expect(h.snap().fx.find((f) => f.kind === 'slip')).toMatchObject({ key: 'p1', dir: 4 });
   });
 
+  it('absent players (no input: disconnected, in the grace period) are no targets', () => {
+    const without = (r: Record<PlayerKey, InputState>, k: PlayerKey) => {
+      const o = { ...r };
+      delete o[k];
+      return o;
+    };
+    // Pointed: aimed at the absent p2, lands on the present p1; nobody present left → not used up.
+    const { game } = topDown(bodies3());
+    const h = started('furzkissen');
+    h.tick(DT, without(raw(0, 290, 190), 'p2'), game);
+    h.tick(DT, without(raw(1, 290, 190), 'p2'), game);
+    expect(h.snap().fx.map((f) => f.key)).toEqual(['p1']);
+    const h2 = started('furzkissen');
+    const solo = (n: number) => ({ p0: inp({ pranks: n, aimX: 290, aimY: 190 }) });
+    h2.tick(DT, solo(0), game);
+    h2.tick(DT, solo(1), game);
+    expect(h2.snap()).toMatchObject({ fx: [], cues: [], left: { p0: 1 } });
+    expect(h2.feats()).toEqual({});
+
+    // Hammer: an absent figure in range is not knocked.
+    const b = bodies3();
+    b.p1 = { x: 130, y: 100 };
+    const hm = topDown(b);
+    const h3 = started('quietsche_hammer');
+    h3.tick(DT, without(raw(0), 'p1'), hm.game);
+    h3.tick(DT, without(raw(1), 'p1'), hm.game);
+    expect(hm.knock).not.toHaveBeenCalled();
+    expect(h3.snap().left.p0).toBe(1);
+
+    // Banana: an absent figure standing on it does not slip.
+    const bb = bodies3();
+    bb.p1 = { x: 103, y: 100 };
+    const bn = topDown(bb);
+    const h4 = started('bananenschale');
+    h4.tick(DT, without(raw(0), 'p1'), bn.game);
+    h4.tick(DT, without(raw(1), 'p1'), bn.game);
+    for (let t = 0; t < 1000; t += DT) h4.tick(DT, without(raw(1), 'p1'), bn.game);
+    expect(h4.snap()).toMatchObject({ fx: [], bananas: [{ armed: true }] });
+    expect(h4.feats()).toEqual({});
+  });
+
   it('the owner never slips on his banana; an untouched banana is gone after its life time', () => {
     const b = bodies3();
     const { game } = topDown(b);
@@ -229,6 +270,23 @@ describe('PrankHost tower', () => {
     h2.tick(DT, raw(0, 50), game);
     h2.tick(DT, raw(1, 50), game);
     expect(h2.snap()).toMatchObject({ fx: [], left: { p0: 1 } });
+  });
+
+  it('an absent plot owner is no target (not used up, no feat)', () => {
+    const { game, spy } = tower();
+    for (const id of ['tintenklecks', 'quietsche_hammer']) {
+      const h = started(id);
+      const r = (n: number) => {
+        const o: Record<PlayerKey, InputState> = raw(n, 250);
+        delete o.p1;
+        return o;
+      };
+      h.tick(DT, r(0), game);
+      h.tick(DT, r(1), game);
+      expect(h.snap()).toMatchObject({ fx: [], cues: [], left: { p0: 1 } });
+      expect(h.feats()).toEqual({});
+    }
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('tower variants go through prankTower; a refusal is not used up and has no cue', () => {

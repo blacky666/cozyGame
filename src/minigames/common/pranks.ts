@@ -84,7 +84,9 @@ export class PrankHost {
     }
     this.fx = kept;
 
-    const bodies = game.prankBodies?.() ?? null;
+    // Absent players (no input this tick: disconnected, still in the reconnect grace period) are no targets.
+    const present = (k: PlayerKey) => raw[k] !== undefined;
+    const bodies = game.prankBodies?.().map((b) => (present(b.key) ? b : { ...b, affectable: false })) ?? null;
     this.tickBananas(dtMs, raw, bodies);
 
     for (const [key, input] of Object.entries(raw)) {
@@ -96,7 +98,7 @@ export class PrankHost {
       const id = this.prankOf.get(key) ?? '';
       if (!isPrankId(id)) continue;
       if (bodies) this.fireTopDown(id, key, input, bodies, game);
-      else if (game.prankPlot) this.fireTower(id, key, input, game);
+      else if (game.prankPlot) this.fireTower(id, key, input, game, present);
     }
   }
 
@@ -169,9 +171,9 @@ export class PrankHost {
     this.fired(id, key, [target.key], true);
   }
 
-  private fireTower(id: PrankId, key: PlayerKey, input: InputState, game: MiniGameHost<unknown>): void {
+  private fireTower(id: PrankId, key: PlayerKey, input: InputState, game: MiniGameHost<unknown>, present: (k: PlayerKey) => boolean): void {
     const target = game.prankPlot?.(key, input.aimX) ?? null;
-    if (target === null || target === key) return;
+    if (target === null || target === key || !present(target)) return;
     if (TOWER_IDS.has(id)) {
       if (!game.prankTower || !game.prankTower(id as 'bananenschale' | 'furzkissen' | 'quietsche_hammer', key, target)) return;
     } else {
