@@ -42,6 +42,8 @@ const STRONG_CHANCE = 0.25;
 
 /** A bot presses an emote key about every 9–12 s (so browser checks see bubbles). */
 const EMOTE_EVERY_S = [9, 12] as const;
+/** A bot presses the prank key about every 12–18 s (the host decides whether it lands). */
+const PRANK_EVERY_S = [12, 18] as const;
 
 /**
  * Bot brain: walks toward the nearest target, with occasional random detours. `emoteSlots` are the
@@ -54,6 +56,12 @@ export function createBotInputs(seed: number, emoteSlots: readonly number[] = [1
   let emotes = 0;
   let emote: InputState['emote'] = 0;
   let emoteIn = emoteGap();
+  // Own random stream, so adding pranks did not change the movement/throw sequence of a seed.
+  const prankRand = mulberry32(seed ^ 0x5f3759df);
+  const prankGap = () =>
+    Math.round((PRANK_EVERY_S[0] + prankRand() * (PRANK_EVERY_S[1] - PRANK_EVERY_S[0])) * CONFIG.net.simHz);
+  let pranks = 0;
+  let prankIn = prankGap();
   let detour: InputState | null = null;
   let detourLeft = 0;
   // Bots press shove now and then (the host decides whether it lands).
@@ -110,8 +118,12 @@ export function createBotInputs(seed: number, emoteSlots: readonly number[] = [1
       emotes++;
       emote = emoteSlots[Math.floor(rand() * emoteSlots.length)] as InputState['emote'];
     }
+    if (--prankIn <= 0) {
+      prankIn = prankGap();
+      pranks++;
+    }
     // The tap counters are always sent (a drop to 0 would make the host re-base and fire a spurious throw).
-    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, secondaryTaps: strongTaps, turnsCw, turnsCcw: 0, drops: 0, emotes, emote };
+    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, secondaryTaps: strongTaps, turnsCw, turnsCcw: 0, drops: 0, emotes, emote, pranks };
     if (view.aim) {
       out.aimX = view.aim.x;
       out.aimY = view.aim.y;

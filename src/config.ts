@@ -313,6 +313,36 @@ interface GameConfig {
     /** Turbo-Start in Heiße Kartoffel: no sprint cooldown during the first turboSprintMs (ms). */
     turboSprintMs: number;
   };
+  /** Streiche (spec §7.2): one prank per player and round on key F. */
+  pranks: {
+    /** Prank uses per round; doubleUses for the chooser of the card Doppelter Streich. */
+    uses: number;
+    doubleUses: number;
+    /** Verkehrte Welt: controls reversed this long (ms). */
+    reverseMs: number;
+    /** Furzkissen (top-down): the victim stumbles (no input) this long (ms). */
+    stumbleMs: number;
+    /** Bananenschale: the victim slips (input forced in his move direction) this long (ms). */
+    slipMs: number;
+    /** Tintenklecks / Konfetti-Kanone: victim's screen effect (ms). */
+    inkMs: number;
+    confettiMs: number;
+    /** One-shot cues stay this long in snapshots, so every client sees them (ms). */
+    cueMs: number;
+    /** Banana: armed after bananaArmMs, gone after bananaLifeMs, trips a player within bananaTriggerPx (ms, ms, px). */
+    bananaArmMs: number;
+    bananaLifeMs: number;
+    bananaTriggerPx: number;
+    /** Quietsche-Hammer (top-down): every affectable opponent within this radius is knocked away (px). */
+    hammerRadiusPx: number;
+    tower: {
+      /** Slippery block (Bananenschale): friction and frictionStatic times this factor. */
+      slickFactor: number;
+      /** Furzkissen tower jolt: upward speed and sideways speed added to every block (matter velocity units). */
+      bumpSpeed: number;
+      bumpSide: number;
+    };
+  };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -447,6 +477,12 @@ export const CONFIG = deepFreeze<GameConfig>({
   },
   // Gemeinheit-Karten (ms).
   gemeinheit: { offer: 3, pickMs: 10000, botPickMs: 1500, revealMs: 4000, falleMs: 3000, turboSprintMs: 15000 },
+  // Streiche (ms, px).
+  pranks: {
+    uses: 1, doubleUses: 2, reverseMs: 3000, stumbleMs: 500, slipMs: 1000, inkMs: 3000, confettiMs: 2000, cueMs: 1200,
+    bananaArmMs: 600, bananaLifeMs: 20000, bananaTriggerPx: 7, hammerRadiusPx: 36,
+    tower: { slickFactor: 0.1, bumpSpeed: 2.5, bumpSide: 1.0 },
+  },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
 });

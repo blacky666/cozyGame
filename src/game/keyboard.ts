@@ -9,17 +9,19 @@ const RIGHT = ['KeyD', 'ArrowRight'];
 export const SHOVE_KEY = 'Space';
 const TURN_CCW = 'KeyQ';
 const TURN_CW = 'KeyE';
+/** Prank key (spec §5): fires the player's chosen Streich during a round. */
+export const PRANK_KEY = 'KeyF';
 /** Emote keys: code -> slot 1–4 (number row and numpad). */
 const EMOTE_KEYS: ReadonlyMap<string, 1 | 2 | 3 | 4> = new Map(
   ([1, 2, 3, 4] as const).flatMap((n) => [[`Digit${n}`, n], [`Numpad${n}`, n]] as [string, 1 | 2 | 3 | 4][]),
 );
-const ALL = new Set([...UP, ...DOWN, ...LEFT, ...RIGHT, SHOVE_KEY, TURN_CCW, TURN_CW, ...EMOTE_KEYS.keys()]);
+const ALL = new Set([...UP, ...DOWN, ...LEFT, ...RIGHT, SHOVE_KEY, TURN_CCW, TURN_CW, PRANK_KEY, ...EMOTE_KEYS.keys()]);
 
 /** Build an InputState from pressed key codes (WASD; arrows as a fallback) and the shove count. */
 export function inputFromKeys(
   down: ReadonlySet<string>,
   shoves = 0,
-  extra: Partial<Pick<InputState, 'turnsCw' | 'turnsCcw' | 'drops' | 'emotes' | 'emote'>> = {},
+  extra: Partial<Pick<InputState, 'turnsCw' | 'turnsCcw' | 'drops' | 'emotes' | 'emote' | 'pranks'>> = {},
 ): InputState {
   const s = neutralInput();
   const any = (codes: string[]) => codes.some((c) => down.has(c));
@@ -34,7 +36,7 @@ export function inputFromKeys(
 
 export interface KeyboardInput {
   state(): InputState;
-  /** Presses only grow the counters (shove, turns, drops, emotes) while on (a running minigame); movement keys are unaffected. */
+  /** Presses only grow the counters (shove, turns, drops, emotes, pranks) while on (a running minigame); movement keys are unaffected. */
   setCounting(on: boolean): void;
   destroy(): void;
 }
@@ -57,6 +59,7 @@ export function createKeyboard(o: KeyboardOptions = {}): KeyboardInput {
   let turnsCcw = 0;
   let drops = 0;
   let emotes = 0;
+  let pranks = 0;
   let emote: InputState['emote'] = 0;
   let counting = false;
   const onDown = (e: Event) => {
@@ -70,7 +73,8 @@ export function createKeyboard(o: KeyboardOptions = {}): KeyboardInput {
       if (slot) {
         emotes++;
         emote = slot;
-      } else if (code === SHOVE_KEY) {
+      } else if (code === PRANK_KEY) pranks++;
+      else if (code === SHOVE_KEY) {
         shoves++;
         drops++;
       } else if (code === TURN_CW || UP.includes(code)) turnsCw++;
@@ -92,7 +96,7 @@ export function createKeyboard(o: KeyboardOptions = {}): KeyboardInput {
   win.addEventListener('blur', release);
   doc.addEventListener('visibilitychange', onVisibility);
   return {
-    state: () => inputFromKeys(down, shoves, { turnsCw, turnsCcw, drops, emotes, emote }),
+    state: () => inputFromKeys(down, shoves, { turnsCw, turnsCcw, drops, emotes, emote, pranks }),
     setCounting(on) {
       counting = on;
     },

@@ -48,13 +48,13 @@ describe('rotation and drop counters', () => {
     }
   });
 
-  it('keepCounters releases buttons and keeps all seven counters (and the emote slot)', () => {
+  it('keepCounters releases buttons and keeps all eight counters (and the emote slot)', () => {
     const s: InputState = { ...neutralInput(), up: true, primary: true, aimX: 5, emote: 3 };
     INPUT_COUNTERS.forEach((k, i) => (s[k] = i + 1));
     const kept = keepCounters(s);
-    expect(INPUT_COUNTERS).toHaveLength(7);
+    expect(INPUT_COUNTERS).toHaveLength(8);
     expect(kept).toEqual({
-      ...neutralInput(), shoves: 1, primaryTaps: 2, secondaryTaps: 3, turnsCw: 4, turnsCcw: 5, drops: 6, emotes: 7, emote: 3,
+      ...neutralInput(), shoves: 1, primaryTaps: 2, secondaryTaps: 3, turnsCw: 4, turnsCcw: 5, drops: 6, emotes: 7, pranks: 8, emote: 3,
     });
   });
 
@@ -64,5 +64,16 @@ describe('rotation and drop counters', () => {
     expect(parseInputState({ ...neutralInput(), emotes: -1 })).toBeNull();
     expect(parseInputState({ ...neutralInput(), emotes: 2.5 })).toBeNull();
     expect(parseInputState({ ...neutralInput(), emotes: 4, emote: 2 })).toMatchObject({ emotes: 4, emote: 2 });
+  });
+
+  it('parseInputState rejects a missing or negative pranks counter and keeps a valid one', () => {
+    const { pranks: _drop, ...noPranks } = neutralInput();
+    expect(parseInputState(noPranks)).toBeNull();
+    for (const bad of [-1, 2.5, NaN, '3']) expect(parseInputState({ ...neutralInput(), pranks: bad })).toBeNull();
+    expect(parseInputState({ ...neutralInput(), pranks: 5 })?.pranks).toBe(5);
+  });
+
+  it('keepCounters keeps pranks', () => {
+    expect(keepCounters({ ...neutralInput(), up: true, pranks: 3 })).toMatchObject({ up: false, pranks: 3 });
   });
 });

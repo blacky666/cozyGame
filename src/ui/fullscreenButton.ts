@@ -1,7 +1,3 @@
-import { isTyping } from './typing';
-
-export const FULLSCREEN_KEY = 'KeyF';
-
 /** 9x9 pixel corner brackets: pointing outwards to enter fullscreen, inwards to leave it. */
 const ENTER = ['0,0,3,1', '0,0,1,3', '6,0,3,1', '8,0,1,3', '0,8,3,1', '0,6,1,3', '6,8,3,1', '8,6,1,3'];
 const LEAVE = ['0,2,3,1', '2,0,1,3', '6,2,3,1', '6,0,1,3', '0,6,3,1', '2,6,1,3', '6,6,3,1', '6,6,1,3'];
@@ -33,7 +29,8 @@ const toggle = (): void => {
 
 /**
  * Fullscreen button left of the speaker in the bottom right corner (outside #ui, like the speaker).
- * F toggles it anywhere except in text fields. Not shown where the browser has no Fullscreen API (iPhone).
+ * No hotkey: F is the prank key (spec §5); Esc leaves fullscreen natively. Not shown where the browser
+ * has no Fullscreen API (iPhone).
  */
 export function mountFullscreenButton(): () => void {
   if (!document.fullscreenEnabled) return () => {};
@@ -47,19 +44,13 @@ export function mountFullscreenButton(): () => void {
   const show = () => {
     const full = !!document.fullscreenElement;
     btn.replaceChildren(icon(full));
-    btn.title = full ? 'Vollbild beenden (F)' : 'Vollbild (F)';
+    btn.title = full ? 'Vollbild beenden' : 'Vollbild';
     btn.setAttribute('aria-label', btn.title);
   };
   show();
-  const onKey = (e: KeyboardEvent) => {
-    if (e.code !== FULLSCREEN_KEY || e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
-    toggle();
-  };
   document.addEventListener('fullscreenchange', show);
-  window.addEventListener('keydown', onKey);
   return () => {
     document.removeEventListener('fullscreenchange', show);
-    window.removeEventListener('keydown', onKey);
     btn.remove();
   };
 }

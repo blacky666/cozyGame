@@ -95,6 +95,26 @@ describe('createBotInputs', () => {
     }
   });
 
+  it('presses the prank key every 12-18 s; the counter never drops', () => {
+    const bot = createBotInputs(5);
+    const view = { self: { x: 100, y: 100 }, targets: [{ x: 160, y: 100 }] };
+    const hz = CONFIG.net.simHz;
+    const presses: number[] = [];
+    let last = bot(view);
+    for (let i = 1; i < 60 * hz; i++) {
+      const s = bot(i % 50 < 10 ? { ...view, idle: true } : view);
+      expect(s.pranks).toBeGreaterThanOrEqual(last.pranks);
+      if (s.pranks > last.pranks) presses.push(i);
+      last = s;
+    }
+    expect(last.pranks).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < presses.length; i++) {
+      const gapS = (presses[i] - presses[i - 1]) / hz;
+      expect(gapS).toBeGreaterThanOrEqual(12);
+      expect(gapS).toBeLessThanOrEqual(18);
+    }
+  });
+
   it('is deterministic per seed and wanders without targets', () => {
     const run = (seed: number) => {
       const bot = createBotInputs(seed);

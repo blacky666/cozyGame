@@ -159,3 +159,45 @@ describe('emote keys', () => {
     }
   });
 });
+
+describe('prank key', () => {
+  it('KeyF while counting counts a prank; repeat ignored; not counting counts nothing', () => {
+    const win = new FakeTarget();
+    const kb = createKeyboard({ win, doc: new FakeTarget() });
+    win.dispatchEvent(key('keydown', 'KeyF')); // not counting yet
+    win.dispatchEvent(key('keyup', 'KeyF'));
+    expect(kb.state().pranks).toBe(0);
+    kb.setCounting(true);
+    win.dispatchEvent(key('keydown', 'KeyF'));
+    win.dispatchEvent(Object.assign(key('keydown', 'KeyF'), { repeat: true }));
+    win.dispatchEvent(key('keydown', 'KeyF')); // still held
+    expect(kb.state()).toMatchObject({ pranks: 1, shoves: 0, emotes: 0 });
+    win.dispatchEvent(key('keyup', 'KeyF'));
+    win.dispatchEvent(key('keydown', 'KeyF'));
+    expect(kb.state().pranks).toBe(2);
+    kb.destroy();
+  });
+
+  it('typing into a text field never counts a prank', () => {
+    const g = globalThis as { HTMLElement?: unknown };
+    const had = g.HTMLElement;
+    class FakeEl {
+      tagName = 'INPUT';
+      type = 'text';
+      isContentEditable = false;
+    }
+    g.HTMLElement = FakeEl;
+    try {
+      const win = new FakeTarget();
+      const kb = createKeyboard({ win, doc: new FakeTarget() });
+      kb.setCounting(true);
+      const e = key('keydown', 'KeyF');
+      Object.defineProperty(e, 'target', { value: new FakeEl() });
+      win.dispatchEvent(e);
+      expect(kb.state().pranks).toBe(0);
+      kb.destroy();
+    } finally {
+      g.HTMLElement = had;
+    }
+  });
+});
