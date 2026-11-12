@@ -11,4 +11,9 @@ describe('sound packages', () => {
     for (const g of MINIGAMES) if (g.sounds) expect(SOUND_PACKAGES).toContain(g.sounds);
     for (const p of SOUND_PACKAGES) expect(existsSync(`public/audio/${p}/sounds.json`)).toBe(true);
   });
+
+  it('card and prank sounds are preloaded', () => {
+    expect(SOUND_PACKAGES).toContain('streich');
+    expect(SOUND_PACKAGES).toContain('karte');
+  });
 });

@@ -4,6 +4,7 @@ import type { EveningPhase } from '../flow/evening';
 import type { MsgData } from '../net/protocol';
 import type { SnapPayload } from './eveningHost';
 import { BootScene } from './scenes/BootScene';
+import { CardScene } from './scenes/CardScene';
 import { EndedScene } from './scenes/EndedScene';
 import { MinigameScene } from './scenes/MinigameScene';
 import { PodiumScene } from './scenes/PodiumScene';
@@ -16,9 +17,8 @@ const SCENE_OF: Record<Exclude<EveningPhase['kind'], 'lobby'>, string> = {
   intro: 'RoundIntroScene',
   playing: 'MinigameScene',
   standings: 'StandingsScene',
-  // Temporary until the card scene exists (Plan 7 Task 3).
-  cards: 'StandingsScene',
-  reveal: 'StandingsScene',
+  cards: 'CardScene',
+  reveal: 'CardScene',
   podium: 'PodiumScene',
   ended: 'EndedScene',
 };
@@ -54,6 +54,7 @@ export class Stage {
         RoundIntroScene,
         MinigameScene,
         StandingsScene,
+        CardScene,
         PodiumScene,
         EndedScene,
       ],

@@ -1,0 +1,73 @@
+{
+ "paket": "streich",
+ "toene": [
+  {
+   "id": "streich.streich_los",
+   "datei": "audio/streich/streich_los.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 240,
+   "lautstaerke": 0.75
+  },
+  {
+   "id": "streich.bananenschale_ablegen",
+   "datei": "audio/streich/bananenschale_ablegen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 270,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "streich.bananenschale_rutschen",
+   "datei": "audio/streich/bananenschale_rutschen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 1060,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "streich.furzkissen",
+   "datei": [
+    "audio/streich/furzkissen_1.mp3",
+    "audio/streich/furzkissen_2.mp3",
+    "audio/streich/furzkissen_3.mp3"
+   ],
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 800,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "streich.verkehrte_welt",
+   "datei": "audio/streich/verkehrte_welt.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 800,
+   "lautstaerke": 0.4
+  },
+  {
+   "id": "streich.tintenklecks",
+   "datei": "audio/streich/tintenklecks.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 430,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "streich.konfetti_kanone",
+   "datei": "audio/streich/konfetti_kanone.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 960,
+   "lautstaerke": 1.0
+  },
+  {
+   "id": "streich.quietsche_hammer",
+   "datei": "audio/streich/quietsche_hammer.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 310,
+   "lautstaerke": 0.8
+  }
+ ]
+}

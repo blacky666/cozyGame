@@ -1,3 +1,4 @@
+import type { CardId } from '../flow/cards';
 import type { EveningPhase } from '../flow/evening';
 import type { InputState } from '../net/protocol';
 import type { PlayerInfo } from '../net/roster';
@@ -26,6 +27,8 @@ export interface StageCtx {
   onSnap(cb: ((tick: number, p: SnapPayload, at: number) => void) | null): void;
   /** Client: send own input to the host; returns the seq sent (0 if none). */
   sendInput?(s: InputState): number;
+  /** Phase `cards`, chooser only: the picked card (host: straight to its EveningHost; client: sent to the host). */
+  pickCard(card: CardId): void;
   /** Host: "Nochmal?" on the podium. */
   playAgain?(): void;
   /** Ended screen: back to the start menu. */

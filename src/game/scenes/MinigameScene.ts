@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
+import type { RoundCard } from '../../flow/cards';
 import { SnapshotBuffer } from '../../net/interpolation';
 import { keepCounters, neutralInput, type InputState } from '../../net/protocol';
 import { getMinigame } from '../../minigames/registry';
@@ -23,6 +24,8 @@ const stepLerp = <S>(a: S, b: S, t: number): S => (t < 0.5 ? a : b);
 export class MinigameScene extends Phaser.Scene {
   private ctx!: StageCtx;
   private round = 0;
+  /** Gemeinheit acting in this round (Peinlicher Hut is drawn here). */
+  private card: RoundCard | null = null;
   private def: MiniGame | null = null;
   private view: MiniGameView<unknown> | null = null;
   private readonly buffer = new SnapshotBuffer<unknown>();
@@ -45,6 +48,7 @@ export class MinigameScene extends Phaser.Scene {
   create({ phase, ctx }: SceneData<'playing'>): void {
     this.ctx = ctx;
     this.round = phase.round;
+    this.card = phase.card ?? null;
     this.buffer.clear();
     this.hostBuffer.clear();
     this.latest = null;
@@ -171,9 +175,12 @@ export class MinigameScene extends Phaser.Scene {
 
   private gamePlayers(): GamePlayer[] {
     const selfKey = this.ctx.selfKey();
+    // Peinlicher Hut: the victim wears the Gurken-Hut this round (local override, never saved or migrated).
+    const hutFor = this.card?.id === 'peinlicher_hut' ? this.card.victim : null;
     return this.ctx.players().map((p) => {
       const key = playerKey(p.slot);
-      return { key, slot: p.slot, name: p.name, look: p.look, remote: !p.isBot && key !== selfKey };
+      const look = key === hutFor ? { ...p.look, hat: 'gurke' } : p.look;
+      return { key, slot: p.slot, name: p.name, look, remote: !p.isBot && key !== selfKey };
     });
   }
 

@@ -6,8 +6,6 @@ import { Character } from '../../gfx/character';
 import type { SceneData } from '../stageCtx';
 import { assetsOf, byKey, INK, playerSymbol, txt } from '../ui';
 
-export const CARD_PLACEHOLDER = 'Gemeinheit-Karte (kommt in Plan 7)';
-
 const ROW_H = 42;
 /** Standings music starts after the jingle. */
 const MUSIC_AFTER_MS = 1500;
@@ -74,10 +72,5 @@ export class StandingsScene extends Phaser.Scene {
         this.time.delayedCall(flyAt + keys.length * 150 + 700, () => sound.play(moved > 0 ? 'ablauf.platz_hoch' : 'ablauf.platz_runter'));
       }
     }
-
-    // Placeholder for the prank card picked by the last player (Plan 7).
-    const boxY = TOP + keys.length * ROW_H + 16;
-    this.add.rectangle(w / 2, boxY, 220, 22, 0x3b2a4a).setStrokeStyle(1, 0xffd27a);
-    txt(this, w / 2, boxY, CARD_PLACEHOLDER, 9, '#ffd27a');
   }
 }

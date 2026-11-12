@@ -92,6 +92,7 @@ export function runHostEvening(
     pointer,
     timing: t.stage,
     progress: createEveningProgress({ selfKey, load: () => loadProfile(), save: (p) => saveProfile(p) }),
+    pickCard: (card) => void host.pickCard(selfKey(), card),
     hostSnapshot: () =>
       host.phase.kind === 'playing'
         ? { round: host.phase.round, state: host.latest, acks: {}, emotes: host.latestEmotes, tick: host.latestTick, at: host.latestAt }
@@ -135,6 +136,7 @@ export function runClientEvening(session: ClientSession, backToStart: () => void
     timing: timings().stage,
     progress: createEveningProgress({ selfKey, load: () => loadProfile(), save: (p) => saveProfile(p) }),
     sendInput: (s) => session.sendInput(s),
+    pickCard: (card) => session.sendCard(card),
     backToStart: () => {
       stage.destroy();
       backToStart();

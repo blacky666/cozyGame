@@ -1,0 +1,93 @@
+{
+ "paket": "karte",
+ "toene": [
+  {
+   "id": "karte.karten_austeilen",
+   "datei": "audio/karte/karten_austeilen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 639,
+   "lautstaerke": 0.75
+  },
+  {
+   "id": "karte.karte_hover",
+   "datei": "audio/karte/karte_hover.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 80,
+   "lautstaerke": 0.35
+  },
+  {
+   "id": "karte.karte_waehlen",
+   "datei": "audio/karte/karte_waehlen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 380,
+   "lautstaerke": 0.67
+  },
+  {
+   "id": "karte.karte_enthuellen",
+   "datei": "audio/karte/karte_enthuellen.mp3",
+   "art": "jingle",
+   "schleife": false,
+   "dauer_ms": 1496,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "karte.falle_einfrieren",
+   "datei": "audio/karte/falle_einfrieren.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 700,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "karte.falle_auftauen",
+   "datei": "audio/karte/falle_auftauen.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 459,
+   "lautstaerke": 0.72
+  },
+  {
+   "id": "karte.gurkenhut",
+   "datei": "audio/karte/gurkenhut.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 500,
+   "lautstaerke": 0.8
+  },
+  {
+   "id": "karte.punkte_klau",
+   "datei": "audio/karte/punkte_klau.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 638,
+   "lautstaerke": 0.56
+  },
+  {
+   "id": "karte.turbo_start",
+   "datei": "audio/karte/turbo_start.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 800,
+   "lautstaerke": 0.51
+  },
+  {
+   "id": "karte.doppelter_streich",
+   "datei": "audio/karte/doppelter_streich.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 520,
+   "lautstaerke": 0.64
+  },
+  {
+   "id": "karte.rollentausch",
+   "datei": "audio/karte/rollentausch.mp3",
+   "art": "effekt",
+   "schleife": false,
+   "dauer_ms": 800,
+   "lautstaerke": 0.54
+  }
+ ]
+}

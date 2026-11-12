@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
 import { getMinigame } from '../../minigames/registry';
+import { introCardLine } from '../cardText';
 import type { SceneData } from '../stageCtx';
-import { assetSprite, INK, txt } from '../ui';
+import { assetSprite, byKey, INK, txt } from '../ui';
 
 export const DOUBLE_BANNER = 'Letzte Runde – doppelte Punkte!';
 
@@ -31,6 +32,9 @@ export class RoundIntroScene extends Phaser.Scene {
       txt(this, w / 2, 124, game?.rule ?? '', 13, INK).setWordWrapWidth(w - 90),
       txt(this, w / 2, 168, game ? `Steuerung: ${game.controls}` : '', 11, INK).setWordWrapWidth(w - 90),
     ];
+    const players = byKey(ctx.players());
+    const cardLine = introCardLine(phase.card, (k) => players.get(k)?.name ?? k);
+    if (cardLine) info.push(txt(this, w / 2, 196, cardLine, 11, '#b8443a', false).setWordWrapWidth(w - 90));
 
     // One opener: last round > evening start > the game's own jingle.
     sound.setMusic(null);
