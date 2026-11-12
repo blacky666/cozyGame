@@ -2,8 +2,11 @@ import Phaser from 'phaser';
 import { sound } from '../../audio/sound';
 import { CONFIG } from '../../config';
 import { Character } from '../../gfx/character';
+import { levelInfo } from '../../progress/levels';
+import { podiumScript } from '../../progress/podiumScript';
 import type { SceneData } from '../stageCtx';
 import { assetSprite, assetsOf, button, byKey, txt } from '../ui';
+import { XpPanel } from '../xpPanel';
 
 const GROUND = 196;
 /** Fanfare first, then cheering/crying, then the podium music. */
@@ -63,6 +66,16 @@ export class PodiumScene extends Phaser.Scene {
       });
       place += group.length;
     });
+
+    // Own XP settlement (already saved by ctx.progress before this scene showed). No report, no panel.
+    const report = ctx.progress.report();
+    if (report) {
+      const steps = podiumScript(report, { tip: ctx.progress.takeSaveTip() });
+      const start = levelInfo(report.xpBefore);
+      this.time.delayedCall(CONFIG.progress.podium.startMs, () => {
+        new XpPanel(this, steps, start.level, start.into, start.need).start();
+      });
+    }
 
     if (ctx.isHost && ctx.playAgain) {
       const again = ctx.playAgain;

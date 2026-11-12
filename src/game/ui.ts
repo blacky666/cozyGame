@@ -135,3 +135,26 @@ export function button(scene: Phaser.Scene, x: number, y: number, label: string,
 
 export const byKey = <T extends { slot: number }>(players: T[]): Map<PlayerKey, T> =>
   new Map(players.map((p) => ['p' + p.slot, p]));
+
+/**
+ * 9-slice panel from an asset sprite with a `slice` ([left, right, top, bottom]), top-left at (x, y).
+ * NineSlice is WebGL-only in Phaser; under the canvas renderer (or without the sprite) a flat rectangle
+ * in `fallback` colour stands in.
+ */
+export function nineSlice(
+  scene: Phaser.Scene,
+  name: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fallback = 0xf3e2c0,
+): Phaser.GameObjects.NineSlice | Phaser.GameObjects.Rectangle {
+  const found = findSprite(assetsOf(scene), name);
+  const sl = found?.def.slice;
+  if (!found || !sl || scene.game.renderer.type !== Phaser.WEBGL) {
+    return scene.add.rectangle(x, y, w, h, fallback).setOrigin(0).setStrokeStyle(1, 0x3b2418);
+  }
+  const key = getTextureKey(scene, found.file, name, {});
+  return scene.add.nineslice(x, y, key, 0, w, h, sl[0], sl[1], sl[2], sl[3]).setOrigin(0);
+}
