@@ -64,6 +64,11 @@ export interface MiniGameView<S> {
    * null hides the bubble).
    */
   emoteAnchor?(key: PlayerKey): { x: number; y: number } | null;
+  /**
+   * Main-camera point of the figure's feet as rendered (prediction included, ghosts too) for the prank
+   * visuals; Wackel-Turm: the bottom of the hanging block (the hook while none hangs). null hides them.
+   */
+  figureAnchor?(key: PlayerKey): { x: number; y: number } | null;
   destroy(): void;
 }
 

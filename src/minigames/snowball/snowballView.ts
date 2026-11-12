@@ -73,6 +73,8 @@ export class SnowballView implements MiniGameView<SnowState> {
   private readonly avatars = new Map<PlayerKey, Avatar>();
   /** Where emote bubbles point: above the name label of the last rendered position (ghosts too). */
   private readonly anchors = new Map<PlayerKey, { x: number; y: number }>();
+  /** Feet of the last rendered position (prank visuals). */
+  private readonly feet = new Map<PlayerKey, { x: number; y: number }>();
   private readonly balls = new Map<number, BallView>();
   private readonly pickups = new Map<number, Phaser.GameObjects.Sprite | null>();
   private readonly snowmen = new Map<string, Phaser.GameObjects.Sprite>();
@@ -257,6 +259,7 @@ export class SnowballView implements MiniGameView<SnowState> {
       a.char.setPosition(x, y).setDepth(y).setAlpha(alpha);
       a.label.setPosition(x, y - LABEL_LIFT).setDepth(y + 0.5);
       this.anchors.set(key, { x, y: y - LABEL_LIFT - EMOTE_GAP });
+      this.feet.set(key, { x, y });
       this.attach(a, a.hat, sp.hat, 'head', `schnee.eiszapfenmuetze.${p.dir === 'left' ? 'side' : p.dir}`, x, y, y + 0.2, alpha);
       if (key === selfKey) {
         drawShoveRing(this.ring, x, y, sp.shoveCdMs);
@@ -367,6 +370,10 @@ export class SnowballView implements MiniGameView<SnowState> {
 
   emoteAnchor(key: PlayerKey): { x: number; y: number } | null {
     return this.anchors.get(key) ?? null;
+  }
+
+  figureAnchor(key: PlayerKey): { x: number; y: number } | null {
+    return this.feet.get(key) ?? null;
   }
 
   destroy(): void {

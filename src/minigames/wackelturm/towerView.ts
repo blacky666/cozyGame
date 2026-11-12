@@ -64,6 +64,8 @@ type Column = {
   hang: Phaser.GameObjects.Sprite | null;
   hangKind: Kind | null;
   wind: Phaser.GameObjects.Sprite | null;
+  /** Bottom centre of the rendered hanging block (the hook while none hangs), world layer coordinates. */
+  feet: { x: number; y: number } | null;
 };
 
 /** Decoded pose of the block entry at i. */
@@ -147,7 +149,7 @@ export class TowerView implements MiniGameView<TowerState> {
       const plot = this.layout.plots[i];
       if (!plot) return;
       const crane = new CraneRig(scene, shape, plot, this.world, WORLD.x, WORLD.y);
-      this.columns.set(key, { plot, cam: this.cams[i], crane, hang: null, hangKind: null, wind: null });
+      this.columns.set(key, { plot, cam: this.cams[i], crane, hang: null, hangKind: null, wind: null, feet: null });
     });
 
     const self = players.find((p) => p.key === selfKey);
@@ -267,6 +269,7 @@ export class TowerView implements MiniGameView<TowerState> {
   /** The hanging block below the hook: its top edge at hangTop, its pivot on the crane x. */
   private renderHang(col: Column, p: TowerPlayer, craneX: number, rot: Rot): void {
     const h = p.hang;
+    col.feet = { x: Math.round(craneX) + WORLD.x, y: Math.round(p.hangTop + (h ? shapeSize(h.kind, rot).h : 0)) + WORLD.y };
     if (!h) {
       col.hang?.setVisible(false);
       return;
@@ -421,6 +424,19 @@ export class TowerView implements MiniGameView<TowerState> {
     const col = this.columns.get(key);
     if (!col) return null;
     return { x: Math.round(ARENA_OFFSET.x + (col.plot.minX + col.plot.maxX) / 2), y: EMOTE_TIP_Y };
+  }
+
+  /** The hanging block's bottom converted from its plot camera into main-camera coordinates, kept in the column. */
+  figureAnchor(key: PlayerKey): { x: number; y: number } | null {
+    const col = this.columns.get(key);
+    if (!col?.feet) return null;
+    const vx = ARENA_OFFSET.x + col.plot.minX;
+    const x = vx + (col.feet.x - col.cam.scrollX);
+    const y = VIEW_TOP + (col.feet.y - col.cam.scrollY);
+    return {
+      x: Math.round(Math.min(vx + this.layout.pitch, Math.max(vx, x))),
+      y: Math.round(Math.min(CONFIG.view.height, Math.max(VIEW_TOP, y))),
+    };
   }
 
   destroy(): void {

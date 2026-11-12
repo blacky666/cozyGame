@@ -83,6 +83,8 @@ export class PaintView implements MiniGameView<PaintState> {
   private readonly avatars = new Map<PlayerKey, Avatar>();
   /** Where emote bubbles point: above the name label of the last rendered position (ghosts too). */
   private readonly anchors = new Map<PlayerKey, { x: number; y: number }>();
+  /** Feet of the last rendered position (prank visuals). */
+  private readonly feet = new Map<PlayerKey, { x: number; y: number }>();
   private readonly colorsOf = new Map<PlayerKey, ColorMap>();
   private readonly blobs = new Map<number, Phaser.GameObjects.Sprite | null>();
   private readonly pickups = new Map<number, Phaser.GameObjects.Sprite | null>();
@@ -242,6 +244,7 @@ export class PaintView implements MiniGameView<PaintState> {
       a.char.setPosition(x, y).setDepth(y);
       a.label.setPosition(x, y - LABEL_LIFT).setDepth(y + 0.5);
       this.anchors.set(key, { x, y: y - LABEL_LIFT - EMOTE_GAP });
+      this.feet.set(key, { x, y });
       this.renderSkates(a, sp.rollMs > 0, x, y);
       if (a.splat) {
         const on = sp.slowMs > 0;
@@ -375,6 +378,10 @@ export class PaintView implements MiniGameView<PaintState> {
 
   emoteAnchor(key: PlayerKey): { x: number; y: number } | null {
     return this.anchors.get(key) ?? null;
+  }
+
+  figureAnchor(key: PlayerKey): { x: number; y: number } | null {
+    return this.feet.get(key) ?? null;
   }
 
   destroy(): void {

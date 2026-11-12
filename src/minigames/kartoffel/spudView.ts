@@ -77,6 +77,8 @@ export class SpudView implements MiniGameView<SpudState> {
   private readonly avatars = new Map<PlayerKey, Avatar>();
   /** Where emote bubbles point: above the name label of the last rendered position (ghosts too). */
   private readonly anchors = new Map<PlayerKey, { x: number; y: number }>();
+  /** Feet of the last rendered position (prank visuals). */
+  private readonly feet = new Map<PlayerKey, { x: number; y: number }>();
   private readonly potatoes = new Map<number, PotatoView>();
   private readonly pickups = new Map<number, Phaser.GameObjects.Sprite | null>();
   /** "Nicht zurück!" sign per passer. */
@@ -219,6 +221,7 @@ export class SpudView implements MiniGameView<SpudState> {
       a.mush?.setPosition(x, y).setDepth(y).setVisible(mushed);
       a.label.setPosition(x, y - LABEL_LIFT).setDepth(y + 0.5).setAlpha(alpha);
       this.anchors.set(key, { x, y: y - LABEL_LIFT - EMOTE_GAP });
+      this.feet.set(key, { x, y });
       if (key === selfKey) drawShoveRing(this.ring, x, y, sp.ghost || mushed ? 0 : sp.shoveCdMs);
     }
   }
@@ -344,6 +347,10 @@ export class SpudView implements MiniGameView<SpudState> {
 
   emoteAnchor(key: PlayerKey): { x: number; y: number } | null {
     return this.anchors.get(key) ?? null;
+  }
+
+  figureAnchor(key: PlayerKey): { x: number; y: number } | null {
+    return this.feet.get(key) ?? null;
   }
 
   destroy(): void {

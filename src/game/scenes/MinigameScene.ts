@@ -11,10 +11,20 @@ import { shouldSend } from '../inputSend';
 import { assetSprite, txt } from '../ui';
 import { EmoteLayer } from '../../minigames/common/emoteLayer';
 import type { EmoteShow } from '../../minigames/common/emotes';
+import { HEAD_LIFT, ownInputFx, PrankLayer } from '../../minigames/common/prankLayer';
+import { InputMask } from '../../minigames/common/prankInput';
+import { emptyPrankSnap, type PrankSnap } from '../../minigames/common/pranks';
 
 /** Round-end jingle after the whistle. */
 const ROUND_END_JINGLE_MS = 700;
 const stepLerp = <S>(a: S, b: S, t: number): S => (t < 0.5 ? a : b);
+/** Prank state from a snapshot; empty when missing or malformed (older hosts). */
+const validPranks = (p: unknown): PrankSnap => {
+  const s = p as Partial<PrankSnap> | null | undefined;
+  return s && Array.isArray(s.fx) && Array.isArray(s.bananas) && Array.isArray(s.cues) && typeof s.left === 'object' && s.left !== null
+    ? (s as PrankSnap)
+    : emptyPrankSnap();
+};
 
 /**
  * Renders the running minigame. Host: draws its authoritative snapshot directly (the simulation
@@ -40,6 +50,12 @@ export class MinigameScene extends Phaser.Scene {
   private emoteLayer: EmoteLayer | null = null;
   /** Client: emote shows of the latest snapshot (not interpolated). */
   private emotes: EmoteShow[] = [];
+  private prankLayer: PrankLayer | null = null;
+  /** Client: prank state of the latest snapshot (empty from older hosts / before the first one). */
+  private pranks: PrankSnap = emptyPrankSnap();
+  /** Client: prank effects applied to the predicted input (buttons and game counters, as the host does). */
+  private predictMask = new InputMask();
+  private prankOf = new Map<string, string>();
 
   constructor() {
     super('MinigameScene');
@@ -57,13 +73,19 @@ export class MinigameScene extends Phaser.Scene {
     this.lastAimAt = 0;
     this.acks = {};
     this.emotes = [];
+    this.pranks = emptyPrankSnap();
+    this.predictMask = new InputMask();
     this.def = getMinigame(phase.game) ?? null;
     if (!this.def) {
       txt(this, CONFIG.view.width / 2, CONFIG.view.height / 2, `Unbekanntes Spiel: ${phase.game}`, 10);
       return;
     }
-    this.view = this.def.createView(this, this.gamePlayers(), ctx.selfKey());
+    const players = this.gamePlayers();
+    this.prankOf = new Map(players.map((p) => [p.key, p.look.prank]));
+    this.view = this.def.createView(this, players, ctx.selfKey());
     this.emoteLayer = new EmoteLayer(this);
+    const off = this.def.aimOffset ?? { x: 0, y: 0 };
+    this.prankLayer = new PrankLayer(this, { simToWorld: (x, y) => ({ x: x + off.x, y: y + off.y }) });
     const unwirePointer = this.wirePointer();
     // Action counters only grow while this scene runs (not during intro/standings).
     ctx.keyboard.setCounting(true);
@@ -82,6 +104,7 @@ export class MinigameScene extends Phaser.Scene {
         this.latest = p.state;
         this.acks = p.acks ?? {};
         this.emotes = Array.isArray(p.emotes) ? p.emotes : [];
+        this.pranks = validPranks(p.pranks);
       });
     }
     const los = assetSprite(this, 'ui.countdown.los', CONFIG.view.width / 2, CONFIG.view.height / 2)
@@ -105,6 +128,8 @@ export class MinigameScene extends Phaser.Scene {
       }
       this.emoteLayer?.destroy();
       this.emoteLayer = null;
+      this.prankLayer?.destroy();
+      this.prankLayer = null;
       this.view?.destroy();
       this.view = null;
     });
@@ -197,6 +222,7 @@ export class MinigameScene extends Phaser.Scene {
         const s = this.hostBuffer.sample(performance.now() - 1000 / CONFIG.net.simHz, this.def.lerp ?? stepLerp);
         view.render(s ?? snap.state, self);
         this.drawEmotes(snap.emotes);
+        this.drawPranks(validPranks(snap.pranks));
       }
       return;
     }
@@ -208,12 +234,27 @@ export class MinigameScene extends Phaser.Scene {
       this.lastSentAt = time;
       this.lastAimAt = time;
     }
-    view.predict?.(input, delta / 1000, this.latest, this.acks[self] ?? 0, this.lastSentSeq);
+    // Prediction sees the input as the host will after its prank mask (reversed / frozen / slipping);
+    // the sent input stays raw.
+    view.predict?.(this.predictMask.apply(self, input, ownInputFx(this.pranks, self)), delta / 1000, this.latest, this.acks[self] ?? 0, this.lastSentSeq);
     const s = this.buffer.sample(performance.now() - CONFIG.net.interpDelayMs, this.def.lerp ?? stepLerp);
     if (s !== null) {
       view.render(s, self);
       this.drawEmotes(this.emotes);
+      this.drawPranks(this.pranks);
     }
+  }
+
+  /** Prank visuals at the figures the view reports (after render). */
+  private drawPranks(snap: PrankSnap): void {
+    const view = this.view;
+    if (!view || !this.prankLayer) return;
+    const figure = (k: string) => view.figureAnchor?.(k) ?? null;
+    const head = (k: string) => {
+      const f = figure(k);
+      return f ? { x: f.x, y: f.y - HEAD_LIFT } : null;
+    };
+    this.prankLayer.update(snap, this.ctx.selfKey(), (k) => this.prankOf.get(k) ?? '', figure, head);
   }
 
   /** Emote bubbles at the anchors the view reports (after render, so they follow the figures). */
