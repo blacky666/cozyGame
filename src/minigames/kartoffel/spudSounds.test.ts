@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../config';
-import type { Cue } from '../snowball/snowballSounds';
+import type { Cue } from '../common/cue';
 import type { Potato, SpudFx, SpudPlayer, SpudState } from './spudHost';
 import { SpudSounds } from './spudSounds';
 
@@ -34,6 +34,13 @@ describe('SpudSounds', () => {
       'uebergabe', 'kein_zurueck', 'fake_kartoffel_konfetti', 'kurze_lunte', 'giesskanne', 'pickup', 'sprint',
     ]);
     expect(t.update(state({ fx: list }), 32)).toEqual([]);
+  });
+
+  it('an extra that hits both potatoes (real + fake) sounds once', () => {
+    const t = new SpudSounds('p0');
+    t.update(state(), 0);
+    const both = [fx(1, 'kurze_lunte'), fx(2, 'kurze_lunte'), fx(3, 'giesskanne'), fx(4, 'giesskanne')];
+    expect(names(t.update(state({ fx: both }), 16))).toEqual(['kurze_lunte', 'giesskanne']);
   });
 
   it('bang: knall, plus geist_werden when ranked out', () => {

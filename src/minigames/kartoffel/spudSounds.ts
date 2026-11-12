@@ -1,6 +1,6 @@
 import { CONFIG } from '../../config';
 import type { PlayerKey } from '../types';
-import type { Cue } from '../snowball/snowballSounds';
+import type { Cue } from '../common/cue';
 import type { SpudFx, SpudState } from './spudHost';
 
 export type { Cue };
@@ -22,6 +22,9 @@ const FX_SOUND: Record<SpudFx['kind'], string> = {
   pickup: 'pickup',
   sprint: 'sprint',
 };
+
+/** One extra can hit the real and the fake potato in the same tick: both fx, one sound. */
+const ONCE_PER_UPDATE = new Set<SpudFx['kind']>(['kurze_lunte', 'giesskanne']);
 
 const panAt = (x: number): number => Math.max(-1, Math.min(1, (x / CONFIG.kartoffel.mapW) * 2 - 1)) * PAN_SPREAD;
 const maxHeat = (s: SpudState): number => s.potatoes.reduce((m, p) => Math.max(m, p.heat), -1);
@@ -75,9 +78,14 @@ export class SpudSounds {
     // Fx ids stay in the snapshot for a while; forget ids that left it.
     const fxNow = new Set(s.fx.map((f) => f.id));
     for (const id of this.seenFx) if (!fxNow.has(id)) this.seenFx.delete(id);
+    const once = new Set<SpudFx['kind']>();
     for (const f of s.fx) {
       if (this.seenFx.has(f.id)) continue;
       this.seenFx.add(f.id);
+      if (ONCE_PER_UPDATE.has(f.kind)) {
+        if (once.has(f.kind)) continue;
+        once.add(f.kind);
+      }
       out.push({ name: FX_SOUND[f.kind], pan: panAt(f.x) });
       if (f.kind === 'knall' && f.who && s.out.includes(f.who)) out.push({ name: 'geist_werden', pan: panAt(f.x) });
     }
