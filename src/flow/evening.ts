@@ -1,12 +1,14 @@
 import { CONFIG } from '../config';
 import { eveningXp, type RoundRecord, type XpLine } from '../progress/xp';
+import { offerCards, type CardId, type RoundCard } from './cards';
 import { pickMinigames } from './picker';
 import { finalRanking, roundPoints } from './scoring';
 
 export type EveningPhase =
   | { kind: 'lobby' }
-  | { kind: 'intro'; round: number; game: string; double: boolean }
-  | { kind: 'playing'; round: number; game: string }
+  /** `card`: the Gemeinheit picked after the previous round (acts in this round), null when none. */
+  | { kind: 'intro'; round: number; game: string; double: boolean; card: RoundCard | null }
+  | { kind: 'playing'; round: number; game: string; card: RoundCard | null }
   | {
       kind: 'standings'; round: number; points: Record<string, number>; totals: Record<string, number>; tieOrder: string[];
       /** XP lines of every player so far (no gesamt lines); each client applies only its own. */
@@ -17,12 +19,27 @@ export type EveningPhase =
       /** XP lines of the whole evening, gesamt lines included. */
       eveningId: string; xp: Record<string, XpLine[]>;
     }
+  /** The overall last place (chooser) picks one of `offer` against the first place (victim); `game` is the next game. */
+  | { kind: 'cards'; round: number; game: string; chooser: string; victim: string; offer: CardId[] }
+  /** The picked card for everyone; `totals` already include Punkte-Klau; `random`: the chooser ran out of time. */
+  | {
+      kind: 'reveal'; round: number; game: string; card: CardId; chooser: string; victim: string; random: boolean;
+      totals: Record<string, number>; tieOrder: string[];
+    }
   | { kind: 'ended'; reason: 'host_left' };
 
 export type EveningEvent =
   | { type: 'introDone' }
   | { type: 'gameResult'; placements: string[][]; feats?: Record<string, string[]> }
-  | { type: 'standingsDone' };
+  /** `present`: connected players (chooser/victim candidates); all players when missing. */
+  | { type: 'standingsDone'; present?: string[] }
+  | { type: 'cardPicked'; card: CardId; random: boolean }
+  | { type: 'revealDone' };
+
+export type EveningOptions = {
+  /** Dev flag `card=<id>`: always offered first (when eligible). */
+  forceCard?: CardId;
+};
 
 /** Evening state machine, keyed by stable player keys. Starts at intro of round 1. */
 export class Evening {
@@ -39,9 +56,11 @@ export class Evening {
     private readonly players: string[],
     private readonly rounds: number,
     games: string[],
-    rand: () => number,
+    /** Kept for the later draws (chooser/victim ties, card offers). */
+    private readonly rand: () => number,
     /** Random per evening; clients settle the XP of one evening exactly once. */
     readonly id: string = newEveningId(),
+    private readonly opts: EveningOptions = {},
   ) {
     if (players.length < CONFIG.players.min) throw new Error('evening needs at least 2 players');
     if (!Number.isInteger(rounds) || rounds < CONFIG.rounds.min || rounds > CONFIG.rounds.max) {
@@ -60,8 +79,29 @@ export class Evening {
     this.phase = this.intro(1);
   }
 
-  private intro(round: number): EveningPhase {
-    return { kind: 'intro', round, game: this.schedule[round - 1], double: round === this.rounds };
+  private intro(round: number, card: RoundCard | null = null): EveningPhase {
+    return { kind: 'intro', round, game: this.schedule[round - 1], double: round === this.rounds, card };
+  }
+
+  /**
+   * After the standings of round `round`: the last place among the present players picks a card against
+   * the first place. No card with fewer than 2 candidates or equal totals. Ties on either end are random.
+   */
+  private cardsOrIntro(round: number, present: string[] | undefined): EveningPhase {
+    const pool = present ? new Set(present) : null;
+    const cands = this.players.filter((k) => !pool || pool.has(k));
+    const t = (k: string) => this.totals[k];
+    if (cands.length < 2 || cands.every((k) => t(k) === t(cands[0]))) return this.intro(round + 1);
+    const low = Math.min(...cands.map(t));
+    const lows = cands.filter((k) => t(k) === low);
+    const chooser = lows[Math.floor(this.rand() * lows.length)];
+    const others = cands.filter((k) => k !== chooser);
+    const high = Math.max(...others.map(t));
+    const highs = others.filter((k) => t(k) === high);
+    const victim = highs[Math.floor(this.rand() * highs.length)];
+    const game = this.schedule[round];
+    const offer = offerCards(game, this.rand, this.opts.forceCard);
+    return { kind: 'cards', round, game, chooser, victim, offer };
   }
 
   /** Current evening totals (a copy). */
@@ -108,7 +148,7 @@ export class Evening {
   advance(event: EveningEvent): EveningPhase {
     const ph = this.phase;
     if (event.type === 'introDone' && ph.kind === 'intro') {
-      this.phase = { kind: 'playing', round: ph.round, game: ph.game };
+      this.phase = { kind: 'playing', round: ph.round, game: ph.game, card: ph.card };
     } else if (event.type === 'gameResult' && ph.kind === 'playing') {
       const last = ph.round === this.rounds;
       const placements = this.sanitize(event.placements);
@@ -126,7 +166,20 @@ export class Evening {
         this.phase = { kind: 'standings', round: ph.round, points, totals, tieOrder: this.tieOrder, eveningId: this.id, xp };
       }
     } else if (event.type === 'standingsDone' && ph.kind === 'standings') {
-      this.phase = this.intro(ph.round + 1);
+      this.phase = this.cardsOrIntro(ph.round, event.present);
+    } else if (event.type === 'cardPicked' && ph.kind === 'cards' && ph.offer.includes(event.card)) {
+      if (event.card === 'punkte_klau') {
+        // The victim has strictly more points than the chooser, so at least 1.
+        this.totals[ph.victim] -= 1;
+        this.totals[ph.chooser] += 1;
+      }
+      const { round, game, chooser, victim } = ph;
+      this.phase = {
+        kind: 'reveal', round, game, card: event.card, chooser, victim, random: event.random,
+        totals: { ...this.totals }, tieOrder: this.tieOrder,
+      };
+    } else if (event.type === 'revealDone' && ph.kind === 'reveal') {
+      this.phase = this.intro(ph.round + 1, { id: ph.card, chooser: ph.chooser, victim: ph.victim });
     } else {
       throw new Error(`event ${event.type} does not fit phase ${ph.kind}`);
     }

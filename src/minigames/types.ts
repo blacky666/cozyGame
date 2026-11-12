@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import type { RoundCard } from '../flow/cards';
 import type { AssetFile } from '../gfx/assetTypes';
 import type { InputState } from '../net/protocol';
 import type { FeatId } from '../progress/feats';
@@ -67,12 +68,12 @@ export interface MiniGame<S = unknown> {
   sounds?: string;
   /**
    * `opts.durationMs` overrides the game's duration (dev-only fast mode); `opts.assets` are the loaded
-   * asset files (games with an arena map need them).
+   * asset files (games with an arena map need them); `opts.card` is the Gemeinheit acting in this round.
    */
   createHost(
     players: GamePlayer[],
     rand: () => number,
-    opts?: { durationMs?: number; assets?: Record<string, AssetFile>; leaders?: PlayerKey[] },
+    opts?: { durationMs?: number; assets?: Record<string, AssetFile>; leaders?: PlayerKey[]; card?: RoundCard | null },
   ): MiniGameHost<S>;
   createView(scene: Phaser.Scene, players: GamePlayer[], selfKey: PlayerKey): MiniGameView<S>;
   /** Snapshot interpolation for clients (default: step to the newer state). */

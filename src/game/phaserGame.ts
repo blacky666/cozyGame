@@ -16,6 +16,9 @@ const SCENE_OF: Record<Exclude<EveningPhase['kind'], 'lobby'>, string> = {
   intro: 'RoundIntroScene',
   playing: 'MinigameScene',
   standings: 'StandingsScene',
+  // Temporary until the card scene exists (Plan 7 Task 3).
+  cards: 'StandingsScene',
+  reveal: 'StandingsScene',
   podium: 'PodiumScene',
   ended: 'EndedScene',
 };

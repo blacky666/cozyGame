@@ -7,7 +7,7 @@ import type { SnapPayload } from './eveningHost';
 import type { KeyboardInput } from './keyboard';
 import type { PointerInput } from './pointer';
 
-export type StageTiming = { ruleMs: number; countdownMs: number; standingsMs: number };
+export type StageTiming = { ruleMs: number; countdownMs: number; standingsMs: number; cardPickMs: number; revealMs: number };
 
 /** Everything a scene may use; scenes only render, the host's EveningHost decides. */
 export interface StageCtx {

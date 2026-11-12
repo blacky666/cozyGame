@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { isCardId, type CardId, type RoundCard } from '../flow/cards';
 import { Evening, type EveningPhase } from '../flow/evening';
 import { neutralInput, type InputState } from '../net/protocol';
 import type { PlayerInfo } from '../net/roster';
@@ -15,7 +16,10 @@ import { playerKey, type BotView, type GamePlayer, type MiniGame, type MiniGameH
  *   through the roster each tick, so a reconnect (new peer id, same slot) needs no special case.
  */
 
-export type EveningTiming = { introMs: number; standingsMs: number; durationScale: number };
+/** cardPickMs: time the chooser has; botPickMs: bots / a disconnected chooser are resolved after this; revealMs: card reveal. */
+export type EveningTiming = {
+  introMs: number; standingsMs: number; durationScale: number; cardPickMs: number; botPickMs: number; revealMs: number;
+};
 /**
  * acks: per player key, the seq of the last input the host processed (for client reconciliation).
  * emotes: the emote bubbles showing right now (game-agnostic, drawn by MinigameScene).
@@ -27,6 +31,9 @@ export const DEFAULT_TIMING: EveningTiming = {
   introMs: CONFIG.intro.ruleMs + CONFIG.intro.countdownMs,
   standingsMs: CONFIG.standings.showMs,
   durationScale: 1,
+  cardPickMs: CONFIG.gemeinheit.pickMs,
+  botPickMs: CONFIG.gemeinheit.botPickMs,
+  revealMs: CONFIG.gemeinheit.revealMs,
 };
 
 export interface EveningHostOptions {
@@ -44,6 +51,8 @@ export interface EveningHostOptions {
   startTicker?: (hz: number, onTick: (dt: number) => void) => () => void;
   /** Local rendering hook (the host renders the same phases it broadcasts). */
   onPhase?: (p: EveningPhase) => void;
+  /** Dev flag `card=<id>`: offered first and picked by bots / on timeouts. */
+  forceCard?: CardId;
 }
 
 const keyOf = (p: PlayerInfo): PlayerKey => playerKey(p.slot);
@@ -75,6 +84,8 @@ export class EveningHost {
   private unsubRoster: (() => void) | null = null;
   /** One per evening: cooldowns and press edges carry over between rounds. */
   private emotes = new EmoteHost();
+  /** The chooser's pick in phase `cards`, applied on the next tick. */
+  private pendingCard: CardId | null = null;
 
   constructor(private readonly o: EveningHostOptions) {
     this.session = o.session;
@@ -91,7 +102,9 @@ export class EveningHost {
     const players = this.session.roster.list().filter((p) => p.connected);
     this.keys = players.map(keyOf);
     this.known = new Set(players.map((p) => p.id));
-    this.evening = new Evening(this.keys, this.o.rounds, this.o.games.map((g) => g.id), this.rand);
+    this.evening = new Evening(this.keys, this.o.rounds, this.o.games.map((g) => g.id), this.rand, undefined, {
+      forceCard: this.o.forceCard,
+    });
     this.emotes = new EmoteHost();
     this.latestEmotes = [];
     this.active = true;
@@ -100,6 +113,18 @@ export class EveningHost {
     this.enter(this.evening.phase);
     const start = this.o.startTicker ?? ((hz, cb) => startHostTicker(hz, cb));
     this.stopTicker = start(CONFIG.net.simHz, (dt) => this.tick(dt));
+  }
+
+  /**
+   * The chooser's card (client message or own click). True when accepted: phase `cards`, the chooser,
+   * an offered card and no pick pending. Applied on the next tick.
+   */
+  pickCard(key: PlayerKey, card: string): boolean {
+    const ph = this.phase;
+    if (!this.active || ph.kind !== 'cards' || key !== ph.chooser || this.pendingCard !== null) return false;
+    if (!isCardId(card) || !ph.offer.includes(card)) return false;
+    this.pendingCard = card;
+    return true;
   }
 
   /** "Nochmal?": stop the evening and return everyone to the lobby (same room). */
@@ -129,7 +154,26 @@ export class EveningHost {
     this.elapsedMs += dt * 1000;
     if (ph.kind === 'intro' && this.elapsedMs >= this.timing.introMs) this.enter(ev.advance({ type: 'introDone' }));
     else if (ph.kind === 'standings' && this.elapsedMs >= this.timing.standingsMs) {
-      this.enter(ev.advance({ type: 'standingsDone' }));
+      const present = this.session.roster.list().filter((p) => p.connected).map(keyOf);
+      this.enter(ev.advance({ type: 'standingsDone', present }));
+    } else if (ph.kind === 'cards') this.tickCards(ph, ev);
+    else if (ph.kind === 'reveal' && this.elapsedMs >= this.timing.revealMs) this.enter(ev.advance({ type: 'revealDone' }));
+  }
+
+  /** Pending pick, else bots and a vanished chooser after botPickMs, else a random card after cardPickMs. */
+  private tickCards(ph: Extract<EveningPhase, { kind: 'cards' }>, ev: Evening): void {
+    if (this.pendingCard !== null) {
+      this.enter(ev.advance({ type: 'cardPicked', card: this.pendingCard, random: false }));
+      return;
+    }
+    const p = this.session.roster.list().find((x) => keyOf(x) === ph.chooser);
+    const bot = !!p && (p.isBot || this.bots.has(p.id));
+    const gone = !p || !p.connected;
+    const late = this.elapsedMs >= this.timing.botPickMs;
+    if ((bot && !gone && late) || (gone && late) || this.elapsedMs >= this.timing.cardPickMs) {
+      const force = this.o.forceCard;
+      const card = force && ph.offer.includes(force) ? force : ph.offer[Math.floor(this.rand() * ph.offer.length)];
+      this.enter(ev.advance({ type: 'cardPicked', card, random: !(bot && !gone) }));
     }
   }
 
@@ -177,13 +221,14 @@ export class EveningHost {
   private enter(p: EveningPhase): void {
     this.phase = p;
     this.elapsedMs = 0;
+    this.pendingCard = null;
     this.snapAcc = 0;
-    if (p.kind === 'playing') this.startGame(p.game);
+    if (p.kind === 'playing') this.startGame(p.game, p.card);
     this.session.setPhase(p.kind, p);
     this.o.onPhase?.(p);
   }
 
-  private startGame(id: string): void {
+  private startGame(id: string, card: RoundCard | null): void {
     const def = this.o.games.find((g) => g.id === id);
     if (!def) throw new Error(`unknown minigame ${id}`);
     const players: GamePlayer[] = this.session.roster
@@ -201,7 +246,7 @@ export class EveningHost {
     const totals = this.evening?.totalsNow() ?? {};
     const top = Math.max(0, ...players.map((p) => totals[p.key] ?? 0));
     const leaders = top > 0 ? players.filter((p) => (totals[p.key] ?? 0) === top).map((p) => p.key) : [];
-    this.game = def.createHost(players, this.rand, { durationMs, assets: this.o.assets, leaders });
+    this.game = def.createHost(players, this.rand, { durationMs, assets: this.o.assets, leaders, card });
     this.emotes.clear();
     this.latestEmotes = [];
     this.latest = this.game.snapshot();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CARD_IDS, type RoundCard } from '../flow/cards';
 import type { EveningPhase } from '../flow/evening';
 import { mulberry32 } from '../flow/rng';
 import { neutralInput, type InputState } from '../net/protocol';
@@ -49,7 +50,7 @@ function setup(games: MiniGame[] = [game as MiniGame]) {
     games,
     rand: mulberry32(1),
     localInput: () => local[0] ?? neutralInput(),
-    timing: { introMs: 1000, standingsMs: 1000, durationScale: 1 },
+    timing: { introMs: 1000, standingsMs: 1000, durationScale: 1, cardPickMs: 2000, botPickMs: 300, revealMs: 500 },
     now: () => clock,
     startTicker: (_hz, cb) => {
       ticker = cb;
@@ -316,9 +317,100 @@ describe('EveningHost', () => {
     await flush();
     s.evening.start();
     s.tick(1.1); // intro -> round 1 playing (result is immediate)
-    s.tick(1.1); // standings -> intro
+    s.tick(1.1); // standings -> cards (p1 last)
+    s.tick(2.1); // no pick: random card -> reveal
+    s.tick(0.6); // reveal -> intro
     s.tick(1.1); // intro -> round 2 playing
     expect(leaders[0]).toEqual([]);
     expect(leaders[1]).toEqual(['p0']);
+  });
+});
+
+describe('EveningHost cards', () => {
+  /** p0 always wins at once, so p1 (or the last slot) is the chooser after round 1. */
+  const cardsSetup = async (opts: { bot?: boolean } = {}) => {
+    const cards: (RoundCard | null | undefined)[] = [];
+    const winP0: MiniGame = {
+      ...(game as MiniGame),
+      createHost: (players, rand, o) => {
+        cards.push(o?.card);
+        const h = createSandboxHost(players, rand, 2000);
+        return { tick: (dt, i) => h.tick(dt, i), snapshot: () => h.snapshot(), result: () => [['p0'], ['p1']] };
+      },
+    };
+    const s = setup([winP0]);
+    let client: ReturnType<typeof createClient> | null = null;
+    let ct: ReturnType<typeof s.hub.join> | null = null;
+    if (opts.bot) {
+      const bot = s.session.addLocalPlayer('Bot Mo', prof('x').look, { isBot: true })!;
+      s.evening.addBot(bot.id, () => neutralInput());
+    } else {
+      ct = s.hub.join();
+      client = createClient(ct, prof('Gast'));
+    }
+    await flush();
+    const sent: Array<[string, unknown]> = [];
+    const orig = s.session.setPhase.bind(s.session);
+    s.session.setPhase = (kind: string, data?: unknown) => {
+      sent.push([kind, data]);
+      orig(kind as never, data as never);
+    };
+    s.evening.start();
+    s.tick(1.1); // intro -> playing round 1 (result at once) -> standings
+    s.tick(1.0); // standings -> cards
+    return { ...s, cards, sent, client, ct };
+  };
+  const phaseOf = (s: { evening: EveningHost }) => s.evening.phase;
+
+  it('the chooser picks a card; wrong picks are refused; the reveal follows on the next tick', async () => {
+    const s = await cardsSetup();
+    const ph = phaseOf(s);
+    if (ph.kind !== 'cards') throw new Error(`expected cards, got ${ph.kind}`);
+    expect(ph).toMatchObject({ chooser: 'p1', victim: 'p0' });
+    expect(s.sent.some(([k]) => k === 'cards')).toBe(true);
+    const notOffered = CARD_IDS.find((id) => !ph.offer.includes(id))!;
+    expect(s.evening.pickCard('p0', ph.offer[0])).toBe(false);
+    expect(s.evening.pickCard('p1', notOffered)).toBe(false);
+    expect(s.evening.pickCard('p1', 'quatsch')).toBe(false);
+    expect(s.evening.pickCard('p1', ph.offer[1])).toBe(true);
+    expect(s.evening.pickCard('p1', ph.offer[0])).toBe(false);
+    expect(phaseOf(s).kind).toBe('cards');
+    s.tick(0.05);
+    expect(phaseOf(s)).toMatchObject({ kind: 'reveal', card: ph.offer[1], random: false, chooser: 'p1', victim: 'p0' });
+    expect(s.evening.pickCard('p1', ph.offer[0])).toBe(false);
+    s.tick(0.3);
+    expect(phaseOf(s).kind).toBe('reveal');
+    s.tick(0.3);
+    const card = { id: ph.offer[1], chooser: 'p1', victim: 'p0' };
+    expect(phaseOf(s)).toMatchObject({ kind: 'intro', round: 2, card });
+    s.tick(1.1);
+    expect(phaseOf(s)).toMatchObject({ kind: 'standings', round: 2 });
+    expect(s.cards).toEqual([null, card]);
+  });
+
+  it('no pick within cardPickMs gives a random card', async () => {
+    const s = await cardsSetup();
+    s.tick(1.9);
+    expect(phaseOf(s).kind).toBe('cards');
+    s.tick(0.15);
+    expect(phaseOf(s)).toMatchObject({ kind: 'reveal', random: true });
+  });
+
+  it('a bot chooser picks after botPickMs', async () => {
+    const s = await cardsSetup({ bot: true });
+    expect(phaseOf(s)).toMatchObject({ kind: 'cards', chooser: 'p1' });
+    s.tick(0.2);
+    expect(phaseOf(s).kind).toBe('cards');
+    s.tick(0.15);
+    expect(phaseOf(s)).toMatchObject({ kind: 'reveal', random: false });
+  });
+
+  it('a disconnected chooser gets a random card after botPickMs', async () => {
+    const s = await cardsSetup();
+    expect(phaseOf(s).kind).toBe('cards');
+    s.ct!.leave();
+    await flush();
+    s.tick(0.35);
+    expect(phaseOf(s)).toMatchObject({ kind: 'reveal', random: true });
   });
 });

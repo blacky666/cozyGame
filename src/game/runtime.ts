@@ -24,11 +24,16 @@ function timings(): { host: EveningTiming; stage: StageTiming } {
     ruleMs: CONFIG.intro.ruleMs * scale,
     countdownMs: CONFIG.intro.countdownMs * scale,
     standingsMs: CONFIG.standings.showMs * scale,
+    cardPickMs: CONFIG.gemeinheit.pickMs * scale,
+    revealMs: CONFIG.gemeinheit.revealMs * scale,
   };
   const host: EveningTiming = {
     introMs: stage.ruleMs + stage.countdownMs,
     standingsMs: stage.standingsMs,
     durationScale: DEFAULT_TIMING.durationScale * scale,
+    cardPickMs: stage.cardPickMs,
+    botPickMs: CONFIG.gemeinheit.botPickMs * scale,
+    revealMs: stage.revealMs,
   };
   return { host, stage };
 }

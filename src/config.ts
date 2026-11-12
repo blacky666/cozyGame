@@ -298,6 +298,21 @@ interface GameConfig {
     /** Surprise box pool (items without a level); order is the pick order base. */
     boxPool: string[];
   };
+  /** Gemeinheit-Karten (spec §6): the overall last place picks a card for the next round. */
+  gemeinheit: {
+    /** Cards offered to the chooser. */
+    offer: number;
+    /** Time the chooser has to pick (ms; scaled by the dev flag `fast`). */
+    pickMs: number;
+    /** Bots pick, and a disconnected chooser falls to a random card, after this (ms). */
+    botPickMs: number;
+    /** Reveal animation shown to everyone (ms). */
+    revealMs: number;
+    /** Falle stellen: the first place starts frozen this long (ms). */
+    falleMs: number;
+    /** Turbo-Start in Heiße Kartoffel: no sprint cooldown during the first turboSprintMs (ms). */
+    turboSprintMs: number;
+  };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -430,6 +445,8 @@ export const CONFIG = deepFreeze<GameConfig>({
       'face.taucherbrille', 'cape.blaetterumhang', 'cape.rucksack', 'outfit.wintermantel',
     ],
   },
+  // Gemeinheit-Karten (ms).
+  gemeinheit: { offer: 3, pickMs: 10000, botPickMs: 1500, revealMs: 4000, falleMs: 3000, turboSprintMs: 15000 },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
 });

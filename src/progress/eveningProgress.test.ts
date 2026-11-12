@@ -66,7 +66,7 @@ describe('eveningProgress', () => {
 
   it('hostLost before any standings saves nothing', () => {
     const s = setup();
-    s.progress.onPhase({ kind: 'intro', round: 1, game: 'g', double: false });
+    s.progress.onPhase({ kind: 'intro', round: 1, game: 'g', double: false, card: null });
     s.progress.hostLost();
     expect(s.saves).toHaveLength(0);
   });
