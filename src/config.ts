@@ -262,6 +262,42 @@ interface GameConfig {
     /** How long fx stay in snapshots. */
     fxKeepMs: number;
   };
+  progress: {
+    /** XP for taking part in an evening (once at least one round finished). */
+    participationXp: number;
+    /** XP per round place, indexed by the start index of the tie group (as roundPoints). */
+    placeXp: number[];
+    /** XP for overall place 1 / 2 at the end of the evening (same tie rule). */
+    finalXp: number[];
+    /** XP for the first evening of the local day (added client-side). */
+    dayBonusXp: number;
+    /** XP from level n to n+1 = levelBase + levelStep * n; no level beyond maxLevel. */
+    levelBase: number;
+    levelStep: number;
+    maxLevel: number;
+    /** After maxLevel: one surprise box (and star) per boxEveryXp. */
+    boxEveryXp: number;
+    /** XP per achievement (feat id -> XP). */
+    featXp: Record<string, number>;
+    /** Achievement thresholds: counts per round, last-second pass window (ms), area fraction, tower blocks. */
+    feats: {
+      serie: number;
+      passes: number;
+      tuencher: number;
+      shoves: number;
+      lastSecondMs: number;
+      areaFrac: number;
+      towerBlocks: number;
+    };
+    /** Emote bubble show time and cooldown (counted from the press), ms. */
+    emote: { showMs: number; cooldownMs: number };
+    /** Podium XP panel timing (ms): start delay, per item row, per level bar segment, per unlock card. */
+    podium: { startMs: number; itemMs: number; barMs: number; unlockMs: number };
+    /** Level reward table: level -> item id ('<category>.<name>'). */
+    rewards: Record<number, string>;
+    /** Surprise box pool (items without a level); order is the pick order base. */
+    boxPool: string[];
+  };
   shove: {
     /** Max distance between two pivots for a shove to land (px). */
     reachPx: number;
@@ -352,6 +388,47 @@ export const CONFIG = deepFreeze<GameConfig>({
     goalPx: 150, goalHoldMs: 400,
     chargeEvery: 3, chargeCap: 2, windMs: 1500, windAccel: 120, windImmuneMs: 8000, aergerLockMs: 5000,
     wobbleSpeed: 0.6, wobbleGapMs: 400, collapseDropPx: 32, collapseWindowMs: 400, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
+  },
+  // Progress: XP, levels, rewards (spec §7.4).
+  progress: {
+    participationXp: 50,
+    placeXp: [25, 15, 10, 5],
+    finalXp: [40, 20],
+    dayBonusXp: 50,
+    levelBase: 80,
+    levelStep: 40,
+    maxLevel: 30,
+    boxEveryXp: 1000,
+    featXp: {
+      schubser: 5,
+      schnee_serie: 10,
+      schnee_erster: 5,
+      schnee_schneemann: 5,
+      kartoffel_knapp: 10,
+      kartoffel_pass: 5,
+      farb_tuencher: 5,
+      farb_flaeche: 10,
+      turm_zehn: 10,
+      turm_aerger: 5,
+      turm_ziel: 10,
+    },
+    feats: { serie: 3, passes: 3, tuencher: 3, shoves: 3, lastSecondMs: 1500, areaFrac: 1 / 3, towerBlocks: 10 },
+    emote: { showMs: 2000, cooldownMs: 3000 },
+    podium: { startMs: 4200, itemMs: 600, barMs: 900, unlockMs: 1600 },
+    rewards: {
+      2: 'emote.zunge', 3: 'hat.zylinder', 4: 'face.rundbrille', 5: 'prank.furzkissen',
+      6: 'emote.tanzen', 7: 'cape.umhang_rot', 8: 'hat.strohhut', 9: 'outfit.streifenpulli',
+      10: 'cape.sternenumhang', 11: 'emote.herz', 12: 'face.sonnenbrille', 13: 'hat.piratenhut',
+      14: 'prank.verkehrte_welt', 15: 'outfit.ruestung', 16: 'emote.weinen', 17: 'cape.heldencape',
+      18: 'hat.propellermuetze', 19: 'face.schnurrbart', 20: 'prank.tintenklecks', 21: 'emote.gg',
+      22: 'outfit.maleroverall', 23: 'hat.wikingerhelm', 24: 'face.clownsnase', 25: 'cape.engelsfluegel',
+      26: 'emote.daumen_runter', 27: 'hat.ritterhelm', 28: 'prank.quietsche_hammer', 29: 'emote.wut',
+      30: 'hat.krone_glitzer',
+    },
+    boxPool: [
+      'emote.schnarchen', 'hat.bauhelm', 'hat.kochmuetze', 'hat.blumenkranz', 'face.augenklappe',
+      'face.taucherbrille', 'cape.blaetterumhang', 'cape.rucksack', 'outfit.wintermantel',
+    ],
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
