@@ -59,3 +59,12 @@ export function introCardLine(card: RoundCard | null, name: NameOf): string | nu
 /** Sound of a card (package karte): Peinlicher Hut and Falle have their own names. */
 export const cardSound = (id: CardId): string =>
   id === 'peinlicher_hut' ? 'karte.gurkenhut' : id === 'falle' ? 'karte.falle_einfrieren' : `karte.${id}`;
+
+const CARD_KEYS: ReadonlyMap<string, number> = new Map([
+  ['Digit1', 0], ['Digit2', 1], ['Digit3', 2], ['Numpad1', 0], ['Numpad2', 1], ['Numpad3', 2],
+]);
+
+/** Card index for a key code (KeyboardEvent.code): 1–3 on the number row or the numpad, else null. */
+export function cardKeyIndex(code: string): number | null {
+  return CARD_KEYS.get(code) ?? null;
+}

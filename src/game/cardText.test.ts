@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { CARD_IDS } from '../flow/cards';
 import type { EveningPhase } from '../flow/evening';
-import { cardSound, cardsHeader, introCardLine, revealLines } from './cardText';
+import { cardKeyIndex, cardSound, cardsHeader, introCardLine, revealLines } from './cardText';
 
 type CardsPhase = Extract<EveningPhase, { kind: 'cards' }>;
 type RevealPhase = Extract<EveningPhase, { kind: 'reveal' }>;
@@ -52,5 +52,15 @@ describe('cardSound', () => {
     expect(existsSync('public/audio/karte/sounds.json')).toBe(true);
     const ids = new Set((JSON.parse(readFileSync('public/audio/karte/sounds.json', 'utf8')) as { toene: { id: string }[] }).toene.map((t) => t.id));
     for (const id of CARD_IDS) expect(ids.has(cardSound(id))).toBe(true);
+  });
+});
+
+describe('cardKeyIndex', () => {
+  it('digit and numpad keys 1–3 pick card 0–2; anything else is null', () => {
+    expect(cardKeyIndex('Digit1')).toBe(0);
+    expect(cardKeyIndex('Digit3')).toBe(2);
+    expect(cardKeyIndex('Numpad2')).toBe(1);
+    expect(cardKeyIndex('Digit4')).toBeNull();
+    expect(cardKeyIndex('KeyF')).toBeNull();
   });
 });

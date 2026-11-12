@@ -4,7 +4,7 @@ import { CONFIG } from '../../config';
 import { cardText, cardTitle, type CardId } from '../../flow/cards';
 import type { EveningPhase } from '../../flow/evening';
 import { findSprite } from '../../gfx/layerPlan';
-import { cardSound, cardsHeader, revealLines } from '../cardText';
+import { cardKeyIndex, cardSound, cardsHeader, revealLines } from '../cardText';
 import type { SceneData, StageCtx } from '../stageCtx';
 import { assetSprite, assetsOf, byKey, INK, txt } from '../ui';
 
@@ -14,10 +14,12 @@ const GAP = 16;
 /** Card centres (y) while choosing and at the reveal. */
 const CARDS_Y = 108;
 const REVEAL_Y = 100;
+/** Bottom border below the card's text field (px) and the line spacing of a wrapped title. */
+const TEXT_FIELD_BOTTOM = 4;
+const TITLE_LINE_SPACING = -4;
 /** Deal animation: per-card delay and flight time (ms). */
 const DEAL_STEP_MS = 120;
 const DEAL_MS = 260;
-const KEYS = ['ONE', 'TWO', 'THREE'] as const;
 
 type CardsPhase = Extract<EveningPhase, { kind: 'cards' }>;
 type RevealPhase = Extract<EveningPhase, { kind: 'reveal' }>;
@@ -53,8 +55,11 @@ export class CardScene extends Phaser.Scene {
     const [tx, ty] = anchors?.text ?? [7, 63];
     const pic = assetSprite(this, `card.bild.${id}`, bx - CARD_W / 2, by - CARD_H / 2);
     if (pic) c.add(pic.setOrigin(0));
-    const title = txt(this, 0, ty - CARD_H / 2, cardTitle(id), 10, INK)
-      .setOrigin(0.5, 0)
+    // Centred in the text field (anchor top to the frame's bottom border); two-line titles packed tighter.
+    const fieldH = CARD_H - ty - TEXT_FIELD_BOTTOM;
+    const title = txt(this, 0, ty + fieldH / 2 - CARD_H / 2, cardTitle(id), 10, INK)
+      .setOrigin(0.5, 0.5)
+      .setLineSpacing(TITLE_LINE_SPACING)
       .setWordWrapWidth(CARD_W - 2 * tx);
     c.add(title);
     return c;
@@ -108,8 +113,15 @@ export class CardScene extends Phaser.Scene {
         zone.on('pointerdown', () => pick(i));
         c.add(zone);
       });
-      KEYS.forEach((k, i) => this.input.keyboard?.on(`keydown-${k}`, () => pick(i)));
-      KEYS.forEach((k, i) => this.input.keyboard?.on(`keydown-NUMPAD_${k}`, () => pick(i)));
+      // A window listener, not Phaser's keyboard: the game keyboard (src/game/keyboard.ts) prevents the
+      // default of the digit keys (emote keys), and Phaser ignores events whose default was prevented.
+      const onKey = (e: KeyboardEvent) => {
+        const i = cardKeyIndex(e.code);
+        if (i !== null && !e.repeat) pick(i);
+      };
+      window.addEventListener('keydown', onKey);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.removeEventListener('keydown', onKey));
+      this.events.once(Phaser.Scenes.Events.DESTROY, () => window.removeEventListener('keydown', onKey));
     }
     // Phases carry no clock: the countdown runs from the scene start.
     const end = this.time.now + ctx.timing.cardPickMs;
