@@ -29,6 +29,9 @@ export type BotView = {
   turn?: 'cw';
 };
 
+/** A player as the prank host sees him in a top-down game (simulation coordinates of the feet). */
+export type PrankBody = { key: PlayerKey; x: number; y: number; affectable: boolean; out: boolean };
+
 export interface MiniGameHost<S> {
   /** dt in seconds. */
   tick(dt: number, inputs: Record<PlayerKey, InputState>): void;
@@ -37,6 +40,17 @@ export interface MiniGameHost<S> {
   result(): PlayerKey[][] | null;
   /** Achievements earned this round; read once when result() is non-null. */
   feats?(): Record<PlayerKey, FeatId[]>;
+  /**
+   * Prank hooks (spec §7.2), all optional. Top-down games: every player's feet; `affectable` = a prank
+   * may hit him now, `out` = he cannot prank (ghost).
+   */
+  prankBodies?(): PrankBody[];
+  /** Top-down: push `to` away from `from` like a landed shove (Quietsche-Hammer). */
+  prankKnock?(from: PlayerKey, to: PlayerKey): void;
+  /** Wackel-Turm: owner of the plot under aimX; null for the own plot or outside every plot. */
+  prankPlot?(from: PlayerKey, aimX: number): PlayerKey | null;
+  /** Wackel-Turm variants of three pranks; false = refused (nothing happened, the prank is not used up). */
+  prankTower?(id: 'bananenschale' | 'furzkissen' | 'quietsche_hammer', from: PlayerKey, to: PlayerKey): boolean;
 }
 
 export interface MiniGameView<S> {

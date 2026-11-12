@@ -11,6 +11,7 @@ export const FEAT_IDS = [
   'turm_zehn',
   'turm_aerger',
   'turm_ziel',
+  'streich_gelandet',
 ] as const;
 
 export type FeatId = (typeof FEAT_IDS)[number];
@@ -27,6 +28,7 @@ const LABELS: Record<FeatId, string> = {
   turm_zehn: 'Turm aus 10 Klötzen',
   turm_aerger: 'Ärger-Aktion gelandet',
   turm_ziel: 'Zielhöhe erreicht',
+  streich_gelandet: 'Streich gelandet',
 };
 
 const KNOWN: ReadonlySet<string> = new Set(FEAT_IDS);

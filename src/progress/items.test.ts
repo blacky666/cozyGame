@@ -94,6 +94,6 @@ describe('feat config', () => {
       expect(CONFIG.progress.featXp[id]).toBeLessThanOrEqual(10);
       expect(featLabel(id).length).toBeGreaterThan(0);
     }
-    expect(FEAT_IDS).toHaveLength(11);
+    expect(FEAT_IDS).toHaveLength(12);
   });
 });

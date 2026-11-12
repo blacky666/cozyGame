@@ -456,6 +456,7 @@ export const CONFIG = deepFreeze<GameConfig>({
       turm_zehn: 10,
       turm_aerger: 5,
       turm_ziel: 10,
+      streich_gelandet: 5,
     },
     feats: { serie: 3, passes: 3, tuencher: 3, shoves: 3, lastSecondMs: 1500, areaFrac: 1 / 3, towerBlocks: 10 },
     emote: { showMs: 2000, cooldownMs: 3000 },
