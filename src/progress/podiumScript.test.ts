@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config';
 import { defaultProfile, type Profile } from '../save/profile';
-import { podiumScript, type PodiumStep } from './podiumScript';
+import { capItems, MAX_ITEM_ROWS, podiumScript, type PodiumStep } from './podiumScript';
 import { settleEvening, type SettleReport } from './settle';
 import type { XpLine } from './xp';
 
@@ -84,5 +84,21 @@ describe('podiumScript', () => {
     const s = podiumScript(r, { tip: false });
     expect(of(s, 'bar')).toMatchObject([{ level: 1, from: 0, to: 120, need: 120 }]);
     expect(of(s, 'levelUp')).toEqual([{ at: expect.any(Number), kind: 'levelUp', level: 2, need: 160 }]);
+  });
+
+  it('keeps every XP line visible: surplus feat rows merge into one summary row, fixed rows stay', () => {
+    const rows = [
+      { label: 'Teilnahme', xp: 50 },
+      { label: 'Rundenplätze', xp: 40 },
+      ...['A', 'B', 'C', 'D', 'E', 'F'].map((l, i) => ({ label: l, xp: i + 1 })),
+      { label: 'Gesamtsieg', xp: 100 },
+      { label: 'Erster Abend heute', xp: 50 },
+    ];
+    const out = capItems(rows);
+    expect(out).toHaveLength(MAX_ITEM_ROWS);
+    expect(out.map((r) => r.label)).toEqual(['Teilnahme', 'Rundenplätze', 'A', 'B', 'C', 'Weitere Erfolge', 'Gesamtsieg', 'Erster Abend heute']);
+    expect(out[5].xp).toBe(4 + 5 + 6);
+    expect(out.reduce((a, r) => a + r.xp, 0)).toBe(rows.reduce((a, r) => a + r.xp, 0));
+    expect(capItems(rows.slice(0, 4))).toEqual(rows.slice(0, 4));
   });
 });

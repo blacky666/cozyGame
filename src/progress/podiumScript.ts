@@ -15,6 +15,29 @@ export type PodiumStep =
   | { at: number; kind: 'box'; item: ItemId | null }
   | { at: number; kind: 'tip' };
 
+/** Rows the XP panel can show. */
+export const MAX_ITEM_ROWS = 8;
+const FIXED_ROWS = new Set(['Teilnahme', 'Rundenplätze', 'Gesamtsieg', 'Platz 2 gesamt', 'Erster Abend heute']);
+
+/** Fit the rows into max: surplus feat rows (anything not fixed) merge into one "Weitere Erfolge" row, summed XP. */
+export function capItems(rows: { label: string; xp: number }[], max = MAX_ITEM_ROWS): { label: string; xp: number }[] {
+  if (rows.length <= max) return rows;
+  const feats = rows.filter((r) => !FIXED_ROWS.has(r.label));
+  const keep = new Set(feats.slice(0, Math.max(0, max - (rows.length - feats.length) - 1)));
+  const rest = feats.filter((r) => !keep.has(r));
+  const out: { label: string; xp: number }[] = [];
+  let merged = false;
+  for (const r of rows) {
+    if (!FIXED_ROWS.has(r.label) && !keep.has(r)) {
+      if (!merged) {
+        out.push({ label: 'Weitere Erfolge', xp: rest.reduce((a, x) => a + x.xp, 0) });
+        merged = true;
+      }
+    } else out.push(r);
+  }
+  return out;
+}
+
 /**
  * The podium's XP settlement as a timeline: the item rows one per itemMs, then the level bar one segment
  * per level (or box step after maxLevel) touched, barMs each. A full segment ends in a levelUp plus that
@@ -23,7 +46,7 @@ export type PodiumStep =
 export function podiumScript(r: SettleReport, o: { tip: boolean }): PodiumStep[] {
   const out: PodiumStep[] = [];
   let t = 0;
-  for (const it of podiumItems(r.lines)) {
+  for (const it of capItems(podiumItems(r.lines))) {
     out.push({ at: t, kind: 'item', label: it.label, xp: it.xp });
     t += P.podium.itemMs;
   }
