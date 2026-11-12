@@ -116,3 +116,46 @@ describe('createKeyboard turns and drops', () => {
     kb.destroy();
   });
 });
+
+describe('emote keys', () => {
+  it('Digit1-4 and Numpad1-4 count fresh presses while counting and remember the slot', () => {
+    const win = new FakeTarget();
+    const kb = createKeyboard({ win, doc: new FakeTarget() });
+    win.dispatchEvent(key('keydown', 'Digit2')); // not counting yet
+    win.dispatchEvent(key('keyup', 'Digit2'));
+    expect(kb.state()).toMatchObject({ emotes: 0, emote: 0 });
+    kb.setCounting(true);
+    win.dispatchEvent(key('keydown', 'Digit2'));
+    expect(kb.state()).toMatchObject({ emotes: 1, emote: 2 });
+    win.dispatchEvent(Object.assign(key('keydown', 'Digit2'), { repeat: true }));
+    expect(kb.state()).toMatchObject({ emotes: 1, emote: 2 });
+    win.dispatchEvent(key('keydown', 'Numpad4'));
+    expect(kb.state()).toMatchObject({ emotes: 2, emote: 4 });
+    win.dispatchEvent(key('keydown', 'Digit5')); // not an emote key
+    expect(kb.state()).toMatchObject({ emotes: 2, emote: 4 });
+    kb.destroy();
+  });
+
+  it('typing into a text field never counts an emote', () => {
+    const g = globalThis as { HTMLElement?: unknown };
+    const had = g.HTMLElement;
+    class FakeEl {
+      tagName = 'INPUT';
+      type = 'text';
+      isContentEditable = false;
+    }
+    g.HTMLElement = FakeEl;
+    try {
+      const win = new FakeTarget();
+      const kb = createKeyboard({ win, doc: new FakeTarget() });
+      kb.setCounting(true);
+      const e = key('keydown', 'Digit1');
+      Object.defineProperty(e, 'target', { value: new FakeEl() });
+      win.dispatchEvent(e);
+      expect(kb.state()).toMatchObject({ emotes: 0, emote: 0 });
+      kb.destroy();
+    } finally {
+      g.HTMLElement = had;
+    }
+  });
+});

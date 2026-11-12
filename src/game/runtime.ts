@@ -73,7 +73,7 @@ export function runHostEvening(
     onPhase: (p) => stage?.setPhase(p),
   });
   for (const p of session.roster.list()) {
-    if (p.isBot) host.addBot(p.id, createBotInputs(1 + p.slot * 7919));
+    if (p.isBot) host.addBot(p.id, createBotInputs(1 + p.slot * 7919, p.look.emotes.flatMap((e, i) => (e ? [i + 1] : []))));
   }
   const selfKey = () => keyFor(session.roster.list(), session.selfId);
   stage = new Stage({
@@ -86,7 +86,7 @@ export function runHostEvening(
     progress: createEveningProgress({ selfKey, load: () => loadProfile(), save: (p) => saveProfile(p) }),
     hostSnapshot: () =>
       host.phase.kind === 'playing'
-        ? { round: host.phase.round, state: host.latest, acks: {}, tick: host.latestTick, at: host.latestAt }
+        ? { round: host.phase.round, state: host.latest, acks: {}, emotes: host.latestEmotes, tick: host.latestTick, at: host.latestAt }
         : null,
     playAgain: () => {
       host.backToLobby();

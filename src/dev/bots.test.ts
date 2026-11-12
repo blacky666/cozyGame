@@ -6,7 +6,8 @@ import { defaultProfile } from '../save/profile';
 import { addDevBots, createBotInputs } from './bots';
 import { mulberry32 } from '../flow/rng';
 import type { AssetFile } from '../gfx/assetTypes';
-import { neutralInput, type InputState } from '../net/protocol';
+import { INPUT_COUNTERS, neutralInput, type InputState } from '../net/protocol';
+import { CONFIG } from '../config';
 import { buildArena } from '../minigames/common/arena';
 import { playerKey, type GamePlayer } from '../minigames/types';
 import { createSnowballHost } from '../minigames/snowball/snowballHost';
@@ -68,6 +69,30 @@ describe('createBotInputs', () => {
     expect(bot(view)).toMatchObject({ turnsCw: 0, turnsCcw: 0, drops: 0 });
     expect(bot({ ...view, turn: 'cw' })).toMatchObject({ turnsCw: 1 });
     for (let i = 0; i < 50; i++) expect(bot(view)).toMatchObject({ turnsCw: 1, turnsCcw: 0, drops: 0 });
+  });
+
+  it('presses a filled emote slot every 9-12 s; counters never drop', () => {
+    const bot = createBotInputs(9, [1, 2]);
+    const view = { self: { x: 100, y: 100 }, targets: [{ x: 160, y: 100 }] };
+    const hz = CONFIG.net.simHz;
+    const presses: number[] = [];
+    let last = bot(view);
+    for (let i = 1; i < 30 * hz; i++) {
+      const s = bot(i % 50 < 10 ? { ...view, idle: true } : view);
+      for (const k of INPUT_COUNTERS) expect(s[k]).toBeGreaterThanOrEqual(last[k]);
+      if (s.emotes > last.emotes) {
+        presses.push(i);
+        expect([1, 2]).toContain(s.emote);
+      }
+      last = s;
+    }
+    expect(presses.length).toBeGreaterThanOrEqual(2);
+    expect(presses.length).toBeLessThanOrEqual(4);
+    for (let i = 1; i < presses.length; i++) {
+      const gapS = (presses[i] - presses[i - 1]) / hz;
+      expect(gapS).toBeGreaterThanOrEqual(9);
+      expect(gapS).toBeLessThanOrEqual(12);
+    }
   });
 
   it('is deterministic per seed and wanders without targets', () => {

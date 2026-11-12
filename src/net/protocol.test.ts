@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INPUT_COUNTERS, keepCounters, MSG_TYPES, neutralInput, parseInputState } from './protocol';
+import { INPUT_COUNTERS, keepCounters, MSG_TYPES, neutralInput, parseInputState, type InputState } from './protocol';
 
 describe('MSG_TYPES', () => {
   it("contains 'profile' and every type name is <= 12 bytes", () => {
@@ -47,11 +47,21 @@ describe('rotation and drop counters', () => {
     }
   });
 
-  it('keepCounters releases buttons and keeps all six counters', () => {
-    const s = { ...neutralInput(), up: true, primary: true, aimX: 5 };
+  it('keepCounters releases buttons and keeps all seven counters (and the emote slot)', () => {
+    const s: InputState = { ...neutralInput(), up: true, primary: true, aimX: 5, emote: 3 };
     INPUT_COUNTERS.forEach((k, i) => (s[k] = i + 1));
     const kept = keepCounters(s);
-    expect(INPUT_COUNTERS).toHaveLength(6);
-    expect(kept).toEqual({ ...neutralInput(), shoves: 1, primaryTaps: 2, secondaryTaps: 3, turnsCw: 4, turnsCcw: 5, drops: 6 });
+    expect(INPUT_COUNTERS).toHaveLength(7);
+    expect(kept).toEqual({
+      ...neutralInput(), shoves: 1, primaryTaps: 2, secondaryTaps: 3, turnsCw: 4, turnsCcw: 5, drops: 6, emotes: 7, emote: 3,
+    });
+  });
+
+  it('parseInputState rejects a missing or negative emotes counter and keeps a valid one', () => {
+    const { emotes: _drop, ...noEmotes } = neutralInput();
+    expect(parseInputState(noEmotes)).toBeNull();
+    expect(parseInputState({ ...neutralInput(), emotes: -1 })).toBeNull();
+    expect(parseInputState({ ...neutralInput(), emotes: 2.5 })).toBeNull();
+    expect(parseInputState({ ...neutralInput(), emotes: 4, emote: 2 })).toMatchObject({ emotes: 4, emote: 2 });
   });
 });

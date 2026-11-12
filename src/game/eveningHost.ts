@@ -4,6 +4,7 @@ import { neutralInput, type InputState } from '../net/protocol';
 import type { PlayerInfo } from '../net/roster';
 import { startHostTicker, type HostSession } from '../net/session';
 import type { AssetFile } from '../gfx/assetTypes';
+import { EmoteHost, type EmoteShow } from '../minigames/common/emotes';
 import { playerKey, type BotView, type GamePlayer, type MiniGame, type MiniGameHost, type PlayerKey } from '../minigames/types';
 
 /*
@@ -15,8 +16,11 @@ import { playerKey, type BotView, type GamePlayer, type MiniGame, type MiniGameH
  */
 
 export type EveningTiming = { introMs: number; standingsMs: number; durationScale: number };
-/** acks: per player key, the seq of the last input the host processed (for client reconciliation). */
-export type SnapPayload = { round: number; state: unknown; acks: Record<PlayerKey, number> };
+/**
+ * acks: per player key, the seq of the last input the host processed (for client reconciliation).
+ * emotes: the emote bubbles showing right now (game-agnostic, drawn by MinigameScene).
+ */
+export type SnapPayload = { round: number; state: unknown; acks: Record<PlayerKey, number>; emotes: EmoteShow[] };
 export type BotBrain = (view: BotView) => InputState;
 
 export const DEFAULT_TIMING: EveningTiming = {
@@ -51,6 +55,8 @@ export class EveningHost {
   latestTick = 0;
   /** Clock time (ms) at which `latest` was produced. */
   latestAt = 0;
+  /** Emote bubbles of the latest tick (the host's own stage draws them). */
+  latestEmotes: EmoteShow[] = [];
 
   private readonly session: HostSession;
   private readonly timing: EveningTiming;
@@ -67,6 +73,8 @@ export class EveningHost {
   private known = new Set<string>();
   private active = false;
   private unsubRoster: (() => void) | null = null;
+  /** One per evening: cooldowns and press edges carry over between rounds. */
+  private emotes = new EmoteHost();
 
   constructor(private readonly o: EveningHostOptions) {
     this.session = o.session;
@@ -84,6 +92,8 @@ export class EveningHost {
     this.keys = players.map(keyOf);
     this.known = new Set(players.map((p) => p.id));
     this.evening = new Evening(this.keys, this.o.rounds, this.o.games.map((g) => g.id), this.rand);
+    this.emotes = new EmoteHost();
+    this.latestEmotes = [];
     this.active = true;
     this.unsubRoster?.();
     this.unsubRoster = this.session.onRoster((list) => this.onRoster(list));
@@ -137,13 +147,17 @@ export class EveningHost {
     }
     const inputs: Record<PlayerKey, InputState> = {};
     const acks: Record<PlayerKey, number> = {};
+    const slots = new Map<PlayerKey, readonly (string | null)[]>();
     for (const p of s.roster.list()) {
       if (!p.connected) continue;
       inputs[keyOf(p)] = s.input(p.id);
       acks[keyOf(p)] = s.lastSeq(p.id);
+      slots.set(keyOf(p), p.look.emotes);
     }
 
     game.tick(dt, inputs);
+    this.emotes.tick(dt * 1000, inputs, (k) => slots.get(k) ?? []);
+    this.latestEmotes = this.emotes.shows();
     this.latest = game.snapshot();
     this.latestTick++;
     this.latestAt = this.now();
@@ -152,7 +166,7 @@ export class EveningHost {
     const period = 1 / CONFIG.net.snapshotHz;
     if (this.snapAcc >= period - 1e-6 || result) {
       this.snapAcc = Math.min(this.snapAcc - period, period);
-      s.broadcast('playing', { round: ph.round, state: this.latest, acks } satisfies SnapPayload);
+      s.broadcast('playing', { round: ph.round, state: this.latest, acks, emotes: this.latestEmotes } satisfies SnapPayload);
     }
     if (result) {
       this.game = null;
@@ -188,6 +202,8 @@ export class EveningHost {
     const top = Math.max(0, ...players.map((p) => totals[p.key] ?? 0));
     const leaders = top > 0 ? players.filter((p) => (totals[p.key] ?? 0) === top).map((p) => p.key) : [];
     this.game = def.createHost(players, this.rand, { durationMs, assets: this.o.assets, leaders });
+    this.emotes.clear();
+    this.latestEmotes = [];
     this.latest = this.game.snapshot();
     this.latestTick = 0;
     this.latestAt = this.now();

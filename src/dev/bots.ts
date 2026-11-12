@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import { mulberry32 } from '../flow/rng';
 import { neutralInput, type InputState } from '../net/protocol';
 import type { BotView } from '../minigames/types';
@@ -39,9 +40,20 @@ const THROW_CHANCE = 1 / 36;
 /** Share of the throws that are strong (right click). */
 const STRONG_CHANCE = 0.25;
 
-/** Bot brain: walks toward the nearest target, with occasional random detours. */
-export function createBotInputs(seed: number): (view: BotView) => InputState {
+/** A bot presses an emote key about every 9–12 s (so browser checks see bubbles). */
+const EMOTE_EVERY_S = [9, 12] as const;
+
+/**
+ * Bot brain: walks toward the nearest target, with occasional random detours. `emoteSlots` are the
+ * filled emote slots (1–4) of its look; one of them is pressed now and then.
+ */
+export function createBotInputs(seed: number, emoteSlots: readonly number[] = [1, 2]): (view: BotView) => InputState {
   const rand = mulberry32(seed);
+  const emoteGap = () =>
+    Math.round((EMOTE_EVERY_S[0] + rand() * (EMOTE_EVERY_S[1] - EMOTE_EVERY_S[0])) * CONFIG.net.simHz);
+  let emotes = 0;
+  let emote: InputState['emote'] = 0;
+  let emoteIn = emoteGap();
   let detour: InputState | null = null;
   let detourLeft = 0;
   // Bots press shove now and then (the host decides whether it lands).
@@ -93,8 +105,13 @@ export function createBotInputs(seed: number): (view: BotView) => InputState {
   };
   return (view) => {
     if (rand() < SHOVE_CHANCE) shoves++;
+    if (--emoteIn <= 0 && emoteSlots.length > 0) {
+      emoteIn = emoteGap();
+      emotes++;
+      emote = emoteSlots[Math.floor(rand() * emoteSlots.length)] as InputState['emote'];
+    }
     // The tap counters are always sent (a drop to 0 would make the host re-base and fire a spurious throw).
-    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, secondaryTaps: strongTaps, turnsCw, turnsCcw: 0, drops: 0 };
+    const out: InputState = { ...brain(view), shoves, primaryTaps: taps, secondaryTaps: strongTaps, turnsCw, turnsCcw: 0, drops: 0, emotes, emote };
     if (view.aim) {
       out.aimX = view.aim.x;
       out.aimY = view.aim.y;

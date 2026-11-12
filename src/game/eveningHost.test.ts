@@ -7,7 +7,7 @@ import { createLocalHub } from '../net/transport';
 import { createSandboxHost, type SandboxState } from '../minigames/sandbox/sandboxHost';
 import type { GamePlayer, MiniGame } from '../minigames/types';
 import { defaultProfile } from '../save/profile';
-import { EveningHost } from './eveningHost';
+import { EveningHost, type SnapPayload } from './eveningHost';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await new Promise<void>((r) => setImmediate(r));
@@ -272,6 +272,33 @@ describe('EveningHost', () => {
     await flush();
     expect(snaps.length).toBeGreaterThan(0);
     expect(snaps.at(-1)?.acks).toEqual({ p0: 0, p1: 2 });
+  });
+
+  it('broadcasts emotes in the snap payload and clears them when the next game starts', async () => {
+    const s = setup();
+    const client = createClient(s.hub.join(), prof('Gast'));
+    const snaps: SnapPayload[] = [];
+    client.onSnapshot((sn) => snaps.push(sn.payload as SnapPayload));
+    await flush();
+    s.evening.start();
+    s.tick(1.1); // intro -> playing
+    expect(s.evening.phase.kind).toBe('playing');
+    s.local[0] = { ...neutralInput(), emotes: 0, emote: 0 };
+    s.tick(1.4); // baseline, most of the round
+    s.local[0] = { ...neutralInput(), emotes: 1, emote: 1 };
+    s.tick(0.1);
+    expect(s.evening.latestEmotes).toMatchObject([{ key: 'p0', id: 'winken', n: 1 }]);
+    await flush();
+    expect(snaps.at(-1)?.emotes).toMatchObject([{ key: 'p0', id: 'winken' }]);
+    for (let i = 0; i < 200 && !(s.evening.phase.kind === 'playing' && s.evening.phase.round === 2); i++) s.tick(0.05);
+    expect(s.evening.phase).toMatchObject({ kind: 'playing', round: 2 });
+    expect(s.evening.latestEmotes).toEqual([]);
+    await flush();
+    snaps.length = 0;
+    s.tick(0.1);
+    await flush();
+    expect(snaps.length).toBeGreaterThan(0);
+    expect(snaps.every((p) => p.round === 2 && p.emotes.length === 0)).toBe(true);
   });
 
   it('passes the evening leader to createHost', async () => {

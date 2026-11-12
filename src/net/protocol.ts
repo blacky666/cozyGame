@@ -9,6 +9,7 @@ export type InputState = {
   primary: boolean;
   secondary: boolean;
   special: boolean;
+  /** Emote slot (1–4) of the latest counted emote press; 0 = never pressed. */
   emote: 0 | 1 | 2 | 3 | 4;
   /** Pointer position in the minigame's simulation coordinates (pointer world position minus the game's aim offset). */
   aimX: number;
@@ -27,6 +28,8 @@ export type InputState = {
   turnsCcw: number;
   /** Drop presses so far (only ever grows). */
   drops: number;
+  /** Emote key (1–4) presses so far (only ever grows); `emote` says which slot the latest one was. */
+  emotes: number;
 };
 
 export function neutralInput(): InputState {
@@ -34,17 +37,19 @@ export function neutralInput(): InputState {
     up: false, down: false, left: false, right: false,
     primary: false, secondary: false, special: false,
     emote: 0, aimX: 0, aimY: 0, primaryTaps: 0, secondaryTaps: 0, shoves: 0,
-    turnsCw: 0, turnsCcw: 0, drops: 0,
+    turnsCw: 0, turnsCcw: 0, drops: 0, emotes: 0,
   };
 }
 
 /** Every growing counter of InputState: validated on the wire, compared, and kept when buttons are released. */
-export const INPUT_COUNTERS = ['shoves', 'primaryTaps', 'secondaryTaps', 'turnsCw', 'turnsCcw', 'drops'] as const;
+export const INPUT_COUNTERS = ['shoves', 'primaryTaps', 'secondaryTaps', 'turnsCw', 'turnsCcw', 'drops', 'emotes'] as const;
 
 /** A neutral input (all buttons released) that carries the counters of `s`, so a host's edges never re-fire. */
 export function keepCounters(s: InputState): InputState {
   const out = neutralInput();
   for (const k of INPUT_COUNTERS) out[k] = s[k];
+  // The slot belongs to the emotes counter: without it a kept press could not be resolved.
+  out.emote = s.emote;
   return out;
 }
 
