@@ -191,6 +191,8 @@ type Slot = {
   wobbleMs: number;
   /** How long a resting placed block has stood at or above goalPx without a break. */
   goalMs: number;
+  /** Heights of the last collapseWindowMs (oldest first): a slow topple adds up to an einsturz. */
+  recent: { atMs: number; h: number }[];
   edges: Edges;
 };
 
@@ -253,7 +255,7 @@ export function createTowerHost(
     });
     slotOf[gp.key] = gp.slot;
     slots[gp.key] = {
-      world, metas: new Map(), hits, seqIndex: 0, fiesQueue: [], rising: false, wobbleMs: 0, goalMs: 0, edges: newEdges(),
+      world, metas: new Map(), hits, seqIndex: 0, fiesQueue: [], rising: false, wobbleMs: 0, goalMs: 0, recent: [], edges: newEdges(),
     };
     players[gp.key] = {
       plot: i, craneX: layout.plots[i].left + layout.hookOffsetX, hangTop: layout.hangTopStart, hang: null, cdMs: 0,
@@ -424,14 +426,25 @@ export function createTowerHost(
     for (const [body, m] of s.metas) {
       if (m.landed) landedTop = Math.min(landedTop, body.bounds.min.y);
       if (!m.placed) continue;
-      restedTop = Math.min(restedTop, Math.max(m.restTop ?? body.bounds.min.y, body.bounds.min.y));
-      if (atRest(body)) goalTop = Math.min(goalTop, body.bounds.min.y);
+      const top = Math.max(m.restTop ?? body.bounds.min.y, body.bounds.min.y);
+      restedTop = Math.min(restedTop, top);
+      // Same per-block top as the height: a block levered above where it rested never reaches the goal
+      // before the height shows it.
+      if (atRest(body)) goalTop = Math.min(goalTop, top);
     }
     s.goalMs = Math.round(layout.surfaceY - goalTop) >= c.goalPx ? s.goalMs + ms : 0;
     const h = Math.max(0, Math.round(layout.surfaceY - restedTop));
     if (h >= p.bestPx + c.hoeheStepPx) addFx('hoehe', k, plot.centre, layout.surfaceY - h);
     p.bestPx = Math.max(p.bestPx, h);
-    if (p.heightPx - h >= c.collapseDropPx) addFx('einsturz', k, plot.centre, layout.surfaceY - p.heightPx);
+    // Einsturz: the height fell collapseDropPx below its peak of the last collapseWindowMs (fast or slow);
+    // the window restarts afterwards, so one collapse sounds once.
+    s.recent = s.recent.filter((r) => elapsedMs - r.atMs <= c.collapseWindowMs);
+    const peak = s.recent.reduce((m, r) => Math.max(m, r.h), p.heightPx);
+    if (peak - h >= c.collapseDropPx) {
+      addFx('einsturz', k, plot.centre, layout.surfaceY - peak);
+      s.recent = [];
+    }
+    s.recent.push({ atMs: elapsedMs, h });
     p.heightPx = h;
     const target = Math.min(layout.hangTopStart, landedTop - c.craneClearPx);
     p.hangTop = moveToward(p.hangTop, target, c.craneRiseSpeed * sec);

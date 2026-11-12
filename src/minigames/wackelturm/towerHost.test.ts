@@ -342,6 +342,25 @@ describe('Wackel-Turm host', () => {
       expect(log.of('einsturz').length).toBeGreaterThan(0);
     });
 
+    it('a slow topple (each tick below collapseDropPx) still fires einsturz once', () => {
+      const d = driver(['p0'], { rand: always('kurz') });
+      const log = fxLog(d);
+      stack(d, 'p0', 0, 'quader', 4, 1);
+      log.tick(ticksFor(C.restHoldMs + 1000));
+      const before = d.snap().players.p0.heightPx;
+      const bodies = d.world('p0').engine.world.bodies.filter((b) => !b.isStatic);
+      const top = bodies.reduce((a, b) => (b.bounds.min.y < a.bounds.min.y ? b : a));
+      // The top block sinks 6 px per tick beside the tower: 48 px within 8 ticks (~270 ms), never 32 at once.
+      Matter.Body.setStatic(top, true);
+      for (let i = 0; i < 8; i++) {
+        Matter.Body.setPosition(top, { x: top.position.x + 40, y: top.position.y + 6 });
+        log.tick();
+      }
+      const after = d.snap().players.p0.heightPx;
+      expect(before - after).toBeGreaterThanOrEqual(C.collapseDropPx);
+      expect(log.of('einsturz')).toHaveLength(1);
+    });
+
     it('timeout ranking uses the rested heights even if a block lands just before the end', () => {
       const d = driver(['p0', 'p1'], { rand: always('quader'), durationMs: 8000 });
       stack(d, 'p0', 0, 'quader', 4);

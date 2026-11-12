@@ -18,6 +18,9 @@ export class PointerInput {
   private wheelCw = 0;
   private wheelCcw = 0;
   private lastWheelAt = -Infinity;
+  /** Wheel delta of the current gesture and whether it already turned. */
+  private wheelAcc = 0;
+  private wheelTurned = false;
   private counting = false;
 
   setCounting(on: boolean): void {
@@ -38,12 +41,23 @@ export class PointerInput {
     }
   }
 
-  /** Mouse wheel: down/forward (deltaY > 0) turns clockwise, up counter-clockwise; at most one turn per wheelGapMs. */
+  /**
+   * Mouse wheel: down/forward (deltaY > 0) turns clockwise, up counter-clockwise. One turn per gesture:
+   * a gesture ends after wheelGapMs without wheel events, so a trackpad swipe with its momentum tail is
+   * one turn, and a gesture turns once its deltas reach wheelStepPx (tiny jitter never turns).
+   */
   wheel(deltaY: number, nowMs: number): void {
     if (!this.counting || deltaY === 0) return;
-    if (nowMs - this.lastWheelAt < CONFIG.input.wheelGapMs) return;
+    if (nowMs - this.lastWheelAt >= CONFIG.input.wheelGapMs) {
+      this.wheelAcc = 0;
+      this.wheelTurned = false;
+    }
     this.lastWheelAt = nowMs;
-    if (deltaY > 0) this.wheelCw++;
+    if (this.wheelTurned) return;
+    this.wheelAcc += deltaY;
+    if (Math.abs(this.wheelAcc) < CONFIG.input.wheelStepPx) return;
+    this.wheelTurned = true;
+    if (this.wheelAcc > 0) this.wheelCw++;
     else this.wheelCcw++;
   }
 

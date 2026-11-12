@@ -175,6 +175,8 @@ export class TowerView implements MiniGameView<TowerState> {
     const w = this.armed ? pointerPixel(this.scene) : null;
     if (w) this.crosshair.setPosition(w.x, w.y).setVisible(true);
     else this.crosshair.setVisible(false);
+    // The system cursor stays visible while nothing is armed (the scene hides it for aimed games).
+    this.scene.input.setDefaultCursor(this.armed ? 'none' : '');
   }
 
   /** Scroll of plot camera i: up with its crane (never below the rest position). */

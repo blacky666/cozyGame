@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONFIG } from '../config';
 import { neutralInput } from '../net/protocol';
 import { PointerInput } from './pointer';
 
@@ -53,16 +54,30 @@ describe('PointerInput', () => {
 });
 
 describe('PointerInput wheel', () => {
-  it('wheel: two events 50 ms apart are one turn, 100 ms apart two; merge adds the keyboard turns', () => {
+  it('wheel: one turn per gesture (a turn needs wheelGapMs of quiet before); merge adds the keyboard turns', () => {
+    const gap = CONFIG.input.wheelGapMs;
     const p = new PointerInput();
     p.wheel(100, 0); // not counting: ignored
     expect(p.merge(neutralInput())).toMatchObject({ turnsCw: 0, turnsCcw: 0 });
     p.setCounting(true);
     p.wheel(100, 1000);
-    p.wheel(100, 1050);
+    p.wheel(100, 1000 + gap - 10); // same gesture
     expect(p.merge(neutralInput())).toMatchObject({ turnsCw: 1, turnsCcw: 0 });
-    p.wheel(100, 1150);
-    p.wheel(-100, 1300);
-    expect(p.merge({ ...neutralInput(), turnsCw: 5, turnsCcw: 2 })).toMatchObject({ turnsCw: 7, turnsCcw: 3 });
+    p.wheel(-100, 1000 + 2 * gap); // quiet long enough: a new turn
+    expect(p.merge({ ...neutralInput(), turnsCw: 5, turnsCcw: 2 })).toMatchObject({ turnsCw: 6, turnsCcw: 3 });
+  });
+
+  it('wheel: a trackpad swipe (many small deltas, then momentum) is a single turn', () => {
+    const p = new PointerInput();
+    p.setCounting(true);
+    for (let i = 0; i < 60; i++) p.wheel(i < 40 ? 4 : 1, 5000 + i * 12);
+    expect(p.merge(neutralInput())).toMatchObject({ turnsCw: 1, turnsCcw: 0 });
+  });
+
+  it('wheel: a tiny jitter below the step does not turn', () => {
+    const p = new PointerInput();
+    p.setCounting(true);
+    p.wheel(1, 0);
+    expect(p.merge(neutralInput())).toMatchObject({ turnsCw: 0, turnsCcw: 0 });
   });
 });

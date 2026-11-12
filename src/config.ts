@@ -34,8 +34,9 @@ interface GameConfig {
     rewindMs: number;
   };
   input: {
-    /** Mouse wheel turns: at most one per this many ms (a notch burst is one turn). */
+    /** Mouse wheel: one turn per gesture; a gesture ends after wheelGapMs without events and turns at wheelStepPx. */
     wheelGapMs: number;
+    wheelStepPx: number;
   };
   view: { width: number; height: number; zoom: number };
   players: { min: number; max: number; maxName: number };
@@ -252,8 +253,9 @@ interface GameConfig {
     /** Wobble sound: a block faster than wobbleSpeed (px/step), at most once per wobbleGapMs. */
     wobbleSpeed: number;
     wobbleGapMs: number;
-    /** A height drop this large in one tick gives fx 'einsturz' (px). */
+    /** A height drop this large within collapseWindowMs gives fx 'einsturz' (px, ms). */
     collapseDropPx: number;
+    collapseWindowMs: number;
     /** Finale music in the last finaleMs or once anyone is within finaleNearPx of the goal. */
     finaleMs: number;
     finaleNearPx: number;
@@ -301,7 +303,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     inputStaleMs: 500,
     rewindMs: 150,
   },
-  input: { wheelGapMs: 80 },
+  input: { wheelGapMs: 120, wheelStepPx: 8 },
   view: { width: 426, height: 240, zoom: 3 },
   players: { min: 2, max: 4, maxName: 16 },
   // Empty until the Metered TURN account exists.
@@ -349,7 +351,7 @@ export const CONFIG = deepFreeze<GameConfig>({
     // Overrides the asset marker (107 px), see the interface comment. Calibrated in the playtest.
     goalPx: 150, goalHoldMs: 400,
     chargeEvery: 3, chargeCap: 2, windMs: 1500, windAccel: 120, windImmuneMs: 8000, aergerLockMs: 5000,
-    wobbleSpeed: 0.6, wobbleGapMs: 400, collapseDropPx: 32, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
+    wobbleSpeed: 0.6, wobbleGapMs: 400, collapseDropPx: 32, collapseWindowMs: 400, finaleMs: 20000, finaleNearPx: 32, fxKeepMs: 500,
   },
   // Shove (Space) in all top-down games.
   shove: { reachPx: 18, pushPx: 28, stunMs: 400, cooldownMs: 4000, immuneMs: 1500, swingMs: 250 },
