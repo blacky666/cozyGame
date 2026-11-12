@@ -9,7 +9,7 @@ import type { GamePlayer, InputState, MiniGameView, PlayerKey } from '../types';
 import {
   columnAt, craneBounds, predictRot, stepCrane, TurnHistory, type ArmedAction, type TowerFx, type TowerPlayer, type TowerState,
 } from './towerHost';
-import { BAND_H, TowerHud } from './towerHud';
+import { BAND_H, HUD_ROWS_BOTTOM, TowerHud } from './towerHud';
 import { readLayout, type Plot, type TowerLayout } from './towerLayout';
 import { KINDS, shapeSize, type Kind, type Rot } from './towerPhysics';
 import { TowerSounds } from './towerSounds';
@@ -18,8 +18,8 @@ import { ARENA_FILE, CraneRig, drawBackdrop, readCrane } from './towerScene';
 export { ARENA_FILE };
 /** Where the 416x208 map sits on screen at rest (columns start at the top band, the ground ends at the bottom). */
 export const ARENA_OFFSET: { readonly x: number; readonly y: number } = { x: 5, y: 32 };
-/** Emote bubble tail tip below the top band (px). */
-const EMOTE_TIP_Y = 18;
+/** Emote bubble tail tip: below the bubble (24 px box + 4 px tail) that sits under the HUD rows (name, height, cards). */
+const EMOTE_TIP_Y = HUD_ROWS_BOTTOM + 28;
 /** The plot cameras: from below the top band to the bottom of the screen. */
 const VIEW_TOP = BAND_H;
 const VIEW_H = CONFIG.view.height - VIEW_TOP;
@@ -412,11 +412,11 @@ export class TowerView implements MiniGameView<TowerState> {
     this.scene.time.delayedCall(ms, () => this.drop(sp));
   }
 
-  /** Wackel-Turm: the column centre just below the top band, so a bubble never covers a plot's tower. */
+  /** Wackel-Turm: the column centre just below the HUD rows, so a bubble never covers the name, height or cards. */
   emoteAnchor(key: PlayerKey): { x: number; y: number } | null {
     const col = this.columns.get(key);
     if (!col) return null;
-    return { x: Math.round(ARENA_OFFSET.x + (col.plot.minX + col.plot.maxX) / 2), y: BAND_H + EMOTE_TIP_Y };
+    return { x: Math.round(ARENA_OFFSET.x + (col.plot.minX + col.plot.maxX) / 2), y: EMOTE_TIP_Y };
   }
 
   destroy(): void {

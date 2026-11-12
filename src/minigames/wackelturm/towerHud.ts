@@ -15,6 +15,8 @@ const HEIGHT_Y = 34;
 const ARMED_Y = 45;
 /** Below the armed card: the Windstoß immunity of a column. */
 const IMMUNE_Y = 56;
+/** Bottom edge of the column HUD rows (the immunity row is the lowest, 10 px text). */
+export const HUD_ROWS_BOTTOM = IMMUNE_Y + 6;
 const IMMUNE_COLOR = '#bfe6ff';
 /** An absent player's column: dimmed rows and a label in the armed row. */
 const AWAY_ALPHA = 0.4;
